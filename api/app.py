@@ -19,6 +19,7 @@ app.config['SECRET_KEY'] = 'ship_game_secret_key'
 players = {}
 islands = {}
 
+
 @socketio.on('player_join')
 def handle_player_join(data):
     player_id = request.sid
