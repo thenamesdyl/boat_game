@@ -1,8 +1,28 @@
 {
+    "name": "boat-game",
+    "version": "1.0.0",
+    "description": "A multiplayer 3D boat game with procedurally generated islands",
+    "main": "index.html",
+    "scripts": {
+        "start": "parcel index.html --open",
+        "build": "parcel build index.html",
+        "dev": "parcel index.html"
+    },
     "dependencies": {
-        "three": "^0.139.2"
+        "three": "^0.152.0",
+        "socket.io-client": "^4.5.4"
     },
     "devDependencies": {
-        "vite": "^6.2.0"
-    }
+        "parcel-bundler": "^1.12.5"
+    },
+    "keywords": [
+        "three.js",
+        "game",
+        "multiplayer",
+        "socket.io",
+        "3d",
+        "boat"
+    ],
+    "author": "",
+    "license": "MIT"
 }

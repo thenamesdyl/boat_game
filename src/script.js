@@ -864,7 +864,7 @@ const boat = new THREE.Group();
 const hullGeometry = new THREE.BoxGeometry(2, 1, 4);
 const hullMaterial = new THREE.MeshPhongMaterial({ color: 0x885533 });
 const hull = new THREE.Mesh(hullGeometry, hullMaterial);
-hull.position.y = 0.5;
+hull.position.y = 0.2;
 boat.add(hull);
 
 const mastGeometry = new THREE.CylinderGeometry(0.1, 0.1, 3);
@@ -942,6 +942,7 @@ function animate() {
     const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(boat.quaternion);
     let newPosition = boat.position.clone().add(direction.multiplyScalar(boatVelocity.z));
 
+
     // Check for island collisions
     let collided = false;
     for (const collider of islandColliders) {
@@ -968,9 +969,13 @@ function animate() {
     const waveZ = boat.position.z;
     const boatHeight = Math.sin(waveX * 0.1 + time * 0.3) * Math.cos(waveZ * 0.1 + time * 0.3) * waveHeight +
         Math.sin(waveX * 0.2 + time * 0.35) * waveHeight * 0.5;
-    boat.position.y = boatHeight + 0.5;
-    boat.rotation.z = Math.sin(time * 0.5 + waveX) * 0.02;
-    boat.rotation.x = Math.cos(time * 0.4 + waveZ) * 0.01;
+
+    // Lower the boat to be partially submerged in the water
+    boat.position.y = boatHeight - 0.3; // Submerge the boat by 0.3 units
+
+    // Increase the boat's rotation response to waves for more natural bobbing
+    boat.rotation.z = Math.sin(time * 0.5 + waveX) * 0.03; // Increased from 0.02
+    boat.rotation.x = Math.cos(time * 0.4 + waveZ) * 0.02; // Increased from 0.01
 
     // Base camera position and orientation
     const cameraOffset = new THREE.Vector3(0, 5, 10).applyQuaternion(boat.quaternion);
