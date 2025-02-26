@@ -43,5 +43,3 @@ logs/
 .env.production.local 
 node_modules/*
 
-package.json
-package-lock.json
