@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 
 // Network configuration
-const SERVER_URL = 'http://boat-game-back.vercel.app';
+const SERVER_URL = 'https://boat-game-back.vercel.app';
 
 // Network state
 let socket;
