@@ -196,4 +196,4 @@ def cleanup_inactive_players():
 
 if __name__ == '__main__':
     # Run the Socket.IO server
-    socketio.run(app, host='0.0.0.0', port=5001, debug=True) 
+    socketio.run(app, host='0.0.0.0', debug=True) 

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 
 // Network configuration
-const SERVER_URL = 'https://boat-game-back.vercel.app';
+const SERVER_URL = 'https://boat-game-python.onrender.com';
 
 // Network state
 let socket;
@@ -46,12 +46,10 @@ export function initializeNetwork(gameScene, gamePlayerState, gameBoat, gameIsla
     // Connect to the server
     try {
         socket = io(SERVER_URL, {
-            transports: ['websocket'],
-            autoConnect: true,
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-            withCredentials: false
+            withCredentials: false,
+            extraHeaders: {
+                "Access-Control-Allow-Origin": "*"
+            }
         });
 
         // Set up event handlers
