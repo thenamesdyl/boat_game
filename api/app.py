@@ -14,6 +14,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'ship_game_secret_key'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+
 # Store player data
 players = {}
 islands = {}
