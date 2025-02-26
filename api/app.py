@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app and Socket.IO
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 app.config['SECRET_KEY'] = 'ship_game_secret_key'
-socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Store player data
 players = {}
@@ -195,4 +196,4 @@ def cleanup_inactive_players():
 
 if __name__ == '__main__':
     # Run the Socket.IO server
-    socketio.run(app, host='0.0.0.0', debug=True) 
+    socketio.run(app, host='0.0.0.0', port=5001, debug=True) 
