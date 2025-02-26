@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 
 // Network configuration
-const SERVER_URL = 'http://localhost:5001';
+const SERVER_URL = 'http://boat-game-back.vercel.app';
 
 // Network state
 let socket;
