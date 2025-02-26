@@ -45,7 +45,12 @@ export function initializeNetwork(gameScene, gamePlayerState, gameBoat, gameIsla
 
     // Connect to the server
     try {
-        socket = io(SERVER_URL);
+        socket = io(SERVER_URL, {
+            withCredentials: false,
+            extraHeaders: {
+                "Access-Control-Allow-Origin": "*"
+            }
+        });
 
         // Set up event handlers
         setupSocketEvents();
