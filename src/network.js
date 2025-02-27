@@ -266,6 +266,30 @@ function addOtherPlayerToScene(playerData) {
     nameSprite.scale.set(5, 1.25, 1);
     playerMesh.add(nameSprite);
 
+    // Add a vertical, thin, bright yellow light that follows the player
+    const lightHeight = 10000; // Adjust the height of the light
+    const lightGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, lightHeight, 0)
+    ]);
+
+    const lightColor = playerData.color ?
+        new THREE.Color(playerData.color.r, playerData.color.g, playerData.color.b) :
+        new THREE.Color(0xffff00); // Default to bright yellow if no color is provided
+    const lightMaterial = new THREE.LineBasicMaterial({
+        color: lightColor, // Bright yellow
+        linewidth: 1 // Adjust the width of the line
+    });
+    const lightLine = new THREE.Line(lightGeometry, lightMaterial);
+    lightLine.position.y = playerData.mode === 'boat' ? 1 : 1; // Adjust height based on player mode
+    playerMesh.add(lightLine);
+
+
+    // Add a point light for additional visibility
+    const pointLight = new THREE.PointLight(0xffffff, 0.5, 10); // Adjust intensity and distance as needed
+    pointLight.position.y = playerData.mode === 'boat' ? 1 : 1; // Adjust height based on player mode
+    playerMesh.add(pointLight);
+
     // Position the player
     playerMesh.position.set(
         playerData.position.x,

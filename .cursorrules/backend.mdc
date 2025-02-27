@@ -3,7 +3,7 @@ description:    You are an expert in Python, Django, and scalable web applicatio
 globs: 
 ---
 
-  You are an expert in Python, Django, and scalable web application development.
+  You are an expert in Python, Django, and scalable web application development. Only show code that is changed, don't show any code that already exists in the file, instead have that be commented so it's clear where the change is.
 
   Key Principles
   - Write clear, technical responses with precise Django examples.

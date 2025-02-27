@@ -1,5 +1,23 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectionShader.js';
 import * as Network from './network.js';
+import { gameUI } from './ui.js';
+
+
+// Add these variables to your global scope
+let skyMaterial;
+let skyMesh;
+let lastTimeOfDay = "";
+let skyboxTransitionProgress = 0;
+let skyboxTransitionDuration = 20; // Seconds for transition
+let lastTime = null;
+let sunMesh;
+const sunSize = 100; // Increased from 10 to make the sun larger
+const skyRadius = 20001; // Larger sky radius
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -19,12 +37,34 @@ let playerState = {
     characterHeight: 2
 };
 
+const composer = new EffectComposer(renderer);
+
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+// Add a color correction pass for lighter colors
+const colorCorrectionPass = new ShaderPass(ColorCorrectionShader);
+colorCorrectionPass.uniforms['powRGB'].value.set(1.1, 1.1, 1.1); // Slightly increase brightness
+colorCorrectionPass.uniforms['mulRGB'].value.set(1.1, 1.1, 1.1); // Slightly increase saturation
+composer.addPass(colorCorrectionPass);
+
+// Add a bloom pass for subtle glows
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.4, 0.85);
+bloomPass.threshold = 0.5;
+bloomPass.strength = 0.5;
+bloomPass.radius = 0.5;
+composer.addPass(bloomPass);
+
 // Stormy Lighting
-const ambientLight = new THREE.AmbientLight(0x333344, 0.5);
+const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
 scene.add(ambientLight);
-const directionalLight = new THREE.DirectionalLight(0x666688, 0.8);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
 directionalLight.position.set(5, 10, 5);
 scene.add(directionalLight);
+
+// Add sky setup here
+setupSky();
 
 // Expanded Water with Slower Shader
 const waterGeometry = new THREE.PlaneGeometry(1000, 1000, 256, 256);
@@ -35,27 +75,15 @@ const waterShader = {
         waveSpeed: { value: 0.09 }, // Slowed down wave speed (was 1.5)
     },
     vertexShader: `
-    uniform float time;
-    uniform float waveHeight;
-    uniform float waveSpeed;
-    varying vec2 vUv;
-    varying float vHeight;
+        varying vec2 vUv;
+        varying float vHeight;
 
-    void main() {
-      vUv = uv;
-      vec3 pos = position;
-
-      // Slower, gentler layered waves
-      float wave1 = sin(pos.x * 0.1 + time * waveSpeed) * cos(pos.y * 0.1 + time * waveSpeed) * waveHeight;
-      float wave2 = sin(pos.x * 0.2 + time * waveSpeed * 1.2) * cos(pos.y * 0.15 + time * waveSpeed) * waveHeight * 0.5;
-      float wave3 = sin(pos.x * 0.05 + time * waveSpeed * 0.8) * waveHeight * 0.3;
-
-      pos.z += wave1 + wave2 + wave3;
-      vHeight = pos.z;
-
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-    }
-  `,
+        void main() {
+        vUv = uv;
+        vHeight = position.z; // Use the CPU-updated Z (height)
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
     fragmentShader: `
     uniform float time;
     varying vec2 vUv;
@@ -64,12 +92,17 @@ const waterShader = {
     void main() {
       vec3 deepColor = vec3(0.1, 0.15, 0.3);
       vec3 crestColor = vec3(0.4, 0.5, 0.7);
-      float heightFactor = clamp(vHeight * 0.5, 0.0, 1.0);
+      float heightFactor = clamp(vHeight * 0.5, 0.0, 1.0); // Scale height for color
       vec3 waterColor = mix(deepColor, crestColor, heightFactor);
+
+      // Foam effect
       float foam = smoothstep(0.7, 1.0, heightFactor + sin(vUv.x * 20.0 + time) * 0.1);
       waterColor = mix(waterColor, vec3(0.9, 0.95, 1.0), foam);
+
+      // Glow effect
       float glow = sin(vUv.x * 10.0 + time) * cos(vUv.y * 10.0 + time) * 0.2 + 0.8;
       waterColor += vec3(0.05, 0.1, 0.15) * glow;
+
       gl_FragColor = vec4(waterColor, 1.0);
     }
   `,
@@ -841,24 +874,6 @@ function updateVisibleChunks() {
     console.log(`Current position: ${Math.floor(boat.position.x)}, ${Math.floor(boat.position.z)}, Current chunk: ${currentChunk.x}, ${currentChunk.z}`);
 }
 
-const skyboxGeometry = new THREE.BoxGeometry(10000, 10000, 10000); // Large cube to encompass the scene
-
-// Load an equirectangular panorama image (replace with your Unsplash image URL or local path)
-const textureLoader = new THREE.TextureLoader();
-textureLoader.load('https://miro.medium.com/v2/resize:fit:4800/format:webp/1*WI5Zw1eKEKNmRX3zreeUHw.png', (texture) => {
-    texture.mapping = THREE.EquirectangularReflectionMapping; // Use equirectangular mapping for panorama
-    const skyboxMaterial = new THREE.MeshBasicMaterial({
-        map: texture,
-        side: THREE.BackSide,
-        transparent: true, // Enable transparency
-        opacity: 0.1 // Set opacity (0.0 is fully transparent, 1.0 is fully opaque)
-    });
-    const skybox = new THREE.Mesh(skyboxGeometry, skyboxMaterial);
-    scene.add(skybox);
-}, undefined, (error) => {
-    console.error('Error loading skybox texture:', error);
-});
-
 // Boat
 const boat = new THREE.Group();
 const hullGeometry = new THREE.BoxGeometry(2, 1, 4);
@@ -923,13 +938,287 @@ let time = 0;
 let lastChunkUpdatePosition = new THREE.Vector3();
 const chunkUpdateThreshold = 50; // Reduced from 100 to update chunks more frequently
 
+
+// Add this function to set up the sky
+function setupSky() {
+    // Create a sphere for the sky
+    const skyGeometry = new THREE.SphereGeometry(skyRadius, 32, 32);
+    // Inside faces
+    skyGeometry.scale(-1, 1, 1);
+
+    // Create a basic material first, then set properties
+    skyMaterial = new THREE.MeshBasicMaterial();
+
+    // Set properties after creation
+    skyMaterial.color = new THREE.Color(0x0a1a2a); // Dark blue for night
+    skyMaterial.side = THREE.BackSide;
+    skyMaterial.fog = false;
+    skyMaterial.depthWrite = false; // Prevent sky from writing to depth buffer
+
+    // Create the sky mesh
+    skyMesh = new THREE.Mesh(skyGeometry, skyMaterial);
+    skyMesh.renderOrder = -1; // Ensure it renders first
+    scene.add(skyMesh);
+
+    // Create a sun/moon mesh with larger size
+    const sunGeometry = new THREE.SphereGeometry(sunSize, 32, 32);
+    const sunMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffaa,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false, // Prevent sun from writing to depth buffer
+        depthTest: false   // Disable depth testing for the sun
+    });
+
+    // Add a glow effect to the sun
+    const sunGlowGeometry = new THREE.SphereGeometry(sunSize * 1.2, 32, 32);
+    const sunGlowMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffdd,
+        transparent: true,
+        opacity: 0.4,
+        side: THREE.BackSide,
+        depthWrite: false, // Prevent glow from writing to depth buffer
+        depthTest: false   // Disable depth testing for the glow
+    });
+
+    const sunGlow = new THREE.Mesh(sunGlowGeometry, sunGlowMaterial);
+
+    sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
+    sunMesh.add(sunGlow); // Add glow as a child of the sun
+    sunMesh.renderOrder = 1000; // Ensure sun renders after everything else
+
+    // Position it at the same position as the directional light
+    // but scaled to be at the edge of the skybox
+    const lightDirection = new THREE.Vector3()
+        .copy(directionalLight.position)
+        .normalize();
+    sunMesh.position.copy(lightDirection.multiplyScalar(skyRadius * 0.95));
+
+    scene.add(sunMesh);
+}
+
+// Add this function to update the sun sprite position
+function updateSunSprite() {
+    if (sunMesh && sunMesh.isSprite) {
+        // Get the current directional light direction
+        const lightDirection = new THREE.Vector3()
+            .copy(directionalLight.position)
+            .normalize();
+
+        // Calculate position at the edge of the skybox
+        const sunPosition = lightDirection.multiplyScalar(skyRadius * 0.95);
+
+        // Check if the sun would be visible from the camera's perspective
+        // by projecting the sun position onto the camera's view plane
+        const sunToCamera = new THREE.Vector3().subVectors(camera.position, sunPosition);
+        const dot = sunToCamera.dot(camera.getWorldDirection(new THREE.Vector3()));
+
+        // If the sun is in front of the camera (dot product is negative)
+        if (dot < 0) {
+            // Position the sprite at the calculated position
+            sunMesh.position.copy(sunPosition);
+
+            // Update sun color based on time of day
+            const timeOfDay = getTimeOfDay();
+            if (timeOfDay === 'Night') {
+                sunMesh.material.color.set(0xaaaaff); // Bluish for moon
+                sunMesh.scale.set(sunSize * 0.7, sunSize * 0.7, 1); // Smaller moon
+            } else if (timeOfDay === 'Dawn' || timeOfDay === 'Dusk') {
+                sunMesh.material.color.set(0xff7700); // Orange for sunrise/sunset
+                sunMesh.scale.set(sunSize * 1.2, sunSize * 1.2, 1); // Slightly larger sun at dawn/dusk
+            } else {
+                sunMesh.material.color.set(0xffffaa); // Yellow for day
+                sunMesh.scale.set(sunSize, sunSize, 1); // Normal size for day
+            }
+
+            // Make the sun visible
+            sunMesh.visible = true;
+        } else {
+            // Sun is behind the camera, hide it
+            sunMesh.visible = false;
+        }
+    }
+}
+
+// Add this function to get sky color based on time of day
+function getSkyColor(timeOfDay) {
+    switch (timeOfDay) {
+        case 'Dawn':
+            return new THREE.Color(0xff6347); // Tomato red for dawn
+        case 'Day':
+            return new THREE.Color(0x87ceeb); // Sky blue
+        case 'Afternoon':
+            return new THREE.Color(0x4682b4); // Steel blue for afternoon
+        case 'Dusk':
+            return new THREE.Color(0xffa500); // Orange for dusk
+        case 'Night':
+            return new THREE.Color(0x0a1a2a); // Dark blue
+        default:
+            return new THREE.Color(0x87ceeb); // Default sky blue
+    }
+}
+
+// Add this function to get ambient light color and intensity
+function getAmbientLight(timeOfDay) {
+    switch (timeOfDay) {
+        case 'Dawn':
+            return { color: new THREE.Color(0xffd4a3), intensity: 0.6 };
+        case 'Day':
+            return { color: new THREE.Color(0xffffff), intensity: 0.8 };
+        case 'Afternoon':
+            return { color: new THREE.Color(0xfffaf0), intensity: 0.7 };
+        case 'Dusk':
+            return { color: new THREE.Color(0xffa07a), intensity: 0.5 };
+        case 'Night':
+            return { color: new THREE.Color(0x333344), intensity: 0.3 };
+        default:
+            return { color: new THREE.Color(0x333344), intensity: 0.5 };
+    }
+}
+
+// Add this function to get directional light color and intensity
+function getDirectionalLight(timeOfDay) {
+    switch (timeOfDay) {
+        case 'Dawn':
+            return {
+                color: new THREE.Color(0xffd4a3),
+                intensity: 0.9,
+                position: new THREE.Vector3(-1500, 300, 0) // Far to the east, just rising
+            };
+        case 'Day':
+            return {
+                color: new THREE.Color(0xffffff),
+                intensity: 1.0,
+                position: new THREE.Vector3(0, 1800, 0) // High in the sky
+            };
+        case 'Afternoon':
+            return {
+                color: new THREE.Color(0xfffaf0),
+                intensity: 0.9,
+                position: new THREE.Vector3(1000, 1000, 0) // Moving west, still high
+            };
+        case 'Dusk':
+            return {
+                color: new THREE.Color(0xff7f50),
+                intensity: 0.7,
+                position: new THREE.Vector3(1500, 300, 0) // Far to the west, setting
+            };
+        case 'Night':
+            return {
+                color: new THREE.Color(0x666688),
+                intensity: 0.4,
+                position: new THREE.Vector3(0, -1000, 1000) // Below horizon, moon visible
+            };
+        default:
+            return {
+                color: new THREE.Color(0x666688),
+                intensity: 0.8,
+                position: new THREE.Vector3(0, 1800, 0)
+            };
+    }
+}
+
+// Add this function to update time of day
+function updateTimeOfDay(deltaTime) {
+    const timeOfDay = getTimeOfDay();
+
+    // If time of day has changed, start transition
+    if (timeOfDay !== lastTimeOfDay) {
+        console.log(`Time of day changed to: ${timeOfDay}`); // Debug log
+        lastTimeOfDay = timeOfDay;
+        skyboxTransitionProgress = 0;
+    }
+
+    // Update transition progress
+    if (skyboxTransitionProgress < 1) {
+        skyboxTransitionProgress += deltaTime / skyboxTransitionDuration;
+        skyboxTransitionProgress = Math.min(skyboxTransitionProgress, 1);
+
+        // Get target colors and settings
+        const targetSkyColor = getSkyColor(timeOfDay);
+        const targetAmbientLight = getAmbientLight(timeOfDay);
+        const targetDirectionalLight = getDirectionalLight(timeOfDay);
+
+        // Make color transition more dramatic (0.05 instead of 0.01)
+        skyMaterial.color.lerp(targetSkyColor, 0.05);
+
+        // Update ambient light with faster transition
+        ambientLight.color.lerp(targetAmbientLight.color, 0.05);
+        ambientLight.intensity += (targetAmbientLight.intensity - ambientLight.intensity) * 0.05;
+
+        // Update directional light with faster transition
+        directionalLight.color.lerp(targetDirectionalLight.color, 0.05);
+        directionalLight.intensity += (targetDirectionalLight.intensity - directionalLight.intensity) * 0.05;
+
+        // Update directional light position with faster transition
+        directionalLight.position.x += (targetDirectionalLight.position.x - directionalLight.position.x) * 0.05;
+        directionalLight.position.y += (targetDirectionalLight.position.y - directionalLight.position.y) * 0.05;
+        directionalLight.position.z += (targetDirectionalLight.position.z - directionalLight.position.z) * 0.05;
+
+        // Update sun position to match directional light but ensure it stays within skybox
+        if (sunMesh) {
+            // Calculate direction from origin to light
+            const lightDirection = new THREE.Vector3()
+                .copy(directionalLight.position)
+                .normalize();
+
+            // Position sun at the edge of the skybox in the light direction
+            sunMesh.position.copy(lightDirection.multiplyScalar(skyRadius * 0.95));
+
+            // Always face the sun toward the camera
+            sunMesh.lookAt(camera.position);
+
+            // Update sun color and size based on time of day
+            if (timeOfDay === 'Night') {
+                sunMesh.material.color.set(0xaaaaff); // Bluish for moon
+                sunMesh.scale.set(0.7, 0.7, 0.7); // Smaller moon
+            } else if (timeOfDay === 'Dawn' || timeOfDay === 'Dusk') {
+                sunMesh.material.color.set(0xff7700); // Orange for sunrise/sunset
+                sunMesh.scale.set(1.2, 1.2, 1.2); // Slightly larger sun at dawn/dusk
+            } else {
+                sunMesh.material.color.set(0xffffaa); // Yellow for day
+                sunMesh.scale.set(1.0, 1.0, 1.0); // Normal size for day
+            }
+        }
+    }
+}
+
 // Update boat movement in the animate function to check collisions
 function animate() {
+    const now = performance.now();
+    const deltaTime = (now - (lastTime || now)) / 1000; // Convert to seconds
+    lastTime = now;
+
     requestAnimationFrame(animate);
     time += 0.09;
 
+    // Update time of day
+    updateTimeOfDay(deltaTime);
+
     // Update water shader time uniform
     waterShader.uniforms.time.value = time;
+
+    // Get wave speed and height from the shader uniforms
+    const waveSpeed = waterShader.uniforms.waveSpeed.value;
+    const waveHeight = waterShader.uniforms.waveHeight.value;
+
+    const positions = water.geometry.attributes.position.array;
+    const vertex = new THREE.Vector3();
+    for (let i = 0; i < positions.length; i += 3) {
+        vertex.x = positions[i];
+        vertex.y = positions[i + 1]; // Local Y before rotation (world Z)
+        vertex.z = 0; // Reset Z
+
+        // Wave equation matching your original
+        const wave1 = Math.sin(vertex.x * 0.1 + time * waveSpeed) * Math.cos(vertex.y * 0.1 + time * waveSpeed) * waveHeight;
+        const wave2 = Math.sin(vertex.x * 0.2 + time * waveSpeed * 1.2) * Math.cos(vertex.y * 0.15 + time * waveSpeed) * waveHeight * 0.5;
+        const wave3 = Math.sin(vertex.x * 0.05 + time * waveSpeed * 0.8) * waveHeight * 0.3;
+        vertex.z = wave1 + wave2 + wave3;
+
+        positions[i + 2] = vertex.z; // Update height
+    }
+    water.geometry.attributes.position.needsUpdate = true;
+    //water.geometry.computeVertexNormals(); // For lighting in shader
 
     // Boat movement
     if (keys.forward) boatVelocity.z -= boatSpeed;
@@ -941,7 +1230,6 @@ function animate() {
     boatVelocity.multiplyScalar(0.5);
     const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(boat.quaternion);
     let newPosition = boat.position.clone().add(direction.multiplyScalar(boatVelocity.z));
-
 
     // Check for island collisions
     let collided = false;
@@ -956,84 +1244,146 @@ function animate() {
     if (!collided) {
         boat.position.copy(newPosition);
 
-        // Only update chunks when we've moved a significant distance
         if (boat.position.distanceTo(lastChunkUpdatePosition) > chunkUpdateThreshold) {
             lastChunkUpdatePosition.copy(boat.position);
             updateVisibleChunks();
         }
     }
 
-    // Wave influence
-    const waveHeight = waterShader.uniforms.waveHeight.value;
-    const waveX = boat.position.x;
-    const waveZ = boat.position.z;
-    const boatHeight = Math.sin(waveX * 0.1 + time * 0.3) * Math.cos(waveZ * 0.1 + time * 0.3) * waveHeight +
-        Math.sin(waveX * 0.2 + time * 0.35) * waveHeight * 0.5;
+    // Sample water height under the boat
+    const boatX = boat.position.x;
+    const boatZ = boat.position.z;
 
-    // Lower the boat to be partially submerged in the water
-    boat.position.y = boatHeight - 0.3; // Submerge the boat by 0.3 units
+    // Convert to grid indices (1000x1000 plane, 32x32 segments)
+    const gridSize = 32;
+    const waterSize = 1000;
+    const xIndex = Math.floor((boatX + waterSize / 2) / waterSize * gridSize);
+    const zIndex = Math.floor((boatZ + waterSize / 2) / waterSize * gridSize);
 
-    // Increase the boat's rotation response to waves for more natural bobbing
-    boat.rotation.z = Math.sin(time * 0.5 + waveX) * 0.03; // Increased from 0.02
-    boat.rotation.x = Math.cos(time * 0.4 + waveZ) * 0.02; // Increased from 0.01
+    const clampedX = Math.max(0, Math.min(gridSize, xIndex));
+    const clampedZ = Math.max(0, Math.min(gridSize, zIndex));
 
-    // Base camera position and orientation
+    // Bilinear interpolation for smooth height
+    const xFraction = (boatX + waterSize / 2) / waterSize * gridSize - clampedX;
+    const zFraction = (boatZ + waterSize / 2) / waterSize * gridSize - clampedZ;
+    const x1 = Math.min(gridSize, clampedX + 1);
+    const z1 = Math.min(gridSize, clampedZ + 1);
+
+    const h00 = positions[(clampedZ * (gridSize + 1) + clampedX) * 3 + 2];
+    const h10 = positions[(clampedZ * (gridSize + 1) + x1) * 3 + 2];
+    const h01 = positions[(z1 * (gridSize + 1) + clampedX) * 3 + 2];
+    const h11 = positions[(z1 * (gridSize + 1) + x1) * 3 + 2];
+
+    const interpolatedHeight = h00 * (1 - xFraction) * (1 - zFraction) +
+        h10 * xFraction * (1 - zFraction) +
+        h01 * (1 - xFraction) * zFraction +
+        h11 * xFraction * zFraction;
+
+    const floatOffset = 0.5;
+    boat.position.y = interpolatedHeight + floatOffset;
+
+    // Debugging
+    console.log(`Boat: x=${boatX.toFixed(2)}, z=${boatZ.toFixed(2)}, y=${boat.position.y.toFixed(2)}, Water Height=${interpolatedHeight.toFixed(2)}`);
+
+    // Camera positioning
     const cameraOffset = new THREE.Vector3(0, 5, 10).applyQuaternion(boat.quaternion);
     camera.position.copy(boat.position).add(cameraOffset);
 
-    // Apply mouse-based camera adjustment if enabled
     if (mouseControl.isEnabled) {
-        // Calculate rotation angles based on mouse position, limited by maxAngle
         const horizontalAngle = Math.max(Math.min(mouseControl.mouseX * mouseControl.sensitivity, mouseControl.maxAngle), -mouseControl.maxAngle);
         const verticalAngle = Math.max(Math.min(-mouseControl.mouseY * mouseControl.sensitivity, mouseControl.maxAngle), -mouseControl.maxAngle);
 
-        // Create a temporary vector for the look target
         const lookTarget = boat.position.clone();
-
-        // Adjust the look target based on mouse position
-        // For horizontal movement (left/right)
         const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(boat.quaternion);
         lookTarget.add(rightVector.multiplyScalar(horizontalAngle * 50));
-
-        // For vertical movement (up/down)
         lookTarget.y += verticalAngle * 50;
-
-        // Look at the adjusted target
         camera.lookAt(lookTarget);
     } else {
-        // Default camera behavior when mouse control is disabled
         camera.lookAt(boat.position);
     }
 
-
-    // Send position updates to the server
+    // Network and UI updates
     Network.updatePlayerPosition();
+    updateGameUI();
 
-    // Update UI elements
-    updateUI();
+    // Update sun position relative to camera
+    updateSunPosition();
 
-    renderer.render(scene, camera);
+    composer.render();
 }
 
-// Update UI elements
-function updateUI() {
-    // Update player count
-    const playerCountElement = document.getElementById('player-count');
-    if (playerCountElement) {
-        playerCountElement.textContent = `Players: ${Network.getConnectedPlayersCount()}`;
-    }
+// Calculate boat speed based on velocity
+function calculateBoatSpeed() {
+    // Convert internal velocity to knots (arbitrary scale for game purposes)
+    return Math.abs(boatVelocity.z) * 20;
+}
 
-    // Update connection status
-    const connectionStatusElement = document.getElementById('connection-status');
-    if (connectionStatusElement) {
-        if (Network.isNetworkConnected()) {
-            connectionStatusElement.textContent = 'Connected';
-            connectionStatusElement.classList.add('connected');
-        } else {
-            connectionStatusElement.textContent = 'Disconnected';
-            connectionStatusElement.classList.remove('connected');
+// Get wind direction and speed (you can make this dynamic later)
+function getWindData() {
+    // For now, return static data or calculate based on time
+    return {
+        direction: (Math.sin(time * 0.01) * Math.PI) + Math.PI, // Slowly changing direction
+        speed: 5 + Math.sin(time * 0.05) * 3 // Wind speed between 2-8 knots
+    };
+}
+
+// Get time of day based on game time
+function getTimeOfDay() {
+    // Cycle through different times of day
+    const dayPhase = (time * 0.005) % 1; // 0 to 1 representing full day cycle
+
+    if (dayPhase < 0.2) return "Dawn";
+    if (dayPhase < 0.4) return "Day";
+    if (dayPhase < 0.6) return "Afternoon";
+    if (dayPhase < 0.8) return "Dusk";
+    return "Night";
+}
+
+// Find nearest island
+function findNearestIsland() {
+    let nearest = { distance: Infinity, name: "None" };
+
+    activeIslands.forEach((island, id) => {
+        const distance = boat.position.distanceTo(island.collider.center);
+        if (distance < nearest.distance) {
+            nearest = {
+                distance: distance,
+                name: `Island ${id.substring(0, 4)}` // Use part of the ID as a name
+            };
         }
-    }
+    });
+
+    return nearest;
+}
+
+// Update the UI in your animate function
+function updateGameUI() {
+    // Import at the top of your file: import { gameUI } from './ui.js';
+
+    const windData = getWindData();
+    const nearestIsland = findNearestIsland();
+
+    // Update UI with all available data
+    gameUI.update({
+        speed: calculateBoatSpeed(),
+        heading: boat.rotation.y,
+        position: boat.position,
+        windDirection: windData.direction,
+        windSpeed: windData.speed,
+        timeOfDay: getTimeOfDay(),
+        playerCount: Network.getConnectedPlayersCount(),
+        isConnected: Network.isNetworkConnected(),
+        nearestIsland: nearestIsland,
+        mapScale: 200 // Scale factor for mini-map (adjust as needed)
+    });
+
+    // Add island markers to mini-map
+    activeIslands.forEach((island, id) => {
+        gameUI.addIslandMarker(id, island.collider.center, island.collider.radius);
+    });
+
+    // Add other player markers (if you have access to other players)
+    // This would need to be integrated with your Network module
 }
 
 // Initialize by generating the starting chunks
@@ -1060,3 +1410,23 @@ window.addEventListener('resize', () => {
 window.addEventListener('beforeunload', () => {
     Network.disconnect();
 });
+
+// Alternative approach: Create a sun that's always positioned relative to the camera
+function updateSunPosition() {
+    if (sunMesh) {
+        // Get the current directional light direction
+        const lightDirection = new THREE.Vector3()
+            .copy(directionalLight.position)
+            .normalize();
+
+        // Convert world direction to camera space
+        const cameraWorldMatrix = camera.matrixWorld;
+        const cameraPosition = new THREE.Vector3().setFromMatrixPosition(cameraWorldMatrix);
+
+        // Position the sun at a fixed distance from the camera in the light direction
+        const sunDistance = 2000; // Fixed distance from camera
+        sunMesh.position.copy(cameraPosition).add(
+            lightDirection.multiplyScalar(sunDistance)
+        );
+    }
+}
