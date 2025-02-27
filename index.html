@@ -5,6 +5,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="src/style.css">
+    <style>
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0a1a2a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            z-index: 1000;
+            transition: opacity 1s ease-in-out;
+        }
+
+        #loading-bar-container {
+            width: 300px;
+            height: 20px;
+            background-color: #333;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        #loading-bar {
+            width: 0;
+            height: 20px;
+            background-color: #4a90e2;
+        }
+    </style>
 </head>
 
 <body>
@@ -17,6 +49,68 @@
         <div id="bloom-intensity">Bloom: 100%</div>
     </div>
 
+    <script>
+        // Initialize loading screen as soon as possible
+        let loadingProgress = 0;
+        let loadingInterval;
+
+        function startLoadingAnimation() {
+            const loadingBar = document.getElementById('loading-bar');
+            if (!loadingBar) return;
+
+            loadingInterval = setInterval(() => {
+                loadingProgress += Math.random() * 5;
+                if (loadingProgress >= 100) {
+                    loadingProgress = 100;
+                }
+                loadingBar.style.width = loadingProgress + '%';
+            }, 100);
+        }
+
+        function completeLoading() {
+            const loadingScreen = document.getElementById('loading-screen');
+            const gameUI = document.getElementById('game-ui');
+            const effectsContainer = document.getElementById('effects-container');
+
+            if (loadingInterval) {
+                clearInterval(loadingInterval);
+            }
+
+            // Ensure loading bar shows 100%
+            const loadingBar = document.getElementById('loading-bar');
+            if (loadingBar) {
+                loadingBar.style.width = '100%';
+            }
+
+            // Wait a moment before fading out
+            setTimeout(() => {
+                if (loadingScreen) {
+                    loadingScreen.style.opacity = '0';
+                }
+
+                // After fade animation completes
+                setTimeout(() => {
+                    if (loadingScreen) {
+                        loadingScreen.style.display = 'none';
+                    }
+                    if (gameUI) {
+                        gameUI.style.display = 'block';
+                    }
+                    if (effectsContainer) {
+                        effectsContainer.style.display = 'block';
+                    }
+                }, 1000);
+            }, 500);
+        }
+
+        // Start loading animation immediately
+        document.addEventListener('DOMContentLoaded', startLoadingAnimation);
+
+        // Expose function for main.js to call when game is ready
+        window.gameLoaded = completeLoading;
+    </script>
+
+    <!-- Import your game modules -->
     <script type="module" src="src/script.js"></script>
 </body>
 
