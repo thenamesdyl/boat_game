@@ -62,7 +62,7 @@ bloomPass.radius = 0.5;
 composer.addPass(bloomPass);
 
 // Stormy Lighting
-const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
 scene.add(ambientLight);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -1205,50 +1205,46 @@ function updateSunSprite() {
 // Add this function to get sky color based on time of day
 function getSkyColor(timeOfDay) {
     switch (timeOfDay) {
-        case 'Dawn':
-            return new THREE.Color(0xff6347); // Tomato red for dawn
-        case 'Day':
-            return new THREE.Color(0x87ceeb); // Sky blue
-        case 'Afternoon':
-            return new THREE.Color(0x4682b4); // Steel blue for afternoon
-        case 'Dusk':
-            return new THREE.Color(0xffa500); // Orange for dusk
-        case 'Night':
-            return new THREE.Color(0x0a1a2a); // Dark blue
+        case 'dawn':
+            return new THREE.Color(0xe0a080); // Richer dawn sky
+        case 'day':
+            return new THREE.Color(0x87ceeb); // Classic sky blue, less washed out
+        case 'dusk':
+            return new THREE.Color(0xff7747); // More vibrant sunset
+        case 'night':
+            return new THREE.Color(0x0a1025); // Deeper night sky
         default:
-            return new THREE.Color(0x87ceeb); // Default sky blue
+            return new THREE.Color(0x87ceeb);
     }
 }
 
 // Add this function to get ambient light color and intensity
 function getAmbientLight(timeOfDay) {
     switch (timeOfDay) {
-        case 'Dawn':
-            return { color: new THREE.Color(0xffd4b5), intensity: 0.3 };
-        case 'Day':
+        case 'dawn':
             return {
-                color: new THREE.Color(0xc8deff), // Slightly bluer to complement warmer directional light
-                intensity: 0.4 // Reduced from higher value
+                color: new THREE.Color(0x7a5c70), // Purple-tinted for dawn
+                intensity: 0.2 // Reduced for more contrast
             };
-        case 'Afternoon':
+        case 'day':
             return {
-                color: new THREE.Color(0xffb191),
-                intensity: 0.3
+                color: new THREE.Color(0x89a7c5), // Slightly bluer sky ambient
+                intensity: 0.25 // Reduced for better contrast with directional
             };
-        case 'Dusk':
+        case 'dusk':
             return {
-                color: new THREE.Color(0xffb191),
-                intensity: 0.3
-            };
-        case 'Night':
-            return {
-                color: new THREE.Color(0x2c3449),
+                color: new THREE.Color(0x614b5a), // Deeper dusk ambient
                 intensity: 0.2
+            };
+        case 'night':
+            return {
+                color: new THREE.Color(0x1a2035), // Darker night ambient
+                intensity: 0.15 // Very low but not completely dark
             };
         default:
             return {
-                color: new THREE.Color(0xc8deff),
-                intensity: 0.4
+                color: new THREE.Color(0x89a7c5),
+                intensity: 0.25
             };
     }
 }
@@ -1258,32 +1254,32 @@ function getDirectionalLight(timeOfDay) {
     switch (timeOfDay) {
         case 'dawn':
             return {
-                color: new THREE.Color(0xffa07a), // Light salmon color
-                intensity: 0.6, // Moderate intensity for dawn
+                color: new THREE.Color(0xffb55a), // Warmer orange sunrise
+                intensity: 0.7, // Higher intensity for better contrast
                 position: new THREE.Vector3(-500, 1000, 0)
             };
         case 'day':
             return {
-                color: new THREE.Color(0xf9f3d5), // Warmer, less white sunlight
-                intensity: 0.7, // Reduced from higher value
+                color: new THREE.Color(0xffefd1), // Warmer, less harsh sunlight
+                intensity: 0.8, // More directional intensity for better shadows
                 position: new THREE.Vector3(0, 1800, 0)
             };
         case 'dusk':
             return {
-                color: new THREE.Color(0xff7f50), // Coral sunset color
-                intensity: 0.6, // Moderate intensity for dusk
+                color: new THREE.Color(0xff6a33), // Richer sunset color
+                intensity: 0.7, // Higher contrast for sunset
                 position: new THREE.Vector3(500, 1000, 0)
             };
         case 'night':
             return {
-                color: new THREE.Color(0x666688), // Soft blue moonlight
-                intensity: 0.4, // Low intensity for night
+                color: new THREE.Color(0x445e8c), // More blue-tinted moonlight
+                intensity: 0.3, // Lower but still visible
                 position: new THREE.Vector3(0, -1000, 1000)
             };
         default:
             return {
-                color: new THREE.Color(0xf9f3d5), // Warmer default
-                intensity: 0.7, // Moderate default
+                color: new THREE.Color(0xffefd1),
+                intensity: 0.8,
                 position: new THREE.Vector3(0, 1800, 0)
             };
     }
@@ -1469,7 +1465,8 @@ function animate() {
     // Update sun position relative to camera
     updateSunPosition();
 
-    composer.render();
+    renderer.render(scene, camera);
+    //composer.render();
 }
 
 // Calculate boat speed based on velocity
