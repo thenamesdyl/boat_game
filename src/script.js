@@ -19,6 +19,12 @@ let sunMesh;
 const sunSize = 100; // Increased from 10 to make the sun larger
 const skyRadius = 20001; // Larger sky radius
 
+// Add these variables near the top with your other boat variables
+let boatRockAngleX = 0; // Pitch (forward/backward rocking)
+let boatRockAngleZ = 0; // Roll (side-to-side rocking)
+const rockSpeed = 1.5; // How fast the boat rocks
+const maxRockAngle = 0.04; // Maximum rocking angle in radians (about 2.3 degrees)
+
 // Scene setup
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
@@ -874,22 +880,178 @@ function updateVisibleChunks() {
     console.log(`Current position: ${Math.floor(boat.position.x)}, ${Math.floor(boat.position.z)}, Current chunk: ${currentChunk.x}, ${currentChunk.z}`);
 }
 
-// Boat
-const boat = new THREE.Group();
-const hullGeometry = new THREE.BoxGeometry(2, 1, 4);
-const hullMaterial = new THREE.MeshPhongMaterial({ color: 0x885533 });
-const hull = new THREE.Mesh(hullGeometry, hullMaterial);
-hull.position.y = 0.2;
-boat.add(hull);
+// Create a larger boat
+function createBoat() {
+    // Create boat group
+    let boat = new THREE.Group();
 
-const mastGeometry = new THREE.CylinderGeometry(0.1, 0.1, 3);
-const mastMaterial = new THREE.MeshPhongMaterial({ color: 0x666666 });
-const mast = new THREE.Mesh(mastGeometry, mastMaterial);
-mast.position.y = 2;
-boat.add(mast);
+    // Create larger hull (increased from 2x1x4 to 6x2x12)
+    const hullGeometry = new THREE.BoxGeometry(6, 2, 12);
+    const hullMaterial = new THREE.MeshPhongMaterial({ color: 0x8b4513 });
+    const hull = new THREE.Mesh(hullGeometry, hullMaterial);
+    hull.position.y = 1; // Adjusted for larger size
+    boat.add(hull);
 
-boat.position.set(0, 0, 0);
-scene.add(boat);
+    // Add front extension of the boat (forecastle)
+    const frontExtensionGeometry = new THREE.BoxGeometry(4, 1.8, 3);
+    const frontExtensionMaterial = new THREE.MeshPhongMaterial({
+        color: 0x8b4513,
+        name: 'frontExtensionMaterial'
+    });
+    const frontExtension = new THREE.Mesh(frontExtensionGeometry, frontExtensionMaterial);
+    frontExtension.position.set(0, 1, -7.5); // Moved to front (negative Z)
+    frontExtension.userData.isNotPlayerColorable = true;
+    boat.add(frontExtension);
+
+    // Add front cannon
+    const frontCannonGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 12);
+    const frontCannonMaterial = new THREE.MeshPhongMaterial({
+        color: 0x111111, // Black color for cannons
+        specular: 0x333333,
+        shininess: 30,
+        name: 'cannonMaterial'
+    });
+    const frontCannon = new THREE.Mesh(frontCannonGeometry, frontCannonMaterial);
+    frontCannon.rotation.x = -Math.PI / 2; // Rotated to point forward
+    frontCannon.position.set(0, 2.3, -9); // Positioned at front of ship (negative Z)
+    frontCannon.userData.isNotPlayerColorable = true;
+    boat.add(frontCannon);
+
+    // Front cannon mount
+    const frontMountGeometry = new THREE.BoxGeometry(2.5, 0.5, 0.5);
+    const frontMountMaterial = new THREE.MeshPhongMaterial({
+        color: 0x5c3317, // Dark brown for the mount
+        name: 'mountMaterial'
+    });
+    const frontMount = new THREE.Mesh(frontMountGeometry, frontMountMaterial);
+    frontMount.position.set(0, 2, -8.5); // Positioned at front
+    frontMount.userData.isNotPlayerColorable = true;
+    boat.add(frontMount);
+
+    // Add a deck with fixed brown color
+    const deckGeometry = new THREE.BoxGeometry(5.8, 0.3, 11.8);
+    const deckMaterial = new THREE.MeshPhongMaterial({
+        color: 0x8b4513, // Brown color for deck
+        name: 'deckMaterial' // Add a name to identify this material
+    });
+    const deck = new THREE.Mesh(deckGeometry, deckMaterial);
+    deck.position.y = 2.15; // Position on top of hull
+    deck.userData.isNotPlayerColorable = true; // Flag to prevent color changes
+    boat.add(deck);
+
+    // Add cannons (two black cannons on the sides)
+    const cannonGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 12);
+    const cannonMaterial = new THREE.MeshPhongMaterial({
+        color: 0x111111, // Black color for cannons
+        specular: 0x333333,
+        shininess: 30,
+        name: 'cannonMaterial'
+    });
+
+    // Left cannon
+    const leftCannon = new THREE.Mesh(cannonGeometry, cannonMaterial);
+    leftCannon.rotation.z = Math.PI / 2; // Rotate 90 degrees to point outward
+    leftCannon.position.set(-3.2, 2.3, 0); // Position on left side of hull
+    leftCannon.userData.isNotPlayerColorable = true;
+    boat.add(leftCannon);
+
+    // Right cannon
+    const rightCannon = new THREE.Mesh(cannonGeometry, cannonMaterial);
+    rightCannon.rotation.z = -Math.PI / 2; // Rotate -90 degrees to point outward
+    rightCannon.position.set(3.2, 2.3, 0); // Position on right side of hull
+    rightCannon.userData.isNotPlayerColorable = true;
+    boat.add(rightCannon);
+
+    // Add cannon mounts
+    const mountGeometry = new THREE.BoxGeometry(0.5, 0.5, 2.5);
+    const mountMaterial = new THREE.MeshPhongMaterial({
+        color: 0x5c3317, // Dark brown for the mounts
+        name: 'mountMaterial'
+    });
+
+    // Left cannon mount
+    const leftMount = new THREE.Mesh(mountGeometry, mountMaterial);
+    leftMount.position.set(-3, 2, 0);
+    leftMount.userData.isNotPlayerColorable = true;
+    boat.add(leftMount);
+
+    // Right cannon mount
+    const rightMount = new THREE.Mesh(mountGeometry, mountMaterial);
+    rightMount.position.set(3, 2, 0);
+    rightMount.userData.isNotPlayerColorable = true;
+    boat.add(rightMount);
+
+    // Continue with the rest of your boat parts...
+    // Add a much taller mast (increased from 3 to 12)
+    const mastGeometry = new THREE.CylinderGeometry(0.25, 0.25, 12, 8);
+    const mastMaterial = new THREE.MeshPhongMaterial({
+        color: 0x8b4513, // Brown color for mast
+        name: 'mastMaterial'
+    });
+    const mast = new THREE.Mesh(mastGeometry, mastMaterial);
+    mast.position.y = 8; // Positioned higher for taller mast
+    mast.userData.isNotPlayerColorable = true; // Flag to prevent color changes
+    boat.add(mast);
+
+    // Add a larger sail
+    const sailGeometry = new THREE.PlaneGeometry(5, 9);
+    const sailMaterial = new THREE.MeshPhongMaterial({
+        color: 0xf5f5f5,
+        side: THREE.DoubleSide,
+        name: 'sailMaterial'
+    });
+    const sail = new THREE.Mesh(sailGeometry, sailMaterial);
+    sail.rotation.y = Math.PI / 2;
+    sail.position.set(0, 8, 1.5); // Positioned on the mast
+    sail.userData.isNotPlayerColorable = true; // Flag to prevent color changes
+    boat.add(sail);
+
+    // Rest of the boat code...
+
+    // Position the boat
+    boat.position.set(0, 0.5, 0);
+    scene.add(boat);
+
+    // Add a small Minecraft-style character to the front of the boat
+    addCharacterToBoat(boat);
+
+    return boat;
+}
+
+// Update or replace the existing boat creation code with the function above
+// Then call it to create the boat:
+const boat = createBoat();
+
+// Update camera positioning in the animation loop
+// Replace the existing camera positioning code (around line 1289) with:
+function updateCamera() {
+    // Increased camera height and distance for the larger boat
+    const cameraOffset = new THREE.Vector3(0, 12, 20).applyQuaternion(boat.quaternion);
+    camera.position.copy(boat.position).add(cameraOffset);
+
+    if (mouseControl.isEnabled) {
+        const horizontalAngle = Math.max(Math.min(mouseControl.mouseX * mouseControl.sensitivity, mouseControl.maxAngle), -mouseControl.maxAngle);
+        const verticalAngle = Math.max(Math.min(-mouseControl.mouseY * mouseControl.sensitivity, mouseControl.maxAngle), -mouseControl.maxAngle);
+
+        const lookTarget = boat.position.clone();
+        // Look at a higher point on the boat (near the mast)
+        lookTarget.y += 4;
+
+        const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(boat.quaternion);
+        lookTarget.add(rightVector.multiplyScalar(horizontalAngle * 50));
+        lookTarget.y += verticalAngle * 50;
+        camera.lookAt(lookTarget);
+    } else {
+        // Look at a higher point on the boat instead of just the position
+        const lookTarget = boat.position.clone();
+        lookTarget.y += 4;
+        camera.lookAt(lookTarget);
+    }
+}
+
+// Make sure to call updateCamera() in your animation loop
+// Replace the camera positioning code in your animate function with:
+// updateCamera();
 
 // Boat controls (slower)
 const boatVelocity = new THREE.Vector3(0, 0, 0);
@@ -1062,57 +1224,66 @@ function getSkyColor(timeOfDay) {
 function getAmbientLight(timeOfDay) {
     switch (timeOfDay) {
         case 'Dawn':
-            return { color: new THREE.Color(0xffd4a3), intensity: 0.6 };
+            return { color: new THREE.Color(0xffd4b5), intensity: 0.3 };
         case 'Day':
-            return { color: new THREE.Color(0xffffff), intensity: 0.8 };
+            return {
+                color: new THREE.Color(0xc8deff), // Slightly bluer to complement warmer directional light
+                intensity: 0.4 // Reduced from higher value
+            };
         case 'Afternoon':
-            return { color: new THREE.Color(0xfffaf0), intensity: 0.7 };
+            return {
+                color: new THREE.Color(0xffb191),
+                intensity: 0.3
+            };
         case 'Dusk':
-            return { color: new THREE.Color(0xffa07a), intensity: 0.5 };
+            return {
+                color: new THREE.Color(0xffb191),
+                intensity: 0.3
+            };
         case 'Night':
-            return { color: new THREE.Color(0x333344), intensity: 0.3 };
+            return {
+                color: new THREE.Color(0x2c3449),
+                intensity: 0.2
+            };
         default:
-            return { color: new THREE.Color(0x333344), intensity: 0.5 };
+            return {
+                color: new THREE.Color(0xc8deff),
+                intensity: 0.4
+            };
     }
 }
 
 // Add this function to get directional light color and intensity
 function getDirectionalLight(timeOfDay) {
     switch (timeOfDay) {
-        case 'Dawn':
+        case 'dawn':
             return {
-                color: new THREE.Color(0xffd4a3),
-                intensity: 0.9,
-                position: new THREE.Vector3(-1500, 300, 0) // Far to the east, just rising
+                color: new THREE.Color(0xffa07a), // Light salmon color
+                intensity: 0.6, // Moderate intensity for dawn
+                position: new THREE.Vector3(-500, 1000, 0)
             };
-        case 'Day':
+        case 'day':
             return {
-                color: new THREE.Color(0xffffff),
-                intensity: 1.0,
-                position: new THREE.Vector3(0, 1800, 0) // High in the sky
+                color: new THREE.Color(0xf9f3d5), // Warmer, less white sunlight
+                intensity: 0.7, // Reduced from higher value
+                position: new THREE.Vector3(0, 1800, 0)
             };
-        case 'Afternoon':
+        case 'dusk':
             return {
-                color: new THREE.Color(0xfffaf0),
-                intensity: 0.9,
-                position: new THREE.Vector3(1000, 1000, 0) // Moving west, still high
+                color: new THREE.Color(0xff7f50), // Coral sunset color
+                intensity: 0.6, // Moderate intensity for dusk
+                position: new THREE.Vector3(500, 1000, 0)
             };
-        case 'Dusk':
+        case 'night':
             return {
-                color: new THREE.Color(0xff7f50),
-                intensity: 0.7,
-                position: new THREE.Vector3(1500, 300, 0) // Far to the west, setting
-            };
-        case 'Night':
-            return {
-                color: new THREE.Color(0x666688),
-                intensity: 0.4,
-                position: new THREE.Vector3(0, -1000, 1000) // Below horizon, moon visible
+                color: new THREE.Color(0x666688), // Soft blue moonlight
+                intensity: 0.4, // Low intensity for night
+                position: new THREE.Vector3(0, -1000, 1000)
             };
         default:
             return {
-                color: new THREE.Color(0x666688),
-                intensity: 0.8,
+                color: new THREE.Color(0xf9f3d5), // Warmer default
+                intensity: 0.7, // Moderate default
                 position: new THREE.Vector3(0, 1800, 0)
             };
     }
@@ -1231,6 +1402,9 @@ function animate() {
     const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(boat.quaternion);
     let newPosition = boat.position.clone().add(direction.multiplyScalar(boatVelocity.z));
 
+    // Update boat rocking motion
+    updateBoatRocking(deltaTime);
+
     // Check for island collisions
     let collided = false;
     for (const collider of islandColliders) {
@@ -1286,21 +1460,7 @@ function animate() {
     console.log(`Boat: x=${boatX.toFixed(2)}, z=${boatZ.toFixed(2)}, y=${boat.position.y.toFixed(2)}, Water Height=${interpolatedHeight.toFixed(2)}`);
 
     // Camera positioning
-    const cameraOffset = new THREE.Vector3(0, 5, 10).applyQuaternion(boat.quaternion);
-    camera.position.copy(boat.position).add(cameraOffset);
-
-    if (mouseControl.isEnabled) {
-        const horizontalAngle = Math.max(Math.min(mouseControl.mouseX * mouseControl.sensitivity, mouseControl.maxAngle), -mouseControl.maxAngle);
-        const verticalAngle = Math.max(Math.min(-mouseControl.mouseY * mouseControl.sensitivity, mouseControl.maxAngle), -mouseControl.maxAngle);
-
-        const lookTarget = boat.position.clone();
-        const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(boat.quaternion);
-        lookTarget.add(rightVector.multiplyScalar(horizontalAngle * 50));
-        lookTarget.y += verticalAngle * 50;
-        camera.lookAt(lookTarget);
-    } else {
-        camera.lookAt(boat.position);
-    }
+    updateCamera();
 
     // Network and UI updates
     Network.updatePlayerPosition();
@@ -1429,4 +1589,95 @@ function updateSunPosition() {
             lightDirection.multiplyScalar(sunDistance)
         );
     }
+}
+
+// Add gentle rocking motion based on boat speed and waves
+function updateBoatRocking(deltaTime) {
+    // Calculate boat speed magnitude
+    const speedMagnitude = Math.abs(boatVelocity.z);
+
+    // Only rock if the boat is moving at least a little
+    if (speedMagnitude > 0.01) {
+        // Gentle oscillation using sine waves with different frequencies
+        boatRockAngleX = Math.sin(time * rockSpeed) * maxRockAngle * speedMagnitude;
+        boatRockAngleZ = Math.sin(time * rockSpeed * 0.7) * maxRockAngle * speedMagnitude;
+
+        // Apply the rocking rotation (keep existing Y rotation)
+        const currentYRotation = boat.rotation.y;
+        boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
+    } else {
+        // Gradually return to level when not moving
+        boatRockAngleX *= 0.95;
+        boatRockAngleZ *= 0.95;
+
+        const currentYRotation = boat.rotation.y;
+        boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
+    }
+}
+
+// Add a small Minecraft-style character to the front of the boat
+function addCharacterToBoat(boat) {
+    // Create a group for the character
+    const character = new THREE.Group();
+
+    // Head - slightly larger than body parts for the Minecraft look
+    const headGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+    const headMaterial = new THREE.MeshPhongMaterial({
+        color: 0xFFD700, // Yellow skin tone
+        name: 'characterHeadMaterial'
+    });
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.y = 0.9;
+    head.userData.isNotPlayerColorable = true; // Flag to prevent color changes
+    character.add(head);
+
+    // Body
+    const bodyGeometry = new THREE.BoxGeometry(0.7, 1.0, 0.5);
+    const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x1E90FF }); // Blue shirt
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.position.y = 0.0;
+    body.userData.isNotPlayerColorable = true; // Flag to prevent color changes
+    character.add(body);
+
+    // Arms
+    const armGeometry = new THREE.BoxGeometry(0.25, 0.8, 0.25);
+    const armMaterial = new THREE.MeshPhongMaterial({ color: 0x1E90FF }); // Match shirt
+
+    // Left arm
+    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+    leftArm.position.set(-0.5, 0.1, 0);
+    leftArm.userData.isNotPlayerColorable = true;
+    character.add(leftArm);
+
+    // Right arm - raised as if pointing forward
+    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+    rightArm.position.set(0.5, 0.1, 0);
+    rightArm.rotation.z = -Math.PI / 4; // Angle the arm up
+    rightArm.userData.isNotPlayerColorable = true;
+    character.add(rightArm);
+
+    // Legs
+    const legGeometry = new THREE.BoxGeometry(0.3, 0.8, 0.3);
+    const legMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 }); // Brown pants
+
+    // Left leg
+    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+    leftLeg.position.set(-0.2, -0.8, 0);
+    leftLeg.userData.isNotPlayerColorable = true;
+    character.add(leftLeg);
+
+    // Right leg
+    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+    rightLeg.position.set(0.2, -0.8, 0);
+    rightLeg.userData.isNotPlayerColorable = true;
+    character.add(rightLeg);
+
+    // Position the character at the front of the boat, moved to the left for visibility
+    character.position.set(-1.5, 3.2, -7.8); // Moved to the left side of the front extension
+    character.rotation.y = Math.PI; // Face forward (looking out from the boat)
+
+    // Add the character to the boat
+    boat.add(character);
+
+    return character;
 }
