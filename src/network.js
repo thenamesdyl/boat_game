@@ -66,8 +66,8 @@ function applyColorToBoat(boatMesh, color) {
     // Find the hull in the boat group
     boatMesh.traverse((child) => {
         if (child instanceof THREE.Mesh && child.geometry instanceof THREE.BoxGeometry) {
-            // This is likely the hull
-            if (child.material) {
+            // Only change color if it's NOT flagged as not player colorable
+            if (child.material && !child.userData.isNotPlayerColorable) {
                 // Create a new material with the player's color
                 const newMaterial = new THREE.MeshPhongMaterial({
                     color: new THREE.Color(color.r, color.g, color.b)

@@ -1677,7 +1677,7 @@ function addCharacterToBoat(boat) {
     const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x1E90FF }); // Blue shirt
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.position.y = 0.0;
-    body.userData.isNotPlayerColorable = true; // Flag to prevent color changes
+    body.userData.isNotPlayerColorable = false; // Flag to prevent color changes
     character.add(body);
 
     // Arms
