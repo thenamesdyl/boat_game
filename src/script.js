@@ -11,6 +11,9 @@ import { scene, camera, renderer, updateTime, getTime } from './gameState.js';
 import { setupSkybox, updateSkybox, setupSky, updateTimeOfDay, updateSunPosition, getTimeOfDay } from './skybox.js';
 import { setupClouds, updateClouds } from './clouds.js';
 import { setupBirds, updateBirds } from './birds.js';
+import { setupSeaMonsters, updateSeaMonsters, getMonsters } from './seaMonsters.js';
+import { initFishing, updateFishing, getFishCount } from './fishing.js';
+import { initCannons, updateCannons } from './cannons.js';
 
 // Add these variables to your global scope
 let lastTime = null;
@@ -531,7 +534,7 @@ function createLighthouse(island, random) {
     const visible = new Float32Array(count);
     for (let i = 0; i < count; i++) {
         // Every other segment
-        visible[i] = (Math.floor(i / (count / 5)) % 2) ? 1.0 : 0.0;
+        visible[i] = (Math.floor(i / (count / 5)) % 2 ? 1.0 : 0.0);
     }
     stripesGeometry.setAttribute('visible', new THREE.BufferAttribute(visible, 1));
     stripesMaterial.onBeforeCompile = (shader) => {
@@ -863,8 +866,6 @@ function updateVisibleChunks() {
     });
 
     // Debug info - log the number of active islands and chunks
-    console.log(`Active islands: ${activeIslands.size}, Generated chunks: ${generatedChunks.size}, Water chunks: ${activeWaterChunks.size}`);
-    console.log(`Current position: ${Math.floor(boat.position.x)}, ${Math.floor(boat.position.z)}, Current chunk: ${currentChunk.x}, ${currentChunk.z}`);
 }
 
 // Update or replace the existing boat creation code with the function above
@@ -1063,8 +1064,6 @@ function animate() {
     boat.position.y = interpolatedHeight + floatOffset;
 
     // Debugging
-    console.log(`Boat: x=${boatX.toFixed(2)}, z=${boatZ.toFixed(2)}, y=${boat.position.y.toFixed(2)}, Water Height=${interpolatedHeight.toFixed(2)}`);
-
     // Camera positioning
     updateCamera();
 
@@ -1081,6 +1080,15 @@ function animate() {
 
     // Update birds with delta time
     updateBirds(deltaTime);
+
+    // Update sea monsters with delta time
+    updateSeaMonsters(deltaTime);
+
+    // Update fishing
+    updateFishing();
+
+    // Update cannons
+    updateCannons(deltaTime);
 
     renderer.render(scene, camera);
     //composer.render();
@@ -1138,7 +1146,8 @@ function updateGameUI() {
         playerCount: Network.getConnectedPlayersCount(),
         isConnected: Network.isNetworkConnected(),
         nearestIsland: nearestIsland,
-        mapScale: 200 // Scale factor for mini-map (adjust as needed)
+        mapScale: 200, // Scale factor for mini-map (adjust as needed)
+        fishCount: getFishCount() // Add fish count
     });
 
     // Add island markers to mini-map
@@ -1211,3 +1220,15 @@ const clouds = setupClouds();
 
 // Initialize birds
 const birds = setupBirds(activeIslands, boat);
+
+// Initialize sea monsters
+const seaMonsters = setupSeaMonsters(boat);
+
+// Initialize fishing system
+initFishing(boat);
+
+// Initialize cannon system
+initCannons(boat, seaMonsters);
+
+// Get monsters reference for cannon system
+const monsters = getMonsters();

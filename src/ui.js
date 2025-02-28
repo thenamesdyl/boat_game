@@ -41,7 +41,10 @@ class GameUI {
             connectionStatus: this.createUIElement('Status: Connecting...'),
             islandDistance: this.createUIElement('Nearest Island: None'),
             compass: this.createCompass(),
-            speedometer: this.createSpeedometer()
+            speedometer: this.createSpeedometer(),
+            fishing: this.createFishingUI(),
+            cannon: this.createCannonUI(),
+            inventory: this.createInventoryUI()
         };
 
         // Create island markers for mini-map
@@ -156,6 +159,400 @@ class GameUI {
         this.container.appendChild(speedContainer);
 
         return { container: speedContainer, bar: speedBar };
+    }
+
+    createFishingUI() {
+        // Create fishing container
+        const fishingContainer = document.createElement('div');
+        fishingContainer.id = 'fishing-ui';
+        fishingContainer.style.position = 'absolute';
+        fishingContainer.style.bottom = '20px';
+        fishingContainer.style.left = '20px';
+        fishingContainer.style.backgroundColor = 'rgba(0, 30, 60, 0.7)';
+        fishingContainer.style.padding = '10px';
+        fishingContainer.style.borderRadius = '5px';
+        fishingContainer.style.display = 'flex';
+        fishingContainer.style.flexDirection = 'column';
+        fishingContainer.style.alignItems = 'center';
+        fishingContainer.style.pointerEvents = 'auto'; // Allow interaction
+        document.body.appendChild(fishingContainer);
+
+        // Cast button
+        const castButton = document.createElement('button');
+        castButton.textContent = 'Cast Line';
+        castButton.style.padding = '8px 15px';
+        castButton.style.marginBottom = '10px';
+        castButton.style.backgroundColor = 'rgba(100, 200, 255, 0.7)';
+        castButton.style.border = 'none';
+        castButton.style.borderRadius = '5px';
+        castButton.style.color = 'white';
+        castButton.style.fontWeight = 'bold';
+        castButton.style.cursor = 'pointer';
+        fishingContainer.appendChild(castButton);
+
+        // Fishing status
+        const fishingStatus = document.createElement('div');
+        fishingStatus.textContent = 'Ready to fish';
+        fishingStatus.style.color = 'white';
+        fishingStatus.style.marginBottom = '10px';
+        fishingContainer.appendChild(fishingStatus);
+
+        // Fish caught counter
+        const fishCounter = document.createElement('div');
+        fishCounter.textContent = 'Fish: 0';
+        fishCounter.style.color = 'white';
+        fishingContainer.appendChild(fishCounter);
+
+        // Create minigame container (hidden by default)
+        const minigameContainer = document.createElement('div');
+        minigameContainer.id = 'fishing-minigame';
+        minigameContainer.style.position = 'absolute';
+        minigameContainer.style.top = '50%';
+        minigameContainer.style.left = '50%';
+        minigameContainer.style.transform = 'translate(-50%, -50%)';
+        minigameContainer.style.backgroundColor = 'rgba(0, 30, 60, 0.9)';
+        minigameContainer.style.padding = '20px';
+        minigameContainer.style.borderRadius = '10px';
+        minigameContainer.style.display = 'none';
+        minigameContainer.style.flexDirection = 'column';
+        minigameContainer.style.alignItems = 'center';
+        minigameContainer.style.pointerEvents = 'auto';
+        minigameContainer.style.zIndex = '100';
+        minigameContainer.style.width = '300px';
+        document.body.appendChild(minigameContainer);
+
+        // Minigame title
+        const minigameTitle = document.createElement('div');
+        minigameTitle.textContent = 'Fish On!';
+        minigameTitle.style.color = 'white';
+        minigameTitle.style.fontSize = '24px';
+        minigameTitle.style.marginBottom = '20px';
+        minigameContainer.appendChild(minigameTitle);
+
+        // Minigame instructions
+        const minigameInstructions = document.createElement('div');
+        minigameInstructions.textContent = 'Click when the marker is in the green zone!';
+        minigameInstructions.style.color = 'white';
+        minigameInstructions.style.marginBottom = '20px';
+        minigameContainer.appendChild(minigameInstructions);
+
+        // Minigame progress bar container
+        const progressBarContainer = document.createElement('div');
+        progressBarContainer.style.width = '250px';
+        progressBarContainer.style.height = '30px';
+        progressBarContainer.style.backgroundColor = 'rgba(50, 50, 50, 0.7)';
+        progressBarContainer.style.borderRadius = '15px';
+        progressBarContainer.style.position = 'relative';
+        progressBarContainer.style.overflow = 'hidden';
+        progressBarContainer.style.marginBottom = '20px';
+        minigameContainer.appendChild(progressBarContainer);
+
+        // Target zone (green area)
+        const targetZone = document.createElement('div');
+        targetZone.style.position = 'absolute';
+        targetZone.style.height = '100%';
+        targetZone.style.backgroundColor = 'rgba(0, 255, 0, 0.5)';
+        targetZone.style.width = '60px';
+        targetZone.style.left = '95px'; // Centered in the progress bar
+        progressBarContainer.appendChild(targetZone);
+
+        // Marker (moving element)
+        const marker = document.createElement('div');
+        marker.style.position = 'absolute';
+        marker.style.height = '100%';
+        marker.style.width = '10px';
+        marker.style.backgroundColor = 'white';
+        marker.style.left = '0px';
+        marker.style.transition = 'left 0.1s linear';
+        progressBarContainer.appendChild(marker);
+
+        // Catch button
+        const catchButton = document.createElement('button');
+        catchButton.textContent = 'CATCH!';
+        catchButton.style.padding = '10px 20px';
+        catchButton.style.backgroundColor = 'rgba(255, 100, 100, 0.8)';
+        catchButton.style.border = 'none';
+        catchButton.style.borderRadius = '5px';
+        catchButton.style.color = 'white';
+        catchButton.style.fontWeight = 'bold';
+        catchButton.style.fontSize = '18px';
+        catchButton.style.cursor = 'pointer';
+        minigameContainer.appendChild(catchButton);
+
+        return {
+            container: fishingContainer,
+            castButton: castButton,
+            status: fishingStatus,
+            counter: fishCounter,
+            minigame: {
+                container: minigameContainer,
+                marker: marker,
+                targetZone: targetZone,
+                catchButton: catchButton
+            }
+        };
+    }
+
+    createCannonUI() {
+        // Create cannon control container
+        const cannonContainer = document.createElement('div');
+        cannonContainer.id = 'cannon-ui';
+        cannonContainer.style.position = 'absolute';
+        cannonContainer.style.bottom = '20px';
+        cannonContainer.style.left = '200px'; // Position next to fishing UI
+        cannonContainer.style.backgroundColor = 'rgba(60, 30, 0, 0.7)';
+        cannonContainer.style.padding = '10px';
+        cannonContainer.style.borderRadius = '5px';
+        cannonContainer.style.display = 'flex';
+        cannonContainer.style.flexDirection = 'column';
+        cannonContainer.style.alignItems = 'center';
+        cannonContainer.style.pointerEvents = 'auto'; // Allow interaction
+        document.body.appendChild(cannonContainer);
+
+        // Fire button
+        const fireButton = document.createElement('button');
+        fireButton.textContent = 'FIRE CANNONS';
+        fireButton.style.padding = '10px 20px';
+        fireButton.style.marginBottom = '10px';
+        fireButton.style.backgroundColor = 'rgba(255, 50, 0, 0.9)';
+        fireButton.style.border = '3px solid rgba(255, 200, 0, 0.9)';
+        fireButton.style.borderRadius = '5px';
+        fireButton.style.color = 'white';
+        fireButton.style.fontWeight = 'bold';
+        fireButton.style.cursor = 'pointer';
+        fireButton.style.fontSize = '18px';
+        fireButton.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
+        fireButton.style.boxShadow = '0 0 10px rgba(255, 100, 0, 0.5)';
+        fireButton.disabled = true; // Disabled by default
+        cannonContainer.appendChild(fireButton);
+
+        // Cannon status
+        const cannonStatus = document.createElement('div');
+        cannonStatus.textContent = 'No targets in range';
+        cannonStatus.style.color = 'white';
+        cannonStatus.style.marginBottom = '5px';
+        cannonContainer.appendChild(cannonStatus);
+
+        // Cooldown indicator
+        const cooldownIndicator = document.createElement('div');
+        cooldownIndicator.style.width = '100%';
+        cooldownIndicator.style.height = '5px';
+        cooldownIndicator.style.backgroundColor = 'rgba(100, 100, 100, 0.5)';
+        cooldownIndicator.style.borderRadius = '2px';
+        cooldownIndicator.style.overflow = 'hidden';
+        cannonContainer.appendChild(cooldownIndicator);
+
+        // Cooldown progress
+        const cooldownProgress = document.createElement('div');
+        cooldownProgress.style.width = '0%';
+        cooldownProgress.style.height = '100%';
+        cooldownProgress.style.backgroundColor = 'rgba(255, 200, 50, 0.8)';
+        cooldownProgress.style.transition = 'width 0.1s linear';
+        cooldownIndicator.appendChild(cooldownProgress);
+
+        return {
+            container: cannonContainer,
+            fireButton: fireButton,
+            status: cannonStatus,
+            cooldown: {
+                indicator: cooldownIndicator,
+                progress: cooldownProgress
+            }
+        };
+    }
+
+    createInventoryUI() {
+        // Create inventory button (to open/close inventory)
+        const inventoryButton = document.createElement('button');
+        inventoryButton.textContent = 'Inventory';
+        inventoryButton.style.position = 'absolute';
+        inventoryButton.style.top = '10px';
+        inventoryButton.style.right = '20px';
+        inventoryButton.style.padding = '8px 15px';
+        inventoryButton.style.backgroundColor = 'rgba(60, 80, 120, 0.8)';
+        inventoryButton.style.border = '2px solid rgba(100, 150, 200, 0.9)';
+        inventoryButton.style.borderRadius = '5px';
+        inventoryButton.style.color = 'white';
+        inventoryButton.style.fontWeight = 'bold';
+        inventoryButton.style.cursor = 'pointer';
+        inventoryButton.style.fontSize = '16px';
+        inventoryButton.style.pointerEvents = 'auto';
+        document.body.appendChild(inventoryButton);
+
+        // Create inventory panel (hidden by default)
+        const inventoryPanel = document.createElement('div');
+        inventoryPanel.style.position = 'absolute';
+        inventoryPanel.style.top = '50%';
+        inventoryPanel.style.left = '50%';
+        inventoryPanel.style.transform = 'translate(-50%, -50%)';
+        inventoryPanel.style.width = '600px';
+        inventoryPanel.style.height = '400px';
+        inventoryPanel.style.backgroundColor = 'rgba(20, 40, 80, 0.9)';
+        inventoryPanel.style.border = '3px solid rgba(100, 150, 200, 0.9)';
+        inventoryPanel.style.borderRadius = '10px';
+        inventoryPanel.style.padding = '20px';
+        inventoryPanel.style.display = 'none';
+        inventoryPanel.style.flexDirection = 'column';
+        inventoryPanel.style.zIndex = '1000';
+        inventoryPanel.style.pointerEvents = 'auto';
+        inventoryPanel.style.color = 'white';
+        inventoryPanel.style.fontFamily = 'Arial, sans-serif';
+        inventoryPanel.style.boxShadow = '0 0 20px rgba(0, 0, 0, 0.5)';
+        document.body.appendChild(inventoryPanel);
+
+        // Inventory header
+        const inventoryHeader = document.createElement('div');
+        inventoryHeader.style.display = 'flex';
+        inventoryHeader.style.justifyContent = 'space-between';
+        inventoryHeader.style.alignItems = 'center';
+        inventoryHeader.style.marginBottom = '20px';
+        inventoryPanel.appendChild(inventoryHeader);
+
+        // Inventory title
+        const inventoryTitle = document.createElement('h2');
+        inventoryTitle.textContent = 'Inventory';
+        inventoryTitle.style.margin = '0';
+        inventoryTitle.style.color = 'rgba(150, 200, 255, 1)';
+        inventoryHeader.appendChild(inventoryTitle);
+
+        // Close button
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '✕';
+        closeButton.style.backgroundColor = 'transparent';
+        closeButton.style.border = 'none';
+        closeButton.style.color = 'white';
+        closeButton.style.fontSize = '20px';
+        closeButton.style.cursor = 'pointer';
+        closeButton.style.padding = '5px 10px';
+        closeButton.style.borderRadius = '5px';
+        closeButton.style.transition = 'background-color 0.2s';
+        closeButton.addEventListener('mouseover', () => {
+            closeButton.style.backgroundColor = 'rgba(255, 100, 100, 0.3)';
+        });
+        closeButton.addEventListener('mouseout', () => {
+            closeButton.style.backgroundColor = 'transparent';
+        });
+        inventoryHeader.appendChild(closeButton);
+
+        // Tabs for different inventory categories
+        const tabsContainer = document.createElement('div');
+        tabsContainer.style.display = 'flex';
+        tabsContainer.style.marginBottom = '15px';
+        tabsContainer.style.borderBottom = '1px solid rgba(100, 150, 200, 0.5)';
+        inventoryPanel.appendChild(tabsContainer);
+
+        // Fish tab (active by default)
+        const fishTab = document.createElement('div');
+        fishTab.textContent = 'Fish';
+        fishTab.style.padding = '8px 15px';
+        fishTab.style.marginRight = '10px';
+        fishTab.style.cursor = 'pointer';
+        fishTab.style.backgroundColor = 'rgba(100, 150, 200, 0.5)';
+        fishTab.style.borderTopLeftRadius = '5px';
+        fishTab.style.borderTopRightRadius = '5px';
+        fishTab.dataset.active = 'true';
+        tabsContainer.appendChild(fishTab);
+
+        // Other tabs can be added here (for future expansion)
+        const treasureTab = document.createElement('div');
+        treasureTab.textContent = 'Treasures';
+        treasureTab.style.padding = '8px 15px';
+        treasureTab.style.marginRight = '10px';
+        treasureTab.style.cursor = 'pointer';
+        treasureTab.style.opacity = '0.7';
+        treasureTab.style.borderTopLeftRadius = '5px';
+        treasureTab.style.borderTopRightRadius = '5px';
+        treasureTab.dataset.active = 'false';
+        tabsContainer.appendChild(treasureTab);
+
+        // Content area
+        const contentArea = document.createElement('div');
+        contentArea.style.flex = '1';
+        contentArea.style.overflowY = 'auto';
+        contentArea.style.padding = '10px';
+        contentArea.style.backgroundColor = 'rgba(30, 50, 90, 0.5)';
+        contentArea.style.borderRadius = '5px';
+        inventoryPanel.appendChild(contentArea);
+
+        // Fish inventory content (visible by default)
+        const fishContent = document.createElement('div');
+        fishContent.id = 'fish-inventory';
+        fishContent.style.display = 'flex';
+        fishContent.style.flexDirection = 'column';
+        fishContent.style.gap = '15px';
+        contentArea.appendChild(fishContent);
+
+        // Treasure inventory content (hidden by default)
+        const treasureContent = document.createElement('div');
+        treasureContent.id = 'treasure-inventory';
+        treasureContent.style.display = 'none';
+        treasureContent.textContent = 'No treasures found yet. Explore more islands!';
+        treasureContent.style.textAlign = 'center';
+        treasureContent.style.padding = '20px';
+        treasureContent.style.color = 'rgba(200, 200, 200, 0.7)';
+        contentArea.appendChild(treasureContent);
+
+        // Set up event listeners
+        inventoryButton.addEventListener('click', () => {
+            inventoryPanel.style.display = 'flex';
+            // Update inventory content when opened
+            this.updateInventoryContent();
+        });
+
+        closeButton.addEventListener('click', () => {
+            inventoryPanel.style.display = 'none';
+        });
+
+        // Tab switching
+        fishTab.addEventListener('click', () => {
+            if (fishTab.dataset.active === 'true') return;
+
+            // Update active states
+            fishTab.dataset.active = 'true';
+            treasureTab.dataset.active = 'false';
+
+            // Update styles
+            fishTab.style.backgroundColor = 'rgba(100, 150, 200, 0.5)';
+            fishTab.style.opacity = '1';
+            treasureTab.style.backgroundColor = 'transparent';
+            treasureTab.style.opacity = '0.7';
+
+            // Show/hide content
+            fishContent.style.display = 'flex';
+            treasureContent.style.display = 'none';
+        });
+
+        treasureTab.addEventListener('click', () => {
+            if (treasureTab.dataset.active === 'true') return;
+
+            // Update active states
+            treasureTab.dataset.active = 'true';
+            fishTab.dataset.active = 'false';
+
+            // Update styles
+            treasureTab.style.backgroundColor = 'rgba(100, 150, 200, 0.5)';
+            treasureTab.style.opacity = '1';
+            fishTab.style.backgroundColor = 'transparent';
+            fishTab.style.opacity = '0.7';
+
+            // Show/hide content
+            treasureContent.style.display = 'block';
+            fishContent.style.display = 'none';
+        });
+
+        // Function to update inventory content
+        this.updateInventoryContent = function () {
+            // This will be called from outside to update the inventory
+            // Implementation will be added later
+        };
+
+        return {
+            button: inventoryButton,
+            panel: inventoryPanel,
+            fishContent: fishContent,
+            treasureContent: treasureContent,
+            updateContent: this.updateInventoryContent
+        };
     }
 
     addIslandMarker(id, position, radius) {
@@ -319,6 +716,11 @@ class GameUI {
             }
         }
 
+        // Update fish count
+        if (data.fishCount !== undefined) {
+            this.elements.fishing.counter.textContent = `Fish: ${data.fishCount}`;
+        }
+
         // Update mini-map
         if (data.position && data.heading !== undefined) {
             this.updateMiniMap(data.position, data.heading, data.mapScale || 100);
@@ -368,6 +770,116 @@ class GameUI {
         if (speed < 56) return 'Storm';
         if (speed < 64) return 'Violent Storm';
         return 'Hurricane';
+    }
+
+    updateInventory(fishInventory) {
+        const fishContent = this.elements.inventory.fishContent;
+
+        // Clear existing content
+        fishContent.innerHTML = '';
+
+        // If no fish, show message
+        if (Object.keys(fishInventory).length === 0) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.textContent = 'No fish caught yet. Try fishing!';
+            emptyMessage.style.textAlign = 'center';
+            emptyMessage.style.padding = '20px';
+            emptyMessage.style.color = 'rgba(200, 200, 200, 0.7)';
+            fishContent.appendChild(emptyMessage);
+            return;
+        }
+
+        // Define fish tiers
+        const tiers = [
+            { name: "Legendary", color: "#FFD700", fishes: [] },  // Gold
+            { name: "Rare", color: "#9370DB", fishes: [] },       // Purple
+            { name: "Uncommon", color: "#32CD32", fishes: [] },   // Green
+            { name: "Common", color: "#B0C4DE", fishes: [] }      // Light blue
+        ];
+
+        // Sort fish into tiers
+        for (const [fishName, fishData] of Object.entries(fishInventory)) {
+            if (fishData.value >= 20) {
+                tiers[0].fishes.push({ name: fishName, ...fishData });
+            } else if (fishData.value >= 5) {
+                tiers[1].fishes.push({ name: fishName, ...fishData });
+            } else if (fishData.value >= 2) {
+                tiers[2].fishes.push({ name: fishName, ...fishData });
+            } else {
+                tiers[3].fishes.push({ name: fishName, ...fishData });
+            }
+        }
+
+        // Create tier sections
+        tiers.forEach(tier => {
+            if (tier.fishes.length === 0) return; // Skip empty tiers
+
+            // Create tier header
+            const tierSection = document.createElement('div');
+            tierSection.style.marginBottom = '15px';
+
+            const tierHeader = document.createElement('div');
+            tierHeader.textContent = tier.name;
+            tierHeader.style.fontSize = '18px';
+            tierHeader.style.fontWeight = 'bold';
+            tierHeader.style.color = tier.color;
+            tierHeader.style.borderBottom = `1px solid ${tier.color}`;
+            tierHeader.style.paddingBottom = '5px';
+            tierHeader.style.marginBottom = '10px';
+            tierSection.appendChild(tierHeader);
+
+            // Create fish grid
+            const fishGrid = document.createElement('div');
+            fishGrid.style.display = 'grid';
+            fishGrid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(120px, 1fr))';
+            fishGrid.style.gap = '10px';
+
+            // Add fish to grid
+            tier.fishes.forEach(fish => {
+                const fishCard = document.createElement('div');
+                fishCard.style.backgroundColor = 'rgba(50, 70, 110, 0.7)';
+                fishCard.style.borderRadius = '5px';
+                fishCard.style.padding = '10px';
+                fishCard.style.display = 'flex';
+                fishCard.style.flexDirection = 'column';
+                fishCard.style.alignItems = 'center';
+                fishCard.style.border = `1px solid ${tier.color}`;
+
+                // Fish icon (colored rectangle for now, could be replaced with images)
+                const fishIcon = document.createElement('div');
+                fishIcon.style.width = '50px';
+                fishIcon.style.height = '30px';
+                fishIcon.style.backgroundColor = fish.color ? `#${fish.color.toString(16).padStart(6, '0')}` : tier.color;
+                fishIcon.style.borderRadius = '3px';
+                fishIcon.style.marginBottom = '8px';
+                fishCard.appendChild(fishIcon);
+
+                // Fish name
+                const fishName = document.createElement('div');
+                fishName.textContent = fish.name;
+                fishName.style.fontWeight = 'bold';
+                fishName.style.marginBottom = '5px';
+                fishName.style.textAlign = 'center';
+                fishCard.appendChild(fishName);
+
+                // Fish count
+                const fishCount = document.createElement('div');
+                fishCount.textContent = `Count: ${fish.count}`;
+                fishCount.style.fontSize = '12px';
+                fishCard.appendChild(fishCount);
+
+                // Fish value
+                const fishValue = document.createElement('div');
+                fishValue.textContent = `Value: ${fish.value}`;
+                fishValue.style.fontSize = '12px';
+                fishCard.appendChild(fishValue);
+
+                fishGrid.appendChild(fishCard);
+            });
+
+            tierSection.appendChild(fishGrid);
+            fishContent.appendChild(tierSection);
+        });
     }
 }
 
