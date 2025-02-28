@@ -10,6 +10,7 @@ import { createBoat } from './character.js';
 import { scene, camera, renderer, updateTime, getTime } from './gameState.js';
 import { setupSkybox, updateSkybox, setupSky, updateTimeOfDay, updateSunPosition, getTimeOfDay } from './skybox.js';
 import { setupClouds, updateClouds } from './clouds.js';
+import { setupBirds, updateBirds } from './birds.js';
 
 // Add these variables to your global scope
 let lastTime = null;
@@ -1078,6 +1079,9 @@ function animate() {
     // Update clouds based on boat position
     updateClouds(boat.position);
 
+    // Update birds with delta time
+    updateBirds(deltaTime);
+
     renderer.render(scene, camera);
     //composer.render();
 }
@@ -1204,3 +1208,6 @@ setupSkybox();
 
 // Initialize clouds
 const clouds = setupClouds();
+
+// Initialize birds
+const birds = setupBirds(activeIslands, boat);
