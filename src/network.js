@@ -23,8 +23,6 @@ let activeIslands;
 // Initialize the network connection
 export function initializeNetwork(gameScene, gamePlayerState, gameBoat, gameIslandColliders, gameActiveIslands, gamePlayerName, gamePlayerColor) {
     // Store references to game objects
-    console.log("we are here")
-
     scene = gameScene;
     playerState = gamePlayerState;
     boat = gameBoat;
@@ -36,7 +34,6 @@ export function initializeNetwork(gameScene, gamePlayerState, gameBoat, gameIsla
     // Apply the player's color to their own boat
     applyColorToBoat(boat, playerColor);
 
-    console.log("we are here")
     // Load Socket.IO client if not already loaded
     if (typeof io === 'undefined') {
         console.error('Socket.IO client not loaded. Make sure to include the Socket.IO script in your HTML.');
