@@ -1,7 +1,22 @@
 import * as THREE from 'three';
+import { scene, camera, directionalLight, ambientLight, getTime } from './gameState.js';
+
+const skyRadius = 20001; // Larger sky radius
+const sunSize = 100; // Increased from 10 to make the sun larger
+let skyMaterial;
+let skyMesh;
+let lastTimeOfDay = "";
+let skyboxTransitionProgress = 0;
+let skyboxTransitionDuration = 20; // Seconds for transition
+let sunMesh;
+
+scene.add(ambientLight);
+
+directionalLight.position.set(5, 10, 5);
+scene.add(directionalLight);
 
 // Create a skybox with a single material
-export function setupSkybox(scene, camera) {
+export function setupSkybox() {
     // Skybox size
     const skyboxSize = 10000;
 
@@ -36,9 +51,9 @@ export function setupSkybox(scene, camera) {
 }
 
 // Get gradual sky color based on continuous time
-export function getGradualSkyboxColor(time) {
+export function getGradualSkyboxColor() {
     // Normalize time to 0-1 range for a full day cycle
-    const dayPhase = (time * 0.005) % 1;
+    const dayPhase = (getTime() * 0.005) % 1;
 
     // Define key colors for different times of day
     const colors = [
@@ -75,10 +90,10 @@ export function getGradualSkyboxColor(time) {
 }
 
 // Update skybox in animation loop
-export function updateSkybox(time, camera) {
+export function updateSkybox() {
     if (window.skybox) {
         // Get gradually changing color based on time
-        const newColor = getGradualSkyboxColor(time);
+        const newColor = getGradualSkyboxColor();
 
         // Apply with slight easing for smoother transitions
         window.skybox.material.color.lerp(newColor, 0.03);
@@ -86,4 +101,319 @@ export function updateSkybox(time, camera) {
         // Keep skybox centered on camera
         window.skybox.position.copy(camera.position);
     }
-} 
+}
+
+export function setupSky() {
+    // Create a sphere for the sky
+    const skyGeometry = new THREE.SphereGeometry(skyRadius, 32, 32);
+    // Inside faces
+    skyGeometry.scale(-1, 1, 1);
+
+    // Create a basic material first, then set properties
+    skyMaterial = new THREE.MeshBasicMaterial();
+
+    // Set properties after creation
+    skyMaterial.color = new THREE.Color(0x0a1a2a); // Dark blue for night
+    skyMaterial.side = THREE.BackSide;
+    skyMaterial.fog = false;
+    skyMaterial.depthWrite = false; // Prevent sky from writing to depth buffer
+
+    // Create the sky mesh
+    skyMesh = new THREE.Mesh(skyGeometry, skyMaterial);
+    skyMesh.renderOrder = -1; // Ensure it renders first
+    scene.add(skyMesh);
+
+    // Create a sun/moon mesh with larger size
+    const sunGeometry = new THREE.SphereGeometry(sunSize, 32, 32);
+    const sunMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffaa,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false, // Prevent sun from writing to depth buffer
+        depthTest: false   // Disable depth testing for the sun
+    });
+
+    // Add a glow effect to the sun
+    const sunGlowGeometry = new THREE.SphereGeometry(sunSize * 1.2, 32, 32);
+    const sunGlowMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffdd,
+        transparent: true,
+        opacity: 0.4,
+        side: THREE.BackSide,
+        depthWrite: false, // Prevent glow from writing to depth buffer
+        depthTest: false   // Disable depth testing for the glow
+    });
+
+    const sunGlow = new THREE.Mesh(sunGlowGeometry, sunGlowMaterial);
+
+    sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
+    sunMesh.add(sunGlow); // Add glow as a child of the sun
+    sunMesh.renderOrder = 1000; // Ensure sun renders after everything else
+
+    // Position it at the same position as the directional light
+    // but scaled to be at the edge of the skybox
+    const lightDirection = new THREE.Vector3()
+        .copy(directionalLight.position)
+        .normalize();
+    sunMesh.position.copy(lightDirection.multiplyScalar(skyRadius * 0.95));
+
+    scene.add(sunMesh);
+}
+
+export function updateTimeOfDay(deltaTime) {
+    const timeOfDay = getTimeOfDay().toLowerCase(); // Convert to lowercase to match lighting functions
+
+    // If time of day has changed, start transition
+    if (timeOfDay !== lastTimeOfDay) {
+        console.log(`Time of day changed to: ${timeOfDay}`); // Debug log
+        lastTimeOfDay = timeOfDay;
+        skyboxTransitionProgress = 0;
+    }
+
+    // Update transition progress
+    if (skyboxTransitionProgress < 1) {
+        skyboxTransitionProgress += deltaTime / skyboxTransitionDuration;
+        skyboxTransitionProgress = Math.min(skyboxTransitionProgress, 1);
+
+        // Get target colors and settings
+        const targetSkyColor = getSkyColor(timeOfDay);
+        const targetAmbientLight = getAmbientLight(timeOfDay);
+        const targetDirectionalLight = getDirectionalLight(timeOfDay);
+
+        // Make color transition more dramatic (0.05 instead of 0.01)
+        if (skyMaterial) {
+            skyMaterial.color.lerp(targetSkyColor, 0.05);
+        }
+
+        // Update ambient light with faster transition
+        ambientLight.color.lerp(targetAmbientLight.color, 0.05);
+        ambientLight.intensity += (targetAmbientLight.intensity - ambientLight.intensity) * 0.05;
+
+        // Update directional light with faster transition
+        directionalLight.color.lerp(targetDirectionalLight.color, 0.05);
+        directionalLight.intensity += (targetDirectionalLight.intensity - directionalLight.intensity) * 0.05;
+
+        // Update directional light position with faster transition
+        directionalLight.position.x += (targetDirectionalLight.position.x - directionalLight.position.x) * 0.05;
+        directionalLight.position.y += (targetDirectionalLight.position.y - directionalLight.position.y) * 0.05;
+        directionalLight.position.z += (targetDirectionalLight.position.z - directionalLight.position.z) * 0.05;
+
+        // Update sun position to match directional light but ensure it stays within skybox
+        if (sunMesh) {
+            // Calculate direction from origin to light
+            const lightDirection = new THREE.Vector3()
+                .copy(directionalLight.position)
+                .normalize();
+
+            // Position sun at the edge of the skybox in the light direction
+            sunMesh.position.copy(lightDirection.multiplyScalar(skyRadius * 0.95));
+
+            // Always face the sun toward the camera
+            sunMesh.lookAt(camera.position);
+
+            // Update sun color and size based on time of day
+            if (timeOfDay === 'night') {
+                sunMesh.material.color.set(0xaaaaff); // Bluish for moon
+                sunMesh.scale.set(0.7, 0.7, 0.7); // Smaller moon
+            } else if (timeOfDay === 'dawn' || timeOfDay === 'dusk') {
+                sunMesh.material.color.set(0xff7700); // Orange for sunrise/sunset
+                sunMesh.scale.set(1.2, 1.2, 1.2); // Slightly larger sun at dawn/dusk
+            } else {
+                sunMesh.material.color.set(0xffffaa); // Yellow for day
+                sunMesh.scale.set(1.0, 1.0, 1.0); // Normal size for day
+            }
+        }
+
+        // Update skybox to match time of day
+        updateSkybox();
+    }
+}
+
+export function getDirectionalLight(timeOfDay) {
+    switch (timeOfDay) {
+        case 'dawn':
+            return {
+                color: new THREE.Color(0xffb55a), // Warmer orange sunrise
+                intensity: 0.7, // Higher intensity for better contrast
+                position: new THREE.Vector3(-500, 1000, 0)
+            };
+        case 'day':
+            return {
+                color: new THREE.Color(0xffefd1), // Warmer, less harsh sunlight
+                intensity: 0.8, // More directional intensity for better shadows
+                position: new THREE.Vector3(0, 1800, 0)
+            };
+        case 'dusk':
+            return {
+                color: new THREE.Color(0xff6a33), // Richer sunset color
+                intensity: 0.7, // Higher contrast for sunset
+                position: new THREE.Vector3(500, 1000, 0)
+            };
+        case 'night':
+            return {
+                color: new THREE.Color(0x445e8c), // More blue-tinted moonlight
+                intensity: 0.3, // Lower but still visible
+                position: new THREE.Vector3(0, -1000, 1000)
+            };
+        default:
+            return {
+                color: new THREE.Color(0xffefd1),
+                intensity: 0.8,
+                position: new THREE.Vector3(0, 1800, 0)
+            };
+    }
+}
+
+export function updateSunPosition() {
+    if (sunMesh && directionalLight) {
+        // Get gradual sun position
+        const sunPosition = getGradualSunPosition();
+
+        // Update directional light position to match sun
+        directionalLight.position.copy(sunPosition);
+
+        // Position sun mesh at edge of skybox in light direction
+        const lightDirection = new THREE.Vector3()
+            .copy(directionalLight.position)
+            .normalize();
+
+        sunMesh.position.copy(lightDirection.multiplyScalar(skyRadius * 0.95));
+
+        // Always face the sun toward the camera
+        sunMesh.lookAt(camera.position);
+
+        // Update sun color and intensity
+        const sunColor = getGradualSunColor();
+        sunMesh.material.color.lerp(sunColor, 0.05);
+
+        // Update sun size based on time (smaller at night)
+        const dayPhase = (getTime() * 0.005) % 1;
+        const sunScale = (dayPhase > 0.85 || dayPhase < 0.15) ? 0.7 : 1.0;
+        sunMesh.scale.lerp(new THREE.Vector3(sunScale, sunScale, sunScale), 0.05);
+
+        // Update directional light intensity and color
+        const intensity = getGradualLightIntensity();
+        directionalLight.intensity = directionalLight.intensity * 0.95 + intensity * 0.05;
+        directionalLight.color.lerp(sunColor, 0.05);
+
+        // Update ambient light intensity (brighter during day)
+        if (ambientLight) {
+            ambientLight.intensity = 0.2 + intensity * 0.3;
+        }
+    }
+}
+
+export function getTimeOfDay() {
+    // Cycle through different times of day
+    const dayPhase = (getTime() * 0.005) % 1; // 0 to 1 representing full day cycle
+
+    if (dayPhase < 0.2) return "Dawn";
+    if (dayPhase < 0.4) return "Day";
+    if (dayPhase < 0.6) return "Afternoon";
+    if (dayPhase < 0.8) return "Dusk";
+    return "Night";
+}
+
+function getSkyColor(timeOfDay) {
+    switch (timeOfDay) {
+        case 'dawn':
+            return new THREE.Color(0xe0a080); // Richer dawn sky
+        case 'day':
+            return new THREE.Color(0x87ceeb); // Classic sky blue, less washed out
+        case 'dusk':
+            return new THREE.Color(0xff7747); // More vibrant sunset
+        case 'night':
+            return new THREE.Color(0x0a1025); // Deeper night sky
+        default:
+            return new THREE.Color(0x87ceeb);
+    }
+}
+
+function getAmbientLight(timeOfDay) {
+    switch (timeOfDay) {
+        case 'dawn':
+            return {
+                color: new THREE.Color(0x7a5c70), // Purple-tinted for dawn
+                intensity: 0.2 // Reduced for more contrast
+            };
+        case 'day':
+            return {
+                color: new THREE.Color(0x89a7c5), // Slightly bluer sky ambient
+                intensity: 0.25 // Reduced for better contrast with directional
+            };
+        case 'dusk':
+            return {
+                color: new THREE.Color(0x614b5a), // Deeper dusk ambient
+                intensity: 0.2
+            };
+        case 'night':
+            return {
+                color: new THREE.Color(0x1a2035), // Darker night ambient
+                intensity: 0.15 // Very low but not completely dark
+            };
+        default:
+            return {
+                color: new THREE.Color(0x89a7c5),
+                intensity: 0.25
+            };
+    }
+}
+
+function getGradualSunPosition() {
+    // Use same day phase calculation as skybox for consistency
+    const dayPhase = (getTime() * 0.005) % 1;
+
+    // Calculate sun position in an arc from east to west
+    // Angle goes from -π/2 (dawn) through π/2 (noon) to 3π/2 (dusk/night)
+    const angle = (dayPhase * Math.PI * 2) - Math.PI / 2;
+
+    // Sun height follows a sine curve (highest at noon)
+    const height = Math.sin(dayPhase * Math.PI) * 800;
+    const distance = 1000;
+
+    // Calculate position
+    const x = Math.cos(angle) * distance;
+    const y = Math.max(height, -700); // Keep minimum height
+    const z = Math.sin(angle) * distance;
+
+    return new THREE.Vector3(x, y, z);
+}
+
+function getGradualSunColor() {
+    const dayPhase = (getTime() * 0.005) % 1;
+
+    // Define colors for different phases
+    if (dayPhase < 0.2) {
+        // Dawn
+        return new THREE.Color(0xff7700); // Orange sunrise
+    } else if (dayPhase < 0.75) {
+        // Day
+        return new THREE.Color(0xffffaa); // Yellow day
+    } else if (dayPhase < 0.85) {
+        // Dusk
+        return new THREE.Color(0xff7700); // Orange sunset
+    } else {
+        // Night
+        return new THREE.Color(0xaaaaff); // Bluish moon
+    }
+}
+
+// Get gradual light intensity based on time
+function getGradualLightIntensity() {
+    const dayPhase = (getTime() * 0.005) % 1;
+
+    // Highest at noon, lowest at night
+    if (dayPhase < 0.25) {
+        // Dawn - rising intensity
+        return 0.2 + (dayPhase / 0.25) * 0.8;
+    } else if (dayPhase < 0.75) {
+        // Day - full intensity
+        return 1.0;
+    } else if (dayPhase < 0.85) {
+        // Dusk - falling intensity
+        return 1.0 - ((dayPhase - 0.75) / 0.1) * 0.8;
+    } else {
+        // Night - low intensity
+        return 0.2;
+    }
+}
