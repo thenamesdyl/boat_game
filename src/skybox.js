@@ -161,11 +161,11 @@ export function setupSky() {
 }
 
 export function updateTimeOfDay(deltaTime) {
-    const timeOfDay = getTimeOfDay().toLowerCase(); // Convert to lowercase to match lighting functions
+    const timeOfDay = getTimeOfDay().toLowerCase();
 
     // If time of day has changed, start transition
     if (timeOfDay !== lastTimeOfDay) {
-        console.log(`Time of day changed to: ${timeOfDay}`); // Debug log
+        console.log(`Time of day changed to: ${timeOfDay}`);
         lastTimeOfDay = timeOfDay;
         skyboxTransitionProgress = 0;
     }
@@ -213,8 +213,9 @@ export function updateTimeOfDay(deltaTime) {
 
             // Update sun color and size based on time of day
             if (timeOfDay === 'night') {
-                sunMesh.material.color.set(0xaaaaff); // Bluish for moon
+                sunMesh.material.color.set(0xccddff); // Brighter moon (was 0xaaaaff)
                 sunMesh.scale.set(0.7, 0.7, 0.7); // Smaller moon
+                updateMoonGlow(); // Update moon glow
             } else if (timeOfDay === 'dawn' || timeOfDay === 'dusk') {
                 sunMesh.material.color.set(0xff7700); // Orange for sunrise/sunset
                 sunMesh.scale.set(1.2, 1.2, 1.2); // Slightly larger sun at dawn/dusk
@@ -226,6 +227,11 @@ export function updateTimeOfDay(deltaTime) {
 
         // Update skybox to match time of day
         updateSkybox();
+    }
+
+    // Always update moon glow when it's night
+    if (lastTimeOfDay === 'night') {
+        updateMoonGlow();
     }
 }
 
@@ -251,8 +257,8 @@ export function getDirectionalLight(timeOfDay) {
             };
         case 'night':
             return {
-                color: new THREE.Color(0x445e8c), // More blue-tinted moonlight
-                intensity: 0.3, // Lower but still visible
+                color: new THREE.Color(0x6a8abc), // Brighter, more blue-tinted moonlight (was 0x445e8c)
+                intensity: 0.5, // Increased from 0.3 for better visibility
                 position: new THREE.Vector3(0, -1000, 1000)
             };
         default:
@@ -317,13 +323,13 @@ export function getTimeOfDay() {
 function getSkyColor(timeOfDay) {
     switch (timeOfDay) {
         case 'dawn':
-            return new THREE.Color(0xe0a080); // Richer dawn sky
+            return new THREE.Color(0x9a6a8c); // Purplish dawn
         case 'day':
-            return new THREE.Color(0x87ceeb); // Classic sky blue, less washed out
+            return new THREE.Color(0x87ceeb); // Sky blue
         case 'dusk':
-            return new THREE.Color(0xff7747); // More vibrant sunset
+            return new THREE.Color(0xff7f50); // Coral sunset
         case 'night':
-            return new THREE.Color(0x0a1025); // Deeper night sky
+            return new THREE.Color(0x1a2a4a); // Lighter night blue (was 0x0a1a2a)
         default:
             return new THREE.Color(0x87ceeb);
     }
@@ -348,8 +354,8 @@ function getAmbientLight(timeOfDay) {
             };
         case 'night':
             return {
-                color: new THREE.Color(0x1a2035), // Darker night ambient
-                intensity: 0.15 // Very low but not completely dark
+                color: new THREE.Color(0x2a3045), // Lighter night ambient (was 0x1a2035)
+                intensity: 0.25 // Increased from 0.15 for better visibility
             };
         default:
             return {
@@ -415,5 +421,26 @@ function getGradualLightIntensity() {
     } else {
         // Night - low intensity
         return 0.2;
+    }
+}
+
+// Add this function to enhance moon glow at night
+function updateMoonGlow() {
+    if (sunMesh && lastTimeOfDay === 'night') {
+        // Find the glow child of the sun/moon
+        sunMesh.children.forEach(child => {
+            if (child.material) {
+                // Enhance the glow for the moon
+                child.material.opacity = 0.6; // Increased from 0.4
+                child.scale.set(1.5, 1.5, 1.5); // Larger glow for moon
+                child.material.color.set(0xaaddff); // Bluer glow for moon
+            }
+        });
+
+        // Make the moon itself brighter
+        if (sunMesh.material) {
+            sunMesh.material.color.set(0xccddff); // Brighter moon
+            sunMesh.material.opacity = 1.0; // Full opacity
+        }
     }
 }
