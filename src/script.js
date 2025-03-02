@@ -6,23 +6,21 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectionShader.js';
 import * as Network from './network.js';
 import { gameUI } from './ui.js';
-import { createBoat } from './character.js';
-import { scene, camera, renderer, updateTime, getTime } from './gameState.js';
+import { scene, camera, renderer, updateTime, getTime, boat, getWindData, boatVelocity, boatSpeed, rotationSpeed, keys } from './gameState.js';
 import { setupSkybox, updateSkybox, setupSky, updateTimeOfDay, updateSunPosition, getTimeOfDay } from './skybox.js';
 import { setupClouds, updateClouds } from './clouds.js';
 import { setupBirds, updateBirds } from './birds.js';
 import { setupSeaMonsters, updateSeaMonsters, getMonsters } from './seaMonsters.js';
 import { initFishing, updateFishing, getFishCount } from './fishing.js';
 import { initCannons, updateCannons } from './cannons.js';
+import { animateSail } from './animations.js';
+import { applyWindInfluence, updateBoatRocking } from './character.js';
+
+
+
 
 // Add these variables to your global scope
 let lastTime = null;
-
-// Add these variables near the top with your other boat variables
-let boatRockAngleX = 0; // Pitch (forward/backward rocking)
-let boatRockAngleZ = 0; // Roll (side-to-side rocking)
-const rockSpeed = 1.5; // How fast the boat rocks
-const maxRockAngle = 0.04; // Maximum rocking angle in radians (about 2.3 degrees)
 
 // Scene setup
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -870,7 +868,7 @@ function updateVisibleChunks() {
 
 // Update or replace the existing boat creation code with the function above
 // Then call it to create the boat:
-const boat = createBoat(scene);
+
 
 // Update camera positioning in the animation loop
 // Replace the existing camera positioning code (around line 1289) with:
@@ -904,10 +902,6 @@ function updateCamera() {
 // updateCamera();
 
 // Boat controls (slower)
-const boatVelocity = new THREE.Vector3(0, 0, 0);
-const boatSpeed = 0.2; // Much slower speed (was 0.03)
-const rotationSpeed = 0.03; // Slower turning (was 0.03)
-const keys = { forward: false, backward: false, left: false, right: false };
 
 // Mouse camera control variables
 const mouseControl = {
@@ -1090,6 +1084,11 @@ function animate() {
     // Update cannons
     updateCannons(deltaTime);
 
+    // Update sail animation
+    animateSail(deltaTime);
+
+    applyWindInfluence();
+
     renderer.render(scene, camera);
     //composer.render();
 }
@@ -1101,13 +1100,6 @@ function calculateBoatSpeed() {
 }
 
 // Get wind direction and speed (you can make this dynamic later)
-function getWindData() {
-    // For now, return static data or calculate based on time
-    return {
-        direction: (Math.sin(getTime() * 0.01) * Math.PI) + Math.PI, // Slowly changing direction
-        speed: 5 + Math.sin(getTime() * 0.05) * 3 // Wind speed between 2-8 knots
-    };
-}
 
 // Get time of day based on game time
 
@@ -1186,28 +1178,6 @@ window.addEventListener('beforeunload', () => {
 
 
 // Add gentle rocking motion based on boat speed and waves
-function updateBoatRocking(deltaTime) {
-    // Calculate boat speed magnitude
-    const speedMagnitude = Math.abs(boatVelocity.z);
-
-    // Only rock if the boat is moving at least a little
-    if (speedMagnitude > 0.01) {
-        // Gentle oscillation using sine waves with different frequencies
-        boatRockAngleX = Math.sin(getTime() * rockSpeed) * maxRockAngle * speedMagnitude;
-        boatRockAngleZ = Math.sin(getTime() * rockSpeed * 0.7) * maxRockAngle * speedMagnitude;
-
-        // Apply the rocking rotation (keep existing Y rotation)
-        const currentYRotation = boat.rotation.y;
-        boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
-    } else {
-        // Gradually return to level when not moving
-        boatRockAngleX *= 0.95;
-        boatRockAngleZ *= 0.95;
-
-        const currentYRotation = boat.rotation.y;
-        boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
-    }
-}
 
 // Create and add a simple blue skybox that changes with time of day
 

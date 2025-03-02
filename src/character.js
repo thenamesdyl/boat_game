@@ -1,4 +1,11 @@
 import * as THREE from 'three';
+import { getWindData, boatVelocity, boat, getTime } from './gameState.js';
+
+// Add these variables near the top with your other boat variables
+let boatRockAngleX = 0; // Pitch (forward/backward rocking)
+let boatRockAngleZ = 0; // Roll (side-to-side rocking)
+const rockSpeed = 1.5; // How fast the boat rocks
+const maxRockAngle = 0.04; // Maximum rocking angle in radians (about 2.3 degrees)
 
 // Add a small Minecraft-style character to the front of the boat
 export function addCharacterToBoat(boat) {
@@ -180,18 +187,39 @@ export function createBoat(scene) {
     mast.userData.isNotPlayerColorable = true; // Flag to prevent color changes
     boat.add(mast);
 
-    // Add a larger sail
-    const sailGeometry = new THREE.PlaneGeometry(5, 9);
+    // Add a larger sail with animation capability
+    const sailGeometry = new THREE.PlaneGeometry(5, 9, 20, 20); // More segments for better animation
     const sailMaterial = new THREE.MeshPhongMaterial({
         color: 0xf5f5f5,
         side: THREE.DoubleSide,
         name: 'sailMaterial'
     });
+
+    // Store original vertex positions for animation
+    sailGeometry.userData.originalPositions = [];
+    const positions = sailGeometry.attributes.position.array;
+    for (let i = 0; i < positions.length; i++) {
+        sailGeometry.userData.originalPositions.push(positions[i]);
+    }
+
     const sail = new THREE.Mesh(sailGeometry, sailMaterial);
     sail.rotation.y = Math.PI / 2;
     sail.position.set(0, 8, 1.5); // Positioned on the mast
     sail.userData.isNotPlayerColorable = true; // Flag to prevent color changes
+    sail.userData.isSail = true; // Flag to identify for animation
     boat.add(sail);
+
+    // Add a crossbeam for the sail
+    const crossBeamGeometry = new THREE.CylinderGeometry(0.15, 0.15, 5.5, 8);
+    const crossBeamMaterial = new THREE.MeshPhongMaterial({
+        color: 0x8b4513, // Brown color for crossbeam
+        name: 'crossBeamMaterial'
+    });
+    const crossBeam = new THREE.Mesh(crossBeamGeometry, crossBeamMaterial);
+    crossBeam.rotation.z = Math.PI / 2; // Make it horizontal
+    crossBeam.position.set(0, 12, 1.5); // Position at top of sail
+    crossBeam.userData.isNotPlayerColorable = true;
+    boat.add(crossBeam);
 
     // Rest of the boat code...
     scene.add(boat);
@@ -203,4 +231,49 @@ export function createBoat(scene) {
     addCharacterToBoat(boat);
 
     return boat;
+}
+
+// Add this function to script.js, near other boat movement code
+export function applyWindInfluence() {
+    // Get wind data
+    const windData = getWindData();
+    const windDirection = windData.direction;
+    const windSpeed = windData.speed;
+
+    // Calculate wind vector in world space
+    const windVector = new THREE.Vector3(
+        Math.cos(windDirection),
+        0,
+        Math.sin(windDirection)
+    );
+
+    // Scale by wind speed (very subtle influence)
+    const windInfluence = 0.02;
+    windVector.multiplyScalar(windSpeed * windInfluence);
+
+    // Apply to boat position
+    boat.position.add(windVector);
+}
+
+export function updateBoatRocking(deltaTime) {
+    // Calculate boat speed magnitude
+    const speedMagnitude = Math.abs(boatVelocity.z);
+
+    // Only rock if the boat is moving at least a little
+    if (speedMagnitude > 0.01) {
+        // Gentle oscillation using sine waves with different frequencies
+        boatRockAngleX = Math.sin(getTime() * rockSpeed) * maxRockAngle * speedMagnitude;
+        boatRockAngleZ = Math.sin(getTime() * rockSpeed * 0.7) * maxRockAngle * speedMagnitude;
+
+        // Apply the rocking rotation (keep existing Y rotation)
+        const currentYRotation = boat.rotation.y;
+        boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
+    } else {
+        // Gradually return to level when not moving
+        boatRockAngleX *= 0.95;
+        boatRockAngleZ *= 0.95;
+
+        const currentYRotation = boat.rotation.y;
+        boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
+    }
 }

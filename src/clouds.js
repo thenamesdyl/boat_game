@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { scene, getTime } from './gameState.js';
 
 let cloudInstances = [];
-const CLOUD_COUNT = 20;
+const CLOUD_COUNT = 40;
 const CLOUD_LAYER_HEIGHT = 500;
 const CLOUD_FIELD_SIZE = 5000;
 const CLOUD_DRIFT_SPEED = 0.8;
