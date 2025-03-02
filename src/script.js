@@ -17,6 +17,7 @@ import { animateSail } from './animations.js';
 import { applyWindInfluence, updateBoatRocking } from './character.js';
 import { initLeaderboard, updateLeaderboardData } from './leaderboard.js';
 import { requestLeaderboard } from './network.js';
+import { updateVillagers } from './villagers.js';
 
 
 
@@ -442,6 +443,8 @@ function createIsland(x, z, seed) {
         );
         island.add(tree);
     }
+
+    console.log("Created island:", islandId);
 
     // Store the island with its ID
     activeIslands.set(islandId, {
@@ -1029,6 +1032,8 @@ function animate() {
         if (boat.position.distanceTo(lastChunkUpdatePosition) > chunkUpdateThreshold) {
             lastChunkUpdatePosition.copy(boat.position);
             updateVisibleChunks();
+            // Add this line to update villagers whenever chunks update
+            updateVillagers(activeIslands);
         }
     }
 
@@ -1093,6 +1098,8 @@ function animate() {
 
     // Update fishing
     updateFishing();
+
+    updateVillagers(activeIslands);
 
     // Update cannons
     updateCannons(deltaTime);
@@ -1172,6 +1179,10 @@ updateVisibleChunks();
 setTimeout(() => {
     console.log("Forcing initial chunk update...");
     updateVisibleChunks();
+
+    // Add this line to initialize villagers after the first chunk update
+    updateVillagers(activeIslands);
+
 }, 1000);
 
 
