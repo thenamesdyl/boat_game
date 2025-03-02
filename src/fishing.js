@@ -42,7 +42,7 @@ export function initFishing(playerBoat) {
     boat = playerBoat;
 
     // Set up event listeners for fishing UI
-    gameUI.elements.fishing.castButton.addEventListener('click', toggleFishing);
+    gameUI.elements.fishing.castButton.onclick = toggleFishing;
     gameUI.elements.fishing.minigame.catchButton.addEventListener('click', attemptCatch);
 
     // Update fish counter
@@ -97,6 +97,7 @@ function stopFishing() {
     isFishing = false;
     gameUI.elements.fishing.castButton.textContent = 'Cast Line';
     gameUI.elements.fishing.status.textContent = 'Ready to fish';
+    gameUI.elements.fishing.castButton.onclick = toggleFishing;
 
     // Clear any pending timeouts
     if (fishingTimeout) {
