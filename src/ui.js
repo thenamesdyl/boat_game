@@ -30,27 +30,26 @@ class GameUI {
         this.miniMapContainer.style.border = '2px solid rgba(100, 200, 255, 0.7)';
         document.body.appendChild(this.miniMapContainer);
 
-        // Create UI elements
-        this.elements = {
-            speed: this.createUIElement('Speed: 0 knots'),
-            heading: this.createUIElement('Heading: N 0°'),
-            coordinates: this.createUIElement('Position: 0, 0'),
-            wind: this.createUIElement('Wind: Calm (0 knots)'),
-            time: this.createUIElement('Time: Dawn'),
-            playerCount: this.createUIElement('Players: 0'),
-            connectionStatus: this.createUIElement('Status: Connecting...'),
-            islandDistance: this.createUIElement('Nearest Island: None'),
-            compass: this.createCompass(),
-            speedometer: this.createSpeedometer(),
-            fishing: this.createFishingUI(),
-            cannon: this.createCannonUI(),
-            inventory: this.createInventoryUI()
-        };
+        // Initialize elements as an empty object first
+        this.elements = {};
 
-        // Create island markers for mini-map
+        // Create basic UI elements
+        this.elements.speed = this.createUIElement('Speed: 0 knots');
+        this.elements.heading = this.createUIElement('Heading: N 0°');
+        this.elements.coordinates = this.createUIElement('Position: 0, 0');
+        this.elements.wind = this.createUIElement('Wind: Calm (0 knots)');
+        this.elements.time = this.createUIElement('Time: Dawn');
+        this.elements.playerCount = this.createUIElement('Players: 0');
+        this.elements.connectionStatus = this.createUIElement('Status: Connecting...');
+        this.elements.islandDistance = this.createUIElement('Nearest Island: None');
+        this.elements.compass = this.createCompass();
+        this.elements.speedometer = this.createSpeedometer();
+        this.elements.fishing = this.createFishingUI();
+        this.elements.cannon = this.createCannonUI();
+        this.elements.inventory = this.createInventoryUI();
+
+        // Initialize player markers and island markers
         this.islandMarkers = new Map();
-
-        // Create player markers for mini-map
         this.playerMarkers = new Map();
 
         // Create player marker (self)
@@ -62,6 +61,9 @@ class GameUI {
         this.selfMarker.style.borderRadius = '50%';
         this.selfMarker.style.transform = 'translate(-50%, -50%)';
         this.miniMapContainer.appendChild(this.selfMarker);
+
+        // Create player stats panel after elements is initialized
+        this.createPlayerStatsPanel();
     }
 
     createUIElement(text) {
@@ -362,22 +364,119 @@ class GameUI {
     }
 
     createInventoryUI() {
-        // Create inventory button (to open/close inventory)
-        const inventoryButton = document.createElement('button');
-        inventoryButton.textContent = 'Inventory';
-        inventoryButton.style.position = 'absolute';
-        inventoryButton.style.top = '10px';
-        inventoryButton.style.right = '20px';
-        inventoryButton.style.padding = '8px 15px';
-        inventoryButton.style.backgroundColor = 'rgba(60, 80, 120, 0.8)';
-        inventoryButton.style.border = '2px solid rgba(100, 150, 200, 0.9)';
-        inventoryButton.style.borderRadius = '5px';
-        inventoryButton.style.color = 'white';
-        inventoryButton.style.fontWeight = 'bold';
-        inventoryButton.style.cursor = 'pointer';
-        inventoryButton.style.fontSize = '16px';
-        inventoryButton.style.pointerEvents = 'auto';
-        document.body.appendChild(inventoryButton);
+        // Create a chest icon instead of a button
+        const inventoryChest = document.createElement('div');
+        inventoryChest.className = 'inventory-chest';
+        inventoryChest.style.position = 'absolute';
+        inventoryChest.style.top = '10px';
+        inventoryChest.style.right = '20px';
+        inventoryChest.style.width = '82.5px'; // Increased from 50px to 90px (1.8x)
+        inventoryChest.style.height = '66px'; // Increased from 40px to 72px (1.8x)
+        inventoryChest.style.cursor = 'pointer';
+        inventoryChest.style.zIndex = '100';
+        inventoryChest.style.pointerEvents = 'auto';
+
+        // Create the chest body
+        const chestBody = document.createElement('div');
+        chestBody.className = 'chest-body';
+        chestBody.style.position = 'absolute';
+        chestBody.style.width = '100%';
+        chestBody.style.height = '70%';
+        chestBody.style.bottom = '0';
+        chestBody.style.backgroundColor = '#8B4513'; // Brown wooden color
+        chestBody.style.borderRadius = '3px 3px 5px 5px';
+        chestBody.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.5), inset 0 0 3px rgba(0, 0, 0, 0.4)';
+        chestBody.style.backgroundImage = 'linear-gradient(90deg, rgba(139, 69, 19, 0.9) 10%, rgba(160, 82, 45, 1) 50%, rgba(139, 69, 19, 0.9) 90%)';
+
+        // Create chest lid
+        const chestLid = document.createElement('div');
+        chestLid.className = 'chest-lid';
+        chestLid.style.position = 'absolute';
+        chestLid.style.width = '100%';
+        chestLid.style.height = '40%';
+        chestLid.style.top = '0';
+        chestLid.style.backgroundColor = '#A0522D'; // Slightly lighter brown for lid
+        chestLid.style.borderRadius = '5px 5px 0 0';
+        chestLid.style.boxShadow = '0 0 3px rgba(0, 0, 0, 0.5), inset 0 0 2px rgba(0, 0, 0, 0.4)';
+        chestLid.style.backgroundImage = 'linear-gradient(90deg, rgba(160, 82, 45, 0.9) 10%, rgba(178, 95, 57, 1) 50%, rgba(160, 82, 45, 0.9) 90%)';
+        chestLid.style.transition = 'transform 0.3s ease';
+        chestLid.style.transformOrigin = 'bottom center';
+
+        // Create chest lock/clasp
+        const chestLock = document.createElement('div');
+        chestLock.className = 'chest-lock';
+        chestLock.style.position = 'absolute';
+        chestLock.style.width = '10px';
+        chestLock.style.height = '10px';
+        chestLock.style.bottom = '0';
+        chestLock.style.left = '50%';
+        chestLock.style.transform = 'translateX(-50%)';
+        chestLock.style.backgroundColor = '#DAA520'; // Gold color
+        chestLock.style.borderRadius = '2px';
+        chestLock.style.boxShadow = '0 0 2px rgba(0, 0, 0, 0.8)';
+
+        // Create horizontal wood grain lines for body
+        const createWoodGrain = (parent, top, width) => {
+            const grain = document.createElement('div');
+            grain.style.position = 'absolute';
+            grain.style.height = '1px';
+            grain.style.width = `${width}%`;
+            grain.style.top = `${top}%`;
+            grain.style.left = `${(100 - width) / 2}%`;
+            grain.style.backgroundColor = 'rgba(101, 67, 33, 0.5)';
+            parent.appendChild(grain);
+        };
+
+        // Add wood grain to chest body
+        createWoodGrain(chestBody, 25, 90);
+        createWoodGrain(chestBody, 50, 80);
+        createWoodGrain(chestBody, 75, 85);
+
+        // Add wood grain to chest lid
+        createWoodGrain(chestLid, 30, 85);
+        createWoodGrain(chestLid, 60, 90);
+
+        // Add metal bands/reinforcements
+        const createMetalBand = (parent, isVertical, position) => {
+            const band = document.createElement('div');
+            band.style.position = 'absolute';
+            band.style.backgroundColor = '#B8860B'; // Dark golden
+
+            if (isVertical) {
+                band.style.width = '4px';
+                band.style.height = '100%';
+                band.style.left = `${position}%`;
+                band.style.top = '0';
+            } else {
+                band.style.height = '4px';
+                band.style.width = '100%';
+                band.style.top = `${position}%`;
+                band.style.left = '0';
+            }
+
+            parent.appendChild(band);
+        };
+
+        // Add vertical metal bands
+        createMetalBand(chestBody, true, 15);
+        createMetalBand(chestBody, true, 85);
+
+        // Add hover effects
+        inventoryChest.addEventListener('mouseover', () => {
+            chestLid.style.transform = 'perspective(100px) rotateX(-15deg)';
+            inventoryChest.style.transform = 'scale(1.05)';
+        });
+
+        inventoryChest.addEventListener('mouseout', () => {
+            chestLid.style.transform = 'none';
+            inventoryChest.style.transform = 'scale(1)';
+        });
+
+        // Assemble the chest
+        inventoryChest.appendChild(chestBody);
+        inventoryChest.appendChild(chestLock);
+        inventoryChest.appendChild(chestLid);
+        document.body.appendChild(inventoryChest);
 
         // Create inventory panel (hidden by default)
         const inventoryPanel = document.createElement('div');
@@ -492,15 +591,23 @@ class GameUI {
         treasureContent.style.color = 'rgba(200, 200, 200, 0.7)';
         contentArea.appendChild(treasureContent);
 
-        // Set up event listeners
-        inventoryButton.addEventListener('click', () => {
+        // Update the event listeners to use the chest
+        inventoryChest.addEventListener('click', () => {
             inventoryPanel.style.display = 'flex';
+            // Play a chest opening sound if available
+            if (window.playSound) {
+                window.playSound('chest_open');
+            }
             // Update inventory content when opened
             this.updateInventoryContent();
         });
 
         closeButton.addEventListener('click', () => {
             inventoryPanel.style.display = 'none';
+            // Play a chest closing sound if available
+            if (window.playSound) {
+                window.playSound('chest_close');
+            }
         });
 
         // Tab switching
@@ -547,12 +654,80 @@ class GameUI {
         };
 
         return {
-            button: inventoryButton,
+            button: inventoryChest, // Now using the chest icon instead of a button
             panel: inventoryPanel,
             fishContent: fishContent,
             treasureContent: treasureContent,
             updateContent: this.updateInventoryContent
         };
+    }
+
+    createPlayerStatsPanel() {
+        // Create stats container
+        const statsContainer = document.createElement('div');
+        statsContainer.id = 'player-stats';
+        statsContainer.style.position = 'absolute';
+        statsContainer.style.top = '10px';
+        statsContainer.style.right = '10px';
+        statsContainer.style.backgroundColor = 'rgba(0, 30, 60, 0.7)';
+        statsContainer.style.padding = '10px';
+        statsContainer.style.borderRadius = '5px';
+        statsContainer.style.display = 'flex';
+        statsContainer.style.flexDirection = 'column';
+        statsContainer.style.gap = '8px';
+        statsContainer.style.visibility = 'hidden';
+        document.body.appendChild(statsContainer);
+
+        // Fish count
+        const fishCount = document.createElement('div');
+        fishCount.textContent = `Fish: 0`;
+        fishCount.style.color = 'white';
+
+        statsContainer.appendChild(fishCount);
+
+        // Monster kills
+        const monsterCount = document.createElement('div');
+        monsterCount.textContent = `Monsters: 0`;
+        monsterCount.style.color = 'white';
+        statsContainer.appendChild(monsterCount);
+
+        // Money/gold
+        const moneyCount = document.createElement('div');
+        moneyCount.textContent = `Gold: 0`;
+        moneyCount.style.color = 'white';
+        statsContainer.appendChild(moneyCount);
+
+        // Store references for easy updates
+        this.elements.playerStats = {
+            panel: statsContainer,
+            fishCount: fishCount,
+            monsterCount: monsterCount,
+            moneyCount: moneyCount
+        };
+    }
+
+    // Method to update player stats - can be called directly from fishing.js
+    updatePlayerStats(stats) {
+        if (!this.elements.playerStats) return;
+
+        // Import getPlayerStats dynamically to avoid circular dependencies
+        import('./network.js').then((network) => {
+            // If stats parameter is provided, use it; otherwise get from network
+            const playerStats = stats || network.getPlayerStats();
+
+            // Update the UI elements with the latest stats
+            if (playerStats.fishCount !== undefined) {
+                this.elements.playerStats.fishCount.textContent = `Fish: ${playerStats.fishCount}`;
+            }
+
+            if (playerStats.monsterKills !== undefined) {
+                this.elements.playerStats.monsterCount.textContent = `Monsters: ${playerStats.monsterKills}`;
+            }
+
+            if (playerStats.money !== undefined) {
+                this.elements.playerStats.moneyCount.textContent = `Gold: ${playerStats.money}`;
+            }
+        });
     }
 
     addIslandMarker(id, position, radius) {
@@ -724,6 +899,11 @@ class GameUI {
         // Update mini-map
         if (data.position && data.heading !== undefined) {
             this.updateMiniMap(data.position, data.heading, data.mapScale || 100);
+        }
+
+        // Update player stats if requested
+        if (data.updateStats) {
+            this.updatePlayerStats();
         }
     }
 

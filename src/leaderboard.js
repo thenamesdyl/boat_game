@@ -1,4 +1,5 @@
 import { gameUI } from './ui.js';
+import { getPlayerStats } from './network.js';
 
 // Sample leaderboard data (will be replaced with real data later)
 const sampleLeaderboardData = {
@@ -41,6 +42,9 @@ export function initLeaderboard() {
 
     // Set up initial leaderboard data
     updateLeaderboardData(sampleLeaderboardData);
+
+    // Update player stats section in the diary
+    updatePlayerStatsInLeaderboard();
 }
 
 // Update the leaderboard with new data
@@ -52,7 +56,7 @@ export function updateLeaderboardData(data) {
         updateLeaderboardTab(
             gameUI.elements.leaderboard.monsterKillsContent,
             data.monsterKills,
-            'Monster Kills'
+            'Monster Records'  // Renamed to Records
         );
     }
 
@@ -61,7 +65,7 @@ export function updateLeaderboardData(data) {
         updateLeaderboardTab(
             gameUI.elements.leaderboard.fishCountContent,
             data.fishCount,
-            'Fish Count'
+            'Fish Records'  // Renamed to Records
         );
     }
 
@@ -70,10 +74,93 @@ export function updateLeaderboardData(data) {
         updateLeaderboardTab(
             gameUI.elements.leaderboard.moneyContent,
             data.money,
-            'Gold Coins',
+            'Gold Records',  // Renamed to Records
             true
         );
     }
+}
+
+// New function to update player stats in the leaderboard/diary
+export function updatePlayerStatsInLeaderboard() {
+    if (!gameUI.elements.leaderboard || !gameUI.elements.leaderboard.playerStatsContent) return;
+
+    // Get player stats
+    const playerStats = getPlayerStats();
+
+    // Clear existing content
+    const container = gameUI.elements.leaderboard.playerStatsContent;
+    container.innerHTML = '';
+
+    // Create player stats section with a styled table
+    const statsTable = document.createElement('table');
+    statsTable.style.width = '100%';
+    statsTable.style.borderCollapse = 'collapse';
+    statsTable.style.marginTop = '20px';
+    statsTable.style.fontFamily = '"Bookman Old Style", Georgia, serif';
+
+    // Add fish count row
+    const fishRow = document.createElement('tr');
+
+    const fishLabel = document.createElement('td');
+    fishLabel.textContent = 'Fish Caught:';
+    fishLabel.style.padding = '10px';
+    fishLabel.style.borderBottom = '1px solid rgba(139, 69, 19, 0.3)';
+    fishLabel.style.fontWeight = 'bold';
+    fishLabel.style.color = '#4B2D0A';
+    fishRow.appendChild(fishLabel);
+
+    const fishValue = document.createElement('td');
+    fishValue.textContent = playerStats.fishCount || 0;
+    fishValue.style.padding = '10px';
+    fishValue.style.borderBottom = '1px solid rgba(139, 69, 19, 0.3)';
+    fishValue.style.textAlign = 'right';
+    fishValue.style.fontSize = '18px';
+    fishRow.appendChild(fishValue);
+
+    statsTable.appendChild(fishRow);
+
+    // Add monster kills row
+    const monsterRow = document.createElement('tr');
+
+    const monsterLabel = document.createElement('td');
+    monsterLabel.textContent = 'Monsters Slain:';
+    monsterLabel.style.padding = '10px';
+    monsterLabel.style.borderBottom = '1px solid rgba(139, 69, 19, 0.3)';
+    monsterLabel.style.fontWeight = 'bold';
+    monsterLabel.style.color = '#4B2D0A';
+    monsterRow.appendChild(monsterLabel);
+
+    const monsterValue = document.createElement('td');
+    monsterValue.textContent = playerStats.monsterKills || 0;
+    monsterValue.style.padding = '10px';
+    monsterValue.style.borderBottom = '1px solid rgba(139, 69, 19, 0.3)';
+    monsterValue.style.textAlign = 'right';
+    monsterValue.style.fontSize = '18px';
+    monsterRow.appendChild(monsterValue);
+
+    statsTable.appendChild(monsterRow);
+
+    // Add money row
+    const moneyRow = document.createElement('tr');
+
+    const moneyLabel = document.createElement('td');
+    moneyLabel.textContent = 'Gold Coins:';
+    moneyLabel.style.padding = '10px';
+    moneyLabel.style.fontWeight = 'bold';
+    moneyLabel.style.color = '#4B2D0A';
+    moneyRow.appendChild(moneyLabel);
+
+    const moneyValue = document.createElement('td');
+    moneyValue.textContent = `${playerStats.money || 0} 🪙`;
+    moneyValue.style.padding = '10px';
+    moneyValue.style.textAlign = 'right';
+    moneyValue.style.fontSize = '18px';
+    moneyValue.style.color = '#B8860B'; // Gold color
+    moneyRow.appendChild(moneyValue);
+
+    statsTable.appendChild(moneyRow);
+
+    container.appendChild(statsTable);
 }
 
 // Helper function to update a specific leaderboard tab
@@ -193,22 +280,102 @@ function updateLeaderboardTab(contentElement, data, valueName, isCurrency = fals
 
 // Create the leaderboard UI
 function createLeaderboardUI() {
-    // Create leaderboard button (to open/close leaderboard)
-    const leaderboardButton = document.createElement('button');
-    leaderboardButton.textContent = '📜 Captain\'s Diary';
-    leaderboardButton.style.position = 'absolute';
-    leaderboardButton.style.top = '10px';
-    leaderboardButton.style.right = '120px'; // Position to the left of inventory button
-    leaderboardButton.style.padding = '8px 15px';
-    leaderboardButton.style.backgroundColor = 'rgba(60, 80, 120, 0.8)';
-    leaderboardButton.style.border = '2px solid rgba(100, 150, 200, 0.9)';
-    leaderboardButton.style.borderRadius = '5px';
-    leaderboardButton.style.color = 'white';
-    leaderboardButton.style.fontWeight = 'bold';
-    leaderboardButton.style.cursor = 'pointer';
-    leaderboardButton.style.fontSize = '16px';
-    leaderboardButton.style.pointerEvents = 'auto';
-    document.body.appendChild(leaderboardButton);
+    // Create a book icon instead of a button
+    const bookIcon = document.createElement('div');
+    bookIcon.className = 'captains-diary-book';
+    bookIcon.style.position = 'absolute';
+    bookIcon.style.top = '10px';
+    bookIcon.style.right = '180px';
+    bookIcon.style.width = '50px';
+    bookIcon.style.height = '60px';
+    bookIcon.style.cursor = 'pointer';
+    bookIcon.style.zIndex = '100';
+    bookIcon.style.pointerEvents = 'auto';
+
+    // Create the book cover
+    const bookCover = document.createElement('div');
+    bookCover.className = 'book-cover';
+    bookCover.style.position = 'absolute';
+    bookCover.style.width = '100%';
+    bookCover.style.height = '100%';
+    bookCover.style.backgroundColor = '#8B4513'; // Brown leather color
+    bookCover.style.borderRadius = '3px 10px 10px 3px'; // Rounded on right side like a book
+    bookCover.style.boxShadow = '2px 2px 5px rgba(0, 0, 0, 0.5), 0 0 5px rgba(139, 69, 19, 0.8) inset';
+    bookCover.style.border = '1px solid #654321';
+    bookCover.style.transform = 'perspective(300px) rotateY(-10deg)';
+    bookCover.style.transformOrigin = 'left center';
+    bookCover.style.transition = 'transform 0.3s ease';
+
+    // Create book spine
+    const bookSpine = document.createElement('div');
+    bookSpine.className = 'book-spine';
+    bookSpine.style.position = 'absolute';
+    bookSpine.style.left = '0';
+    bookSpine.style.width = '5px';
+    bookSpine.style.height = '100%';
+    bookSpine.style.backgroundColor = '#654321'; // Darker brown for spine
+    bookSpine.style.borderRadius = '2px 0 0 2px';
+    bookSpine.style.boxShadow = 'inset -1px 0 3px rgba(0, 0, 0, 0.5)';
+
+    // Create book pages (white edge visible on the side)
+    const bookPages = document.createElement('div');
+    bookPages.className = 'book-pages';
+    bookPages.style.position = 'absolute';
+    bookPages.style.top = '2px';
+    bookPages.style.right = '2px';
+    bookPages.style.width = '95%';
+    bookPages.style.height = '95%';
+    bookPages.style.backgroundColor = '#F5F1E4'; // Old paper color
+    bookPages.style.borderRadius = '1px 7px 7px 1px'; // Slightly rounded
+    bookPages.style.zIndex = '-1'; // Behind the cover
+    bookPages.style.transform = 'translateX(-3px)';
+
+    // Create book title label
+    const bookTitle = document.createElement('div');
+    bookTitle.className = 'book-title';
+    bookTitle.textContent = "Diary";
+    bookTitle.style.position = 'absolute';
+    bookTitle.style.top = '50%';
+    bookTitle.style.left = '50%';
+    bookTitle.style.transform = 'translate(-50%, -50%) rotate(-90deg)';
+    bookTitle.style.color = '#F5F1E4'; // Off-white color
+    bookTitle.style.fontSize = '18px';
+    bookTitle.style.fontWeight = 'bold';
+    bookTitle.style.fontFamily = '"Pirata One", cursive, serif';
+    bookTitle.style.whiteSpace = 'nowrap';
+    bookTitle.style.textAlign = 'center';
+    bookTitle.style.textShadow = '0 0 2px rgba(0, 0, 0, 0.7)';
+
+    // Create a decorative bookmark hanging out of the book
+    const bookmark = document.createElement('div');
+    bookmark.className = 'book-bookmark';
+    bookmark.style.position = 'absolute';
+    bookmark.style.top = '5px';
+    bookmark.style.right = '10px';
+    bookmark.style.width = '5px';
+    bookmark.style.height = '15px';
+    bookmark.style.backgroundColor = '#B22222'; // Red bookmark
+    bookmark.style.borderRadius = '0 0 2px 2px';
+    bookmark.style.zIndex = '2';
+
+    // Add hover effects
+    bookIcon.addEventListener('mouseover', () => {
+        bookCover.style.transform = 'perspective(300px) rotateY(-20deg)';
+        bookIcon.style.transform = 'scale(1.05)';
+    });
+
+    bookIcon.addEventListener('mouseout', () => {
+        bookCover.style.transform = 'perspective(300px) rotateY(-10deg)';
+        bookIcon.style.transform = 'scale(1)';
+    });
+
+    // Assemble the book
+    bookCover.appendChild(bookTitle);
+    bookIcon.appendChild(bookPages);
+    bookIcon.appendChild(bookCover);
+    bookIcon.appendChild(bookSpine);
+    bookIcon.appendChild(bookmark);
+    document.body.appendChild(bookIcon);
 
     // Create book panel (hidden by default)
     const bookPanel = document.createElement('div');
@@ -289,31 +456,6 @@ function createLeaderboardUI() {
     diaryTitle.style.marginBottom = '20px';
     leftPage.appendChild(diaryTitle);
 
-    // Close button designed as a bookmark
-    const closeButton = document.createElement('div');
-    closeButton.textContent = '✕';
-    closeButton.style.position = 'absolute';
-    closeButton.style.top = '-15px';
-    closeButton.style.right = '10px';
-    closeButton.style.width = '30px';
-    closeButton.style.height = '40px';
-    closeButton.style.backgroundColor = '#B22222'; // Red bookmark
-    closeButton.style.color = '#F5F1E4';
-    closeButton.style.display = 'flex';
-    closeButton.style.justifyContent = 'center';
-    closeButton.style.alignItems = 'center';
-    closeButton.style.cursor = 'pointer';
-    closeButton.style.borderRadius = '0 0 5px 5px';
-    closeButton.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.5)';
-    closeButton.style.zIndex = '10';
-    closeButton.addEventListener('mouseover', () => {
-        closeButton.style.backgroundColor = '#8B0000'; // Darker red on hover
-    });
-    closeButton.addEventListener('mouseout', () => {
-        closeButton.style.backgroundColor = '#B22222';
-    });
-    bookPanel.appendChild(closeButton);
-
     // Table of contents entries (Left page)
     const tocTitle = document.createElement('h3');
     tocTitle.textContent = "Table of Contents";
@@ -323,15 +465,22 @@ function createLeaderboardUI() {
 
     // Create entries that serve as our tabs
     const tocEntries = [
-        { id: 'monsterKills', icon: '🐙', name: 'Monster Hunt Records' },
-        { id: 'fishCount', icon: '🐟', name: 'Fishing Achievements' },
-        { id: 'money', icon: '💰', name: 'Treasury Notes' }
+        { id: 'playerStats', icon: '📊', name: 'Captain\'s Stats' },
+        { id: 'monsterKills', icon: '🐙', name: 'Monster Hunt Records' },  // Changed to Records
+        { id: 'fishCount', icon: '🐟', name: 'Fishing Records' },          // Changed to Records
+        { id: 'money', icon: '💰', name: 'Treasury Records' }              // Changed to Records
     ];
 
-    // Content containers on right page (initially hidden)
+    // Create player stats content container (new)
+    const playerStatsContent = document.createElement('div');
+    playerStatsContent.id = 'player-stats-content';
+    playerStatsContent.style.display = 'block'; // First one visible by default
+    rightPage.appendChild(playerStatsContent);
+
+    // Content containers 
     const monsterKillsContent = document.createElement('div');
     monsterKillsContent.id = 'monster-kills-leaderboard';
-    monsterKillsContent.style.display = 'block'; // First one visible by default
+    monsterKillsContent.style.display = 'none'; // Hide initially, show stats first
     rightPage.appendChild(monsterKillsContent);
 
     const fishCountContent = document.createElement('div');
@@ -398,7 +547,7 @@ function createLeaderboardUI() {
 
     // Right page title (changes based on selected tab)
     const rightPageTitle = document.createElement('h2');
-    rightPageTitle.textContent = "Monster Hunt Records";
+    rightPageTitle.textContent = "Captain's Stats"; // Changed to Stats first
     rightPageTitle.style.fontFamily = '"Pirata One", "Bookman Old Style", cursive';
     rightPageTitle.style.textAlign = 'center';
     rightPageTitle.style.borderBottom = '2px solid #8B4513';
@@ -407,16 +556,46 @@ function createLeaderboardUI() {
     rightPage.insertBefore(rightPageTitle, rightPage.firstChild);
 
     // Set up event listeners for tab switching
+    tabElements.playerStats.addEventListener('click', () => {
+        if (tabElements.playerStats.dataset.active === 'true') return;
+
+        // Update active states
+        tabElements.playerStats.dataset.active = 'true';
+        tabElements.monsterKills.dataset.active = 'false';
+        tabElements.fishCount.dataset.active = 'false';
+        tabElements.money.dataset.active = 'false';
+
+        // Update styles
+        tabElements.playerStats.style.backgroundColor = 'rgba(139, 69, 19, 0.2)';
+        tabElements.monsterKills.style.backgroundColor = 'transparent';
+        tabElements.fishCount.style.backgroundColor = 'transparent';
+        tabElements.money.style.backgroundColor = 'transparent';
+
+        // Update right page title
+        rightPageTitle.textContent = "Captain's Stats";
+
+        // Show/hide content
+        playerStatsContent.style.display = 'block';
+        monsterKillsContent.style.display = 'none';
+        fishCountContent.style.display = 'none';
+        moneyContent.style.display = 'none';
+
+        // Update player stats when this tab is shown
+        updatePlayerStatsInLeaderboard();
+    });
+
     tabElements.monsterKills.addEventListener('click', () => {
         if (tabElements.monsterKills.dataset.active === 'true') return;
 
         // Update active states
         tabElements.monsterKills.dataset.active = 'true';
+        tabElements.playerStats.dataset.active = 'false';
         tabElements.fishCount.dataset.active = 'false';
         tabElements.money.dataset.active = 'false';
 
         // Update styles
         tabElements.monsterKills.style.backgroundColor = 'rgba(139, 69, 19, 0.2)';
+        tabElements.playerStats.style.backgroundColor = 'transparent';
         tabElements.fishCount.style.backgroundColor = 'transparent';
         tabElements.money.style.backgroundColor = 'transparent';
 
@@ -425,6 +604,7 @@ function createLeaderboardUI() {
 
         // Show/hide content
         monsterKillsContent.style.display = 'block';
+        playerStatsContent.style.display = 'none';
         fishCountContent.style.display = 'none';
         moneyContent.style.display = 'none';
     });
@@ -434,19 +614,22 @@ function createLeaderboardUI() {
 
         // Update active states
         tabElements.fishCount.dataset.active = 'true';
+        tabElements.playerStats.dataset.active = 'false';
         tabElements.monsterKills.dataset.active = 'false';
         tabElements.money.dataset.active = 'false';
 
         // Update styles
         tabElements.fishCount.style.backgroundColor = 'rgba(139, 69, 19, 0.2)';
+        tabElements.playerStats.style.backgroundColor = 'transparent';
         tabElements.monsterKills.style.backgroundColor = 'transparent';
         tabElements.money.style.backgroundColor = 'transparent';
 
         // Update right page title
-        rightPageTitle.textContent = "Fishing Achievements";
+        rightPageTitle.textContent = "Fishing Records";
 
         // Show/hide content
         fishCountContent.style.display = 'block';
+        playerStatsContent.style.display = 'none';
         monsterKillsContent.style.display = 'none';
         moneyContent.style.display = 'none';
     });
@@ -456,43 +639,48 @@ function createLeaderboardUI() {
 
         // Update active states
         tabElements.money.dataset.active = 'true';
+        tabElements.playerStats.dataset.active = 'false';
         tabElements.monsterKills.dataset.active = 'false';
         tabElements.fishCount.dataset.active = 'false';
 
         // Update styles
         tabElements.money.style.backgroundColor = 'rgba(139, 69, 19, 0.2)';
+        tabElements.playerStats.style.backgroundColor = 'transparent';
         tabElements.monsterKills.style.backgroundColor = 'transparent';
         tabElements.fishCount.style.backgroundColor = 'transparent';
 
         // Update right page title
-        rightPageTitle.textContent = "Treasury Notes";
+        rightPageTitle.textContent = "Treasury Records";
 
         // Show/hide content
         moneyContent.style.display = 'block';
+        playerStatsContent.style.display = 'none';
         monsterKillsContent.style.display = 'none';
         fishCountContent.style.display = 'none';
     });
 
-    // Set up event listeners for opening/closing the book
-    leaderboardButton.addEventListener('click', () => {
-        bookPanel.style.display = 'block';
+    // Toggle leaderboard visibility when the book icon is clicked
+    bookIcon.addEventListener('click', () => {
+        if (bookPanel.style.display === 'none') {
+            bookPanel.style.display = 'block';
+            // Play a book opening sound if available
+            if (window.playSound) {
+                window.playSound('page_turn');
+            }
+            // Update player stats when opening the diary
+            updatePlayerStatsInLeaderboard();
+        } else {
+            bookPanel.style.display = 'none';
+        }
     });
 
-    closeButton.addEventListener('click', () => {
-        bookPanel.style.display = 'none';
-    });
-
-    // Store references in gameUI
+    // Store references to the leaderboard elements in gameUI
     gameUI.elements.leaderboard = {
-        button: leaderboardButton,
+        button: bookIcon, // Now using the book icon instead of a button
         panel: bookPanel,
+        playerStatsContent: playerStatsContent,
         monsterKillsContent: monsterKillsContent,
         fishCountContent: fishCountContent,
-        moneyContent: moneyContent,
-        tabs: {
-            monsterKills: tabElements.monsterKills,
-            fishCount: tabElements.fishCount,
-            money: tabElements.money
-        }
+        moneyContent: moneyContent
     };
 } 

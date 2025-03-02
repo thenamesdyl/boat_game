@@ -16,6 +16,7 @@ import { initCannons, updateCannons } from './cannons.js';
 import { animateSail } from './animations.js';
 import { applyWindInfluence, updateBoatRocking } from './character.js';
 import { initLeaderboard, updateLeaderboardData } from './leaderboard.js';
+import { requestLeaderboard } from './network.js';
 
 
 
@@ -60,6 +61,8 @@ composer.addPass(bloomPass);
 
 // Add sky setup here
 setupSky();
+requestLeaderboard();
+
 
 // Expanded Water with Slower Shader
 const waterGeometry = new THREE.PlaneGeometry(1000, 1000, 256, 256);
@@ -499,6 +502,9 @@ function createAncientTemple(island, random) {
         island.add(column);
     });
 }
+
+let lastLeaderboardUpdate = 0;
+const LEADERBOARD_UPDATE_INTERVAL = 10000; // 10 seconds
 
 // Function to create a lighthouse mega structure
 function createLighthouse(island, random) {
@@ -1057,6 +1063,12 @@ function animate() {
 
     const floatOffset = 0.5;
     boat.position.y = interpolatedHeight + floatOffset;
+
+    // Update leaderboard periodically
+    if (getTime() - lastLeaderboardUpdate > LEADERBOARD_UPDATE_INTERVAL) {
+        requestLeaderboard();
+        lastLeaderboardUpdate = time;
+    }
 
     // Debugging
     // Camera positioning

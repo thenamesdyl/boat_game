@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { scene, camera } from './gameState.js';
 import { gameUI } from './ui.js';
+import { onFishCaught, onMoneyEarned } from './network.js';
 
 // Fishing system configuration
 const FISHING_CAST_DISTANCE = 15;
@@ -382,6 +383,18 @@ function catchFish() {
     // Create a 3D fish model that jumps out of the water
     createCaughtFishEffect(caughtFish);
 
+    // Update player stats in network
+    onFishCaught(1);
+
+    // If different fish have different values
+    const fishValue = caughtFish.value; // Use the fish's value directly
+
+    // IMPORTANT: Directly update the UI stats panel
+    // This ensures the UI updates immediately without waiting for network responses
+    gameUI.updatePlayerStats({
+        fishCount: fishCaught,
+    });
+
     // Reset after a moment
     setTimeout(() => {
         if (isFishing) {
@@ -467,4 +480,16 @@ export function getFishCount() {
 // Add this function to get the fish inventory
 export function getFishInventory() {
     return fishInventory;
+}
+
+// Example function to determine fish value (implement based on your game design)
+function getFishValue(fishType) {
+    // Return money value based on fish type
+    switch (fishType) {
+        case 'common': return 10;
+        case 'uncommon': return 25;
+        case 'rare': return 50;
+        case 'legendary': return 100;
+        default: return 5;
+    }
 } 

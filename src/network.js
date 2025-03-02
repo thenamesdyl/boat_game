@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 
 // Network configuration
-const SERVER_URL = 'https://boat-game-python.onrender.com';
+const SERVER_URL = 'http://localhost:5001';
+// const SERVER_URL = 'https://boat-game-python.onrender.com';
 
 // Network state
 let socket;
@@ -11,6 +12,11 @@ let otherPlayers = new Map(); // Map to store other players' meshes
 let isConnected = false;
 let playerName = "Sailor_" + Math.floor(Math.random() * 1000);
 let playerColor;
+let playerStats = {
+    fishCount: 0,
+    monsterKills: 0,
+    money: 0
+};
 
 // Reference to scene and game objects (to be set from script.js)
 let scene;
@@ -114,6 +120,9 @@ function setupSocketEvents() {
         // Register islands
         registerIslands();
 
+        // Initialize player stats from server
+        initializePlayerStats();
+
         // Request all current players (as a backup in case the automatic all_players event wasn't received)
         socket.emit('get_all_players');
     });
@@ -159,6 +168,39 @@ function setupSocketEvents() {
     socket.on('island_registered', (data) => {
         // This could be used to sync islands across clients
         console.log('Island registered:', data.id);
+    });
+
+    // Leaderboard events
+    socket.on('leaderboard_update', (data) => {
+        console.log('Received leaderboard update:', data);
+
+        // Update the UI with new leaderboard data
+        if (typeof updateLeaderboardData === 'function') {
+            updateLeaderboardData(data);
+        } else {
+            console.warn('updateLeaderboardData function not available');
+        }
+    });
+
+    // Add this handler to process the player stats response
+    socket.on('player_stats', (data) => {
+        console.log('Received player stats from server:', data);
+
+        // Update local player stats
+        if (data.fishCount !== undefined) {
+            playerStats.fishCount = data.fishCount;
+        }
+        if (data.monsterKills !== undefined) {
+            playerStats.monsterKills = data.monsterKills;
+        }
+        if (data.money !== undefined) {
+            playerStats.money = data.money;
+        }
+
+        // Update UI if gameUI exists
+        if (window.gameUI && typeof window.gameUI.updatePlayerStats === 'function') {
+            window.gameUI.updatePlayerStats();
+        }
     });
 }
 
@@ -408,4 +450,94 @@ export function getConnectedPlayersCount() {
 // Check if connected to the server
 export function isNetworkConnected() {
     return isConnected;
+}
+
+// Request leaderboard data from the server
+export function requestLeaderboard() {
+    if (!isConnected || !socket) return;
+
+    console.log('Requesting leaderboard data...');
+    socket.emit('get_leaderboard');
+}
+
+// Update player stats
+export function updatePlayerStats(stats) {
+    if (!isConnected || !socket) return;
+
+    // Update local stats
+    if (stats.fishCount !== undefined) {
+        playerStats.fishCount = stats.fishCount;
+    }
+    if (stats.monsterKills !== undefined) {
+        playerStats.monsterKills = stats.monsterKills;
+    }
+    if (stats.money !== undefined) {
+        playerStats.money = stats.money;
+    }
+
+    // Send update to server
+    console.log('Updating player stats:', stats);
+    socket.emit('update_stats', stats);
+
+    // Update UI if gameUI exists
+    if (window.gameUI && typeof window.gameUI.updatePlayerStats === 'function') {
+        window.gameUI.updatePlayerStats();
+    }
+}
+
+// Increment player stats (more convenient for individual updates)
+export function incrementPlayerStats(stats) {
+    if (!isConnected || !socket) return;
+
+    // Update local stats
+    if (stats.fishCount) {
+        playerStats.fishCount += stats.fishCount;
+    }
+    if (stats.monsterKills) {
+        playerStats.monsterKills += stats.monsterKills;
+    }
+    if (stats.money) {
+        playerStats.money += stats.money;
+    }
+
+    updatePlayerStats(playerStats);
+
+    // Send the complete updated stats to server
+    console.log('Incrementing player stats:', stats);
+    socket.emit('update_stats', playerStats);
+
+    // Update UI if gameUI exists
+    if (window.gameUI && typeof window.gameUI.updatePlayerStats === 'function') {
+        window.gameUI.updatePlayerStats();
+    }
+}
+
+// Get current player stats
+export function getPlayerStats() {
+    return { ...playerStats };
+}
+
+// Call this when a player catches a fish
+export function onFishCaught(value = 1) {
+    incrementPlayerStats({ fishCount: value });
+}
+
+// Call this when a player kills a monster
+export function onMonsterKilled(value = 1) {
+    incrementPlayerStats({ monsterKills: value });
+}
+
+// Call this when a player earns money
+export function onMoneyEarned(value) {
+    incrementPlayerStats({ money: value });
+}
+
+// Add this new function to initialize player stats
+function initializePlayerStats() {
+    if (!isConnected || !socket || !playerId) return;
+
+    console.log('Initializing player stats from server...');
+
+    // Request player stats from server
+    socket.emit('get_player_stats', { id: playerId });
 } 
