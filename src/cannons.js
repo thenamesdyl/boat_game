@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { scene, getTime } from './gameState.js';
 import { gameUI } from './ui.js';
+import { onMonsterKilled } from './network.js';
 
 // Cannon system configuration
 const CANNON_RANGE = 100; // Maximum range for cannons
@@ -328,6 +329,8 @@ function hitMonster(monster) {
 
         // Create a more dramatic death effect
         createMonsterDeathEffect(monster.mesh.position);
+
+        onMonsterKilled(1);
 
         // Play death sound
         playMonsterDeathSound();
