@@ -285,6 +285,46 @@ def handle_island_registration(data):
         logger.info(f"Registered island: {island_id}")
         emit('island_registered', islands[island_id])
 
+# Helper function to format leaderboard data
+def get_leaderboard_data():
+    """Format player data for leaderboards using the Player model.
+    Includes both active and inactive players to maintain historical records."""
+    # Use the new model method to get formatted leaderboard data
+    from models import Player
+    return Player.get_combined_leaderboard()
+
+# Helper function to check and update leaderboards
+def update_leaderboards_if_needed(player_id):
+    """Check if player is in any top 10 and update leaderboards if needed"""
+    leaderboard_data = get_leaderboard_data()
+    
+    # Check if the player is in any of the leaderboards
+    player_name = players[player_id]['name'] if player_id in players else None
+    is_in_leaderboard = False
+    
+    if player_name:
+        for category in ['fishCount', 'monsterKills', 'money']:
+            for entry in leaderboard_data[category]:
+                if entry['name'] == player_name:
+                    is_in_leaderboard = True
+                    break
+            if is_in_leaderboard:
+                break
+    
+    # If player is in any leaderboard, broadcast the update
+    if is_in_leaderboard:
+        print(f"Player {player_name} is in top 10, updating leaderboards")
+        logger.info(f"Player {player_name} is in top 10, updating leaderboards")
+        emit('leaderboard_update', leaderboard_data, broadcast=True)
+    
+    return leaderboard_data
+
+@socketio.on('get_leaderboard')
+def handle_get_leaderboard():
+    """Send leaderboard data to the requesting client"""
+    logger.info(f"Sending leaderboard data to client")
+    emit('leaderboard_update', get_leaderboard_data())
+
 # New event handler for updating player stats
 @socketio.on('update_stats')
 def handle_stats_update(data):
@@ -293,6 +333,13 @@ def handle_stats_update(data):
     player_id = request.sid
     if player_id not in players:
         return
+    
+    # Store previous values to check for changes
+    previous_stats = {
+        'fishCount': players[player_id].get('fishCount', 0),
+        'monsterKills': players[player_id].get('monsterKills', 0),
+        'money': players[player_id].get('money', 0)
+    }
     
     # Update stats if provided
     if 'fishCount' in data:
@@ -304,84 +351,21 @@ def handle_stats_update(data):
     
     logger.info(f"Updated stats for player {players[player_id]['name']}: Fish: {players[player_id]['fishCount']}, Monsters: {players[player_id]['monsterKills']}, Money: {players[player_id]['money']}")
     
-    # Broadcast updated leaderboard to all players
-    socketio.emit('leaderboard_update', get_leaderboard_data(), broadcast=True)
-
-# New event handler for getting leaderboard data
-@socketio.on('get_leaderboard')
-def handle_get_leaderboard():
-    """Send leaderboard data to the requesting client"""
-    logger.info(f"Sending leaderboard data to client")
-    emit('leaderboard_update', get_leaderboard_data())
-
-# Helper function to format leaderboard data
-def get_leaderboard_data():
-    """Format player data for leaderboards"""
-    leaderboard_data = {
-        'monsterKills': [],
-        'fishCount': [],
-        'money': []
-    }
+    # Update player in database
+    from models import Player, db
+    player_db = Player.query.get(player_id)
+    if player_db:
+        player_db.fishCount = players[player_id]['fishCount']
+        player_db.monsterKills = players[player_id]['monsterKills']
+        player_db.money = players[player_id]['money']
+        db.session.commit()
     
-    for player_id, player in players.items():
-        # Convert server color format to hex color for frontend
-        color_hex = '#'
-        if isinstance(player['color'], dict):
-            r = int(player['color'].get('r', 0.3) * 255)
-            g = int(player['color'].get('g', 0.6) * 255)
-            b = int(player['color'].get('b', 0.8) * 255)
-            color_hex = f'#{r:02x}{g:02x}{b:02x}'
-        else:
-            color_hex = '#4287f5'  # Default blue if color is not in expected format
-        
-        # Add to monster kills leaderboard
-        leaderboard_data['monsterKills'].append({
-            'name': player['name'],
-            'value': player['monsterKills'],
-            'color': color_hex
-        })
-        
-        # Add to fish count leaderboard
-        leaderboard_data['fishCount'].append({
-            'name': player['name'],
-            'value': player['fishCount'],
-            'color': color_hex
-        })
-        
-        # Add to money leaderboard
-        leaderboard_data['money'].append({
-            'name': player['name'],
-            'value': player['money'],
-            'color': color_hex
-        })
-    
-    # Sort each leaderboard by value in descending order
-    leaderboard_data['monsterKills'].sort(key=lambda x: x['value'], reverse=True)
-    leaderboard_data['fishCount'].sort(key=lambda x: x['value'], reverse=True)
-    leaderboard_data['money'].sort(key=lambda x: x['value'], reverse=True)
-    
-    return leaderboard_data
-
-# REST API endpoints
-@app.route('/api/players', methods=['GET'])
-def get_players():
-    """Get all active players"""
-    return jsonify(list(players.values()))
-
-@app.route('/api/islands', methods=['GET'])
-def get_islands():
-    """Get all registered islands"""
-    return jsonify(list(islands.values()))
-
-@app.route('/api/status', methods=['GET'])
-def get_status():
-    """Get server status"""
-    return jsonify({
-        'status': 'online',
-        'players': len(players),
-        'islands': len(islands),
-        'timestamp': datetime.now().isoformat()
-    })
+    # Check if any stats changed and update leaderboards if needed
+    if (previous_stats['fishCount'] != players[player_id]['fishCount'] or
+        previous_stats['monsterKills'] != players[player_id]['monsterKills'] or
+        previous_stats['money'] != players[player_id]['money']):
+        print(f"Updating leaderboards for player {player_id}")
+        update_leaderboards_if_needed(player_id)
 
 # New REST API endpoint for getting leaderboard data
 @app.route('/api/leaderboard', methods=['GET'])
@@ -400,6 +384,13 @@ def update_player_stats(player_id):
     if not data:
         return jsonify({'error': 'No data provided'}), 400
     
+    # Store previous values to check for changes
+    previous_stats = {
+        'fishCount': players[player_id].get('fishCount', 0),
+        'monsterKills': players[player_id].get('monsterKills', 0),
+        'money': players[player_id].get('money', 0)
+    }
+    
     # Update stats if provided
     if 'fishCount' in data:
         players[player_id]['fishCount'] = data['fishCount']
@@ -408,12 +399,32 @@ def update_player_stats(player_id):
     if 'money' in data:
         players[player_id]['money'] = data['money']
     
+    # Update player in database
+    from models import Player, db
+    player_db = Player.query.get(player_id)
+    if player_db:
+        if 'fishCount' in data:
+            player_db.fishCount = data['fishCount']
+        if 'monsterKills' in data:
+            player_db.monsterKills = data['monsterKills']
+        if 'money' in data:
+            player_db.money = data['money']
+        db.session.commit()
+    
     logger.info(f"API: Updated stats for player {players[player_id]['name']}")
     
-    # Broadcast updated leaderboard to all players
-    socketio.emit('leaderboard_update', get_leaderboard_data())
+    # Check if any stats changed and update leaderboards if needed
+    leaderboard_data = None
+    if (previous_stats['fishCount'] != players[player_id]['fishCount'] or
+        previous_stats['monsterKills'] != players[player_id]['monsterKills'] or
+        previous_stats['money'] != players[player_id]['money']):
+        leaderboard_data = update_leaderboards_if_needed(player_id)
     
-    return jsonify({'success': True, 'player': players[player_id]})
+    return jsonify({
+        'success': True, 
+        'player': players[player_id],
+        'leaderboard': leaderboard_data
+    })
 
 # Increment stats endpoint - more convenient for individual updates
 @app.route('/api/stats/<player_id>/increment', methods=['POST'])
@@ -426,7 +437,14 @@ def increment_player_stats(player_id):
     if not data:
         return jsonify({'error': 'No data provided'}), 400
     
-    # Update stats if provided
+    # Store previous values to check for changes
+    previous_stats = {
+        'fishCount': players[player_id].get('fishCount', 0),
+        'monsterKills': players[player_id].get('monsterKills', 0),
+        'money': players[player_id].get('money', 0)
+    }
+    
+    # Update player in memory
     if 'fishCount' in data:
         players[player_id]['fishCount'] += data['fishCount']
     if 'monsterKills' in data:
@@ -434,12 +452,32 @@ def increment_player_stats(player_id):
     if 'money' in data:
         players[player_id]['money'] += data['money']
     
+    # Update player in database
+    from models import Player, db
+    player_db = Player.query.get(player_id)
+    if player_db:
+        if 'fishCount' in data:
+            player_db.fishCount += data['fishCount']
+        if 'monsterKills' in data:
+            player_db.monsterKills += data['monsterKills']
+        if 'money' in data:
+            player_db.money += data['money']
+        db.session.commit()
+    
     logger.info(f"API: Incremented stats for player {players[player_id]['name']}")
     
-    # Broadcast updated leaderboard to all players
-    socketio.emit('leaderboard_update', get_leaderboard_data())
+    # Check if any stats changed and update leaderboards if needed
+    leaderboard_data = None
+    if (previous_stats['fishCount'] != players[player_id]['fishCount'] or
+        previous_stats['monsterKills'] != players[player_id]['monsterKills'] or
+        previous_stats['money'] != players[player_id]['money']):
+        leaderboard_data = update_leaderboards_if_needed(player_id)
     
-    return jsonify({'success': True, 'player': players[player_id]})
+    return jsonify({
+        'success': True, 
+        'player': players[player_id],
+        'leaderboard': leaderboard_data
+    })
 
 # Periodic cleanup of inactive players (could be moved to a background task)
 def cleanup_inactive_players():
@@ -474,5 +512,5 @@ def get_active_players_api():
 
 if __name__ == '__main__':
     # Run the Socket.IO server with debug and reloader enabled
-   #  socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=True) 
+   # socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=True) 
    socketio.run(app, host='0.0.0.0') 

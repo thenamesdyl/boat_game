@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy import func, desc
 
 db = SQLAlchemy()
 
@@ -31,6 +32,62 @@ class Player(db.Model):
             'monsterKills': self.monsterKills,
             'money': self.money,
             'active': self.active
+        }
+    
+    @classmethod
+    def get_leaderboard(cls, category, limit=10):
+        """
+        Get the leaderboard for a specific category
+        
+        :param category: The category to get the leaderboard for ('fishCount', 'monsterKills', or 'money')
+        :param limit: Maximum number of entries to return
+        :return: List of players sorted by the specified category
+        """
+        if category not in ['fishCount', 'monsterKills', 'money']:
+            raise ValueError("Category must be 'fishCount', 'monsterKills', or 'money'")
+        
+        # Query active players sorted by the specified category in descending order
+        query = cls.query
+        
+        if category == 'fishCount':
+            query = query.order_by(desc(cls.fishCount))
+        elif category == 'monsterKills':
+            query = query.order_by(desc(cls.monsterKills))
+        elif category == 'money':
+            query = query.order_by(desc(cls.money))
+        
+        return query.limit(limit).all()
+    
+    @classmethod
+    def get_combined_leaderboard(cls, limit=10):
+        """
+        Get leaderboards for all categories
+        
+        :param limit: Maximum number of entries to return per category
+        :return: Dictionary containing leaderboards for each category
+        """
+        return {
+            'fishCount': [
+                {
+                    'name': player.name,
+                    'value': player.fishCount,
+                    'color': player.color
+                } for player in cls.get_leaderboard('fishCount', limit)
+            ],
+            'monsterKills': [
+                {
+                    'name': player.name,
+                    'value': player.monsterKills,
+                    'color': player.color
+                } for player in cls.get_leaderboard('monsterKills', limit)
+            ],
+            'money': [
+                {
+                    'name': player.name,
+                    'value': player.money,
+                    'color': player.color
+                } for player in cls.get_leaderboard('money', limit)
+            ]
         }
 
 class Island(db.Model):

@@ -2,8 +2,8 @@
 import * as THREE from 'three';
 
 // Network configuration
-const SERVER_URL = 'http://localhost:5001';
-// const SERVER_URL = 'https://boat-game-python.onrender.com';
+// const SERVER_URL = 'http://localhost:5001';
+const SERVER_URL = 'https://boat-game-python.onrender.com';
 
 // Network state
 let socket;

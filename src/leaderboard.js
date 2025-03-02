@@ -1,5 +1,5 @@
 import { gameUI } from './ui.js';
-import { getPlayerStats } from './network.js';
+import { getPlayerStats, requestLeaderboard } from './network.js';
 
 // Sample leaderboard data (will be replaced with real data later)
 const sampleLeaderboardData = {
@@ -45,6 +45,9 @@ export function initLeaderboard() {
 
     // Update player stats section in the diary
     updatePlayerStatsInLeaderboard();
+
+    // Make this function available globally so network.js can call it
+    window.updateLeaderboardData = updateLeaderboardData;
 }
 
 // Update the leaderboard with new data
@@ -56,7 +59,7 @@ export function updateLeaderboardData(data) {
         updateLeaderboardTab(
             gameUI.elements.leaderboard.monsterKillsContent,
             data.monsterKills,
-            'Monster Records'  // Renamed to Records
+            'Monster Records'
         );
     }
 
@@ -65,7 +68,7 @@ export function updateLeaderboardData(data) {
         updateLeaderboardTab(
             gameUI.elements.leaderboard.fishCountContent,
             data.fishCount,
-            'Fish Records'  // Renamed to Records
+            'Fish Records'
         );
     }
 
@@ -74,7 +77,7 @@ export function updateLeaderboardData(data) {
         updateLeaderboardTab(
             gameUI.elements.leaderboard.moneyContent,
             data.money,
-            'Gold Records',  // Renamed to Records
+            'Gold Records',
             true
         );
     }
@@ -607,6 +610,10 @@ function createLeaderboardUI() {
         playerStatsContent.style.display = 'none';
         fishCountContent.style.display = 'none';
         moneyContent.style.display = 'none';
+
+        // Request fresh leaderboard data
+        console.log("data leaderboard " + requestLeaderboard());
+
     });
 
     tabElements.fishCount.addEventListener('click', () => {
@@ -632,6 +639,9 @@ function createLeaderboardUI() {
         playerStatsContent.style.display = 'none';
         monsterKillsContent.style.display = 'none';
         moneyContent.style.display = 'none';
+
+        // Request fresh leaderboard data
+        requestLeaderboard();
     });
 
     tabElements.money.addEventListener('click', () => {
@@ -657,6 +667,9 @@ function createLeaderboardUI() {
         playerStatsContent.style.display = 'none';
         monsterKillsContent.style.display = 'none';
         fishCountContent.style.display = 'none';
+
+        // Request fresh leaderboard data
+        requestLeaderboard();
     });
 
     // Toggle leaderboard visibility when the book icon is clicked
@@ -669,6 +682,9 @@ function createLeaderboardUI() {
             }
             // Update player stats when opening the diary
             updatePlayerStatsInLeaderboard();
+
+            // Request latest leaderboard data from server
+            requestLeaderboard();
         } else {
             bookPanel.style.display = 'none';
         }

@@ -7,6 +7,95 @@ let boatRockAngleZ = 0; // Roll (side-to-side rocking)
 const rockSpeed = 1.5; // How fast the boat rocks
 const maxRockAngle = 0.04; // Maximum rocking angle in radians (about 2.3 degrees)
 
+// Function to create a wooden texture material
+function createWoodMaterial(baseColor, name) {
+    // Create a canvas for the wood texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const context = canvas.getContext('2d');
+
+    // Fill with base color
+    context.fillStyle = '#' + new THREE.Color(baseColor).getHexString();
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Add wood grain
+    const grainLayers = 15; // Number of grain layers
+
+    for (let i = 0; i < grainLayers; i++) {
+        // Vary the grain color slightly for each layer
+        const grainColor = new THREE.Color(baseColor);
+        const darkening = Math.random() * 0.2;
+        grainColor.r -= darkening;
+        grainColor.g -= darkening;
+        grainColor.b -= darkening;
+
+        context.strokeStyle = '#' + grainColor.getHexString();
+        context.lineWidth = 1 + Math.random() * 2;
+
+        // Create wavy grain lines
+        const grainCount = 10 + Math.floor(Math.random() * 20);
+        const yStep = canvas.height / grainCount;
+
+        for (let j = 0; j < grainCount; j++) {
+            const y = j * yStep + Math.random() * yStep * 0.5;
+
+            context.beginPath();
+            context.moveTo(0, y);
+
+            // Create a wavy line for wood grain
+            const segments = 10;
+            const xStep = canvas.width / segments;
+
+            for (let k = 1; k <= segments; k++) {
+                const x = k * xStep;
+                const yOffset = (Math.random() - 0.5) * yStep * 0.8;
+                context.lineTo(x, y + yOffset);
+            }
+
+            context.stroke();
+        }
+
+        // Add some knots randomly
+        if (Math.random() < 0.4) {
+            const knotX = Math.random() * canvas.width;
+            const knotY = Math.random() * canvas.height;
+            const knotSize = 5 + Math.random() * 15;
+
+            const gradient = context.createRadialGradient(
+                knotX, knotY, 1,
+                knotX, knotY, knotSize
+            );
+
+            gradient.addColorStop(0, '#3d2c17');
+            gradient.addColorStop(0.6, '#' + new THREE.Color(baseColor).getHexString());
+            gradient.addColorStop(1, '#' + new THREE.Color(baseColor).getHexString());
+
+            context.fillStyle = gradient;
+            context.beginPath();
+            context.arc(knotX, knotY, knotSize, 0, Math.PI * 2);
+            context.fill();
+        }
+    }
+
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+
+    // Create material with the texture
+    const material = new THREE.MeshPhongMaterial({
+        map: texture,
+        color: baseColor,
+        name: name || 'woodMaterial',
+        bumpMap: texture,
+        bumpScale: 0.05,
+        shininess: 5
+    });
+
+    return material;
+}
+
 // Add a small Minecraft-style character to the front of the boat
 export function addCharacterToBoat(boat) {
     // Create a group for the character
@@ -79,19 +168,16 @@ export function createBoat(scene) {
     // Create boat group
     let boat = new THREE.Group();
 
-    // Create larger hull (increased from 2x1x4 to 6x2x12)
+    // Create larger hull with wood texture
     const hullGeometry = new THREE.BoxGeometry(6, 2, 12);
-    const hullMaterial = new THREE.MeshPhongMaterial({ color: 0x8b4513 });
+    const hullMaterial = createWoodMaterial(0x8b4513, 'hullMaterial');
     const hull = new THREE.Mesh(hullGeometry, hullMaterial);
     hull.position.y = 1; // Adjusted for larger size
     boat.add(hull);
 
     // Add front extension of the boat (forecastle)
     const frontExtensionGeometry = new THREE.BoxGeometry(4, 1.8, 3);
-    const frontExtensionMaterial = new THREE.MeshPhongMaterial({
-        color: 0x8b4513,
-        name: 'frontExtensionMaterial'
-    });
+    const frontExtensionMaterial = createWoodMaterial(0x8b4513, 'frontExtensionMaterial');
     const frontExtension = new THREE.Mesh(frontExtensionGeometry, frontExtensionMaterial);
     frontExtension.position.set(0, 1, -7.5); // Moved to front (negative Z)
     frontExtension.userData.isNotPlayerColorable = true;
@@ -113,21 +199,15 @@ export function createBoat(scene) {
 
     // Front cannon mount
     const frontMountGeometry = new THREE.BoxGeometry(2.5, 0.5, 0.5);
-    const frontMountMaterial = new THREE.MeshPhongMaterial({
-        color: 0x5c3317, // Dark brown for the mount
-        name: 'mountMaterial'
-    });
+    const frontMountMaterial = createWoodMaterial(0x5c3317, 'mountMaterial');
     const frontMount = new THREE.Mesh(frontMountGeometry, frontMountMaterial);
     frontMount.position.set(0, 2, -8.5); // Positioned at front
     frontMount.userData.isNotPlayerColorable = true;
     boat.add(frontMount);
 
-    // Add a deck with fixed brown color
+    // Add a deck with wood texture
     const deckGeometry = new THREE.BoxGeometry(5.8, 0.3, 11.8);
-    const deckMaterial = new THREE.MeshPhongMaterial({
-        color: 0x8b4513, // Brown color for deck
-        name: 'deckMaterial' // Add a name to identify this material
-    });
+    const deckMaterial = createWoodMaterial(0x8b4513, 'deckMaterial');
     const deck = new THREE.Mesh(deckGeometry, deckMaterial);
     deck.position.y = 2.15; // Position on top of hull
     deck.userData.isNotPlayerColorable = true; // Flag to prevent color changes
@@ -158,10 +238,7 @@ export function createBoat(scene) {
 
     // Add cannon mounts
     const mountGeometry = new THREE.BoxGeometry(0.5, 0.5, 2.5);
-    const mountMaterial = new THREE.MeshPhongMaterial({
-        color: 0x5c3317, // Dark brown for the mounts
-        name: 'mountMaterial'
-    });
+    const mountMaterial = createWoodMaterial(0x5c3317, 'mountMaterial');
 
     // Left cannon mount
     const leftMount = new THREE.Mesh(mountGeometry, mountMaterial);
@@ -175,13 +252,10 @@ export function createBoat(scene) {
     rightMount.userData.isNotPlayerColorable = true;
     boat.add(rightMount);
 
-    // Continue with the rest of your boat parts...
-    // Add a much taller mast (increased from 3 to 12)
+    // Add a much taller mast with wood texture
     const mastGeometry = new THREE.CylinderGeometry(0.25, 0.25, 12, 8);
-    const mastMaterial = new THREE.MeshPhongMaterial({
-        color: 0x8b4513, // Brown color for mast
-        name: 'mastMaterial'
-    });
+    const mastMaterial = createWoodMaterial(0x8b4513, 'mastMaterial');
+    mastMaterial.map.repeat.set(1, 6); // Repeat the texture vertically for the tall mast
     const mast = new THREE.Mesh(mastGeometry, mastMaterial);
     mast.position.y = 8; // Positioned higher for taller mast
     mast.userData.isNotPlayerColorable = true; // Flag to prevent color changes
@@ -211,10 +285,7 @@ export function createBoat(scene) {
 
     // Add a crossbeam for the sail
     const crossBeamGeometry = new THREE.CylinderGeometry(0.15, 0.15, 5.5, 8);
-    const crossBeamMaterial = new THREE.MeshPhongMaterial({
-        color: 0x8b4513, // Brown color for crossbeam
-        name: 'crossBeamMaterial'
-    });
+    const crossBeamMaterial = createWoodMaterial(0x8b4513, 'crossBeamMaterial');
     const crossBeam = new THREE.Mesh(crossBeamGeometry, crossBeamMaterial);
     crossBeam.rotation.z = Math.PI / 2; // Make it horizontal
     crossBeam.position.set(0, 12, 1.5); // Position at top of sail
