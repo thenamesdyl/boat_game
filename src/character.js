@@ -233,7 +233,33 @@ export function createBoat(scene) {
     return boat;
 }
 
-// Add this function to script.js, near other boat movement code
+export function updateBoatRocking(deltaTime) {
+    // Calculate boat speed magnitude
+    const speedMagnitude = Math.abs(boatVelocity.z);
+
+    // Get wind data for additional rocking effect
+    const windData = getWindData();
+    const windSpeed = windData.speed;
+
+    // Combine boat speed and wind for total rocking factor
+    // Wind has a smaller effect than boat speed
+    const rockingFactor = speedMagnitude + (windSpeed * 0.1);
+
+    // Calculate target rocking angles
+    const targetRockAngleX = Math.sin(getTime() * rockSpeed) * maxRockAngle * rockingFactor;
+    const targetRockAngleZ = Math.sin(getTime() * rockSpeed * 0.7) * maxRockAngle * rockingFactor;
+
+    // Smoothly interpolate current angles toward target angles
+    const smoothFactor = Math.min(deltaTime * 3, 1.0);
+    boatRockAngleX += (targetRockAngleX - boatRockAngleX) * smoothFactor;
+    boatRockAngleZ += (targetRockAngleZ - boatRockAngleZ) * smoothFactor;
+
+    // Apply the rocking rotation (keep existing Y rotation)
+    const currentYRotation = boat.rotation.y;
+    boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
+}
+
+// Add this function to apply wind influence to boat movement
 export function applyWindInfluence() {
     // Get wind data
     const windData = getWindData();
@@ -248,32 +274,9 @@ export function applyWindInfluence() {
     );
 
     // Scale by wind speed (very subtle influence)
-    const windInfluence = 0.02;
+    const windInfluence = 0.0005;
     windVector.multiplyScalar(windSpeed * windInfluence);
 
     // Apply to boat position
     boat.position.add(windVector);
-}
-
-export function updateBoatRocking(deltaTime) {
-    // Calculate boat speed magnitude
-    const speedMagnitude = Math.abs(boatVelocity.z);
-
-    // Only rock if the boat is moving at least a little
-    if (speedMagnitude > 0.01) {
-        // Gentle oscillation using sine waves with different frequencies
-        boatRockAngleX = Math.sin(getTime() * rockSpeed) * maxRockAngle * speedMagnitude;
-        boatRockAngleZ = Math.sin(getTime() * rockSpeed * 0.7) * maxRockAngle * speedMagnitude;
-
-        // Apply the rocking rotation (keep existing Y rotation)
-        const currentYRotation = boat.rotation.y;
-        boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
-    } else {
-        // Gradually return to level when not moving
-        boatRockAngleX *= 0.95;
-        boatRockAngleZ *= 0.95;
-
-        const currentYRotation = boat.rotation.y;
-        boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
-    }
 }
