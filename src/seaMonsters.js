@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { scene, getTime } from './gameState.js';
 
 // Sea monster configuration
-const MONSTER_COUNT = 50;
+const MONSTER_COUNT = 30;
 const MONSTER_TYPES = {
     YELLOW_BEAST: 'yellowBeast',   // Original monster
     KRAKEN: 'kraken',              // New octopus-like monster
