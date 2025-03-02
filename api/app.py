@@ -6,7 +6,7 @@ import json
 import logging
 import time
 from datetime import datetime
-from models import db, Player, Island
+from models import db, Player, Island, Message
 from collections import defaultdict
 
 # Load environment variables from .env file
@@ -509,6 +509,161 @@ def get_active_players_api():
     """Get all currently active players"""
     active_players = [p for p in players.values() if p.get('active', False)]
     return jsonify(active_players)
+
+@socketio.on('send_message')
+def handle_send_message(data):
+    """Handle new chat messages from clients"""
+    player_id = request.sid
+    
+    if player_id not in players:
+        return
+    
+    content = data.get('content', '').strip()
+    if not content:
+        return
+    
+    # Limit message length
+    content = content[:500]
+    
+    # Get message type (default to global)
+    message_type = data.get('type', 'global')
+    
+    # Create new message in database
+    try:
+        new_message = Message(
+            sender_id=player_id,
+            content=content,
+            message_type=message_type
+        )
+        db.session.add(new_message)
+        db.session.commit()
+        
+        # Convert to dict for broadcast
+        message_data = new_message.to_dict()
+        
+        # Broadcast to all connected clients
+        emit('new_message', message_data, broadcast=True)
+        
+        logger.info(f"Chat message from {players[player_id]['name']}: {content}")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error saving message: {e}")
+
+@socketio.on('get_recent_messages')
+def handle_get_recent_messages(data):
+    """Send recent chat messages to the requesting client"""
+    # Get message type (default to global)
+    message_type = data.get('type', 'global')
+    
+    # Get limit (default to 50)
+    limit = min(int(data.get('limit', 50)), 100)  # Cap at 100 messages
+    
+    try:
+        # Get messages from database
+        messages = Message.get_recent_messages(limit=limit, message_type=message_type)
+        
+        # Convert to dict for sending
+        message_data = [message.to_dict() for message in messages]
+        
+        # Send to requesting client
+        emit('recent_messages', {
+            'messages': message_data,
+            'type': message_type
+        })
+        
+        logger.info(f"Sent {len(message_data)} recent messages to client")
+    except Exception as e:
+        logger.error(f"Error retrieving messages: {e}")
+
+# REST API endpoints for chat
+
+@app.route('/api/messages', methods=['GET'])
+def get_messages_api():
+    """Get recent chat messages"""
+    # Get message type from query params (default to global)
+    message_type = request.args.get('type', 'global')
+    
+    # Get limit from query params (default to 50, max 100)
+    try:
+        limit = min(int(request.args.get('limit', 50)), 100)
+    except ValueError:
+        limit = 50
+    
+    try:
+        # Get messages from database
+        messages = Message.get_recent_messages(limit=limit, message_type=message_type)
+        
+        # Return as JSON
+        return jsonify({
+            'success': True,
+            'messages': [message.to_dict() for message in messages],
+            'count': len(messages),
+            'type': message_type
+        })
+    except Exception as e:
+        logger.error(f"API error retrieving messages: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/messages', methods=['POST'])
+def send_message_api():
+    """Send a new chat message"""
+    data = request.json
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    
+    # Verify required fields
+    if 'sender_id' not in data or 'content' not in data:
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    sender_id = data['sender_id']
+    content = data['content'].strip()
+    
+    # Validate sender exists
+    if sender_id not in players:
+        return jsonify({'error': 'Invalid sender ID'}), 404
+    
+    # Validate content
+    if not content:
+        return jsonify({'error': 'Message content cannot be empty'}), 400
+    
+    # Limit message length
+    content = content[:500]
+    
+    # Get message type (default to global)
+    message_type = data.get('type', 'global')
+    
+    try:
+        # Create new message
+        new_message = Message(
+            sender_id=sender_id,
+            content=content,
+            message_type=message_type
+        )
+        db.session.add(new_message)
+        db.session.commit()
+        
+        # Get message data
+        message_data = new_message.to_dict()
+        
+        # Broadcast to all connected clients via Socket.IO
+        socketio.emit('new_message', message_data)
+        
+        logger.info(f"API: Chat message from {players[sender_id]['name']}: {content}")
+        
+        return jsonify({
+            'success': True,
+            'message': message_data
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"API error saving message: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 if __name__ == '__main__':
     # Run the Socket.IO server with debug and reloader enabled

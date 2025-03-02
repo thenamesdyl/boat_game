@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import JSON
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, ForeignKey
+from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -104,4 +105,42 @@ class Island(db.Model):
             'position': self.position,
             'radius': self.radius,
             'type': self.type
-        } 
+        }
+
+class Message(db.Model):
+    __tablename__ = 'messages'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.String(50), db.ForeignKey('players.id'), nullable=False)
+    content = db.Column(db.String(500), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    message_type = db.Column(db.String(20), default='global')
+    
+    # Relationship with Player
+    sender = db.relationship('Player', backref=db.backref('messages', lazy=True))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'sender_id': self.sender_id,
+            'sender_name': self.sender.name if self.sender else 'Unknown',
+            'sender_color': self.sender.color,
+            'content': self.content,
+            'timestamp': self.timestamp.timestamp(),
+            'message_type': self.message_type
+        }
+    
+    @classmethod
+    def get_recent_messages(cls, limit=50, message_type='global'):
+        """
+        Get recent messages of a specific type
+        
+        :param limit: Maximum number of messages to return
+        :param message_type: Type of messages to retrieve ('global', 'team', etc.)
+        :return: List of recent messages in chronological order
+        """
+        return (cls.query
+                .filter_by(message_type=message_type)
+                .order_by(cls.timestamp.desc())
+                .limit(limit)
+                .all()) 

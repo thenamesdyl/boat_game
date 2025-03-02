@@ -1,5 +1,6 @@
 // Enhanced UI system for the boat game
 import * as THREE from 'three';
+import { initChat, initMiniMap } from './chat.js';
 
 // Create a UI class to manage all interface elements
 class GameUI {
@@ -64,6 +65,13 @@ class GameUI {
 
         // Create player stats panel after elements is initialized
         this.createPlayerStatsPanel();
+
+        // Initialize the chat system
+        this.chat = initChat();
+
+        // Initialize the mini map and connect it to the chat system
+        this.miniMap = initMiniMap();
+        this.miniMap.setChatSystem(this.chat);
     }
 
     createUIElement(text) {
@@ -731,99 +739,19 @@ class GameUI {
     }
 
     addIslandMarker(id, position, radius) {
-        if (this.islandMarkers.has(id)) return;
-
-        const marker = document.createElement('div');
-        marker.style.position = 'absolute';
-        marker.style.width = '6px';
-        marker.style.height = '6px';
-        marker.style.backgroundColor = '#00ff88';
-        marker.style.borderRadius = '50%';
-        marker.style.transform = 'translate(-50%, -50%)';
-        this.miniMapContainer.appendChild(marker);
-
-        this.islandMarkers.set(id, {
-            element: marker,
-            position: position
-        });
+        this.miniMap.addIslandMarker(id, position, radius);
     }
 
     addPlayerMarker(id, position, color) {
-        if (this.playerMarkers.has(id)) return;
-
-        const marker = document.createElement('div');
-        marker.style.position = 'absolute';
-        marker.style.width = '6px';
-        marker.style.height = '6px';
-        marker.style.backgroundColor = color || '#ff0000';
-        marker.style.borderRadius = '50%';
-        marker.style.transform = 'translate(-50%, -50%)';
-        this.miniMapContainer.appendChild(marker);
-
-        this.playerMarkers.set(id, {
-            element: marker,
-            position: position
-        });
+        this.miniMap.addPlayerMarker(id, position, color);
     }
 
     removePlayerMarker(id) {
-        if (!this.playerMarkers.has(id)) return;
-
-        const marker = this.playerMarkers.get(id);
-        this.miniMapContainer.removeChild(marker.element);
-        this.playerMarkers.delete(id);
+        this.miniMap.removePlayerMarker(id);
     }
 
     updateMiniMap(playerPosition, playerRotation, mapScale) {
-        // Center the player on the mini-map
-        const centerX = this.miniMapContainer.clientWidth / 2;
-        const centerY = this.miniMapContainer.clientHeight / 2;
-
-        // Update self marker
-        this.selfMarker.style.left = `${centerX}px`;
-        this.selfMarker.style.top = `${centerY}px`;
-
-        // Update island markers
-        this.islandMarkers.forEach((marker, id) => {
-            const relX = (marker.position.x - playerPosition.x) / mapScale;
-            const relZ = (marker.position.z - playerPosition.z) / mapScale;
-
-            // Rotate relative to player heading
-            const rotatedX = relX * Math.cos(-playerRotation) - relZ * Math.sin(-playerRotation);
-            const rotatedZ = relX * Math.sin(-playerRotation) + relZ * Math.cos(-playerRotation);
-
-            marker.element.style.left = `${centerX + rotatedX}px`;
-            marker.element.style.top = `${centerY + rotatedZ}px`;
-
-            // Hide if outside mini-map
-            const distance = Math.sqrt(rotatedX * rotatedX + rotatedZ * rotatedZ);
-            if (distance > this.miniMapContainer.clientWidth / 2) {
-                marker.element.style.display = 'none';
-            } else {
-                marker.element.style.display = 'block';
-            }
-        });
-
-        // Update other player markers
-        this.playerMarkers.forEach((marker, id) => {
-            const relX = (marker.position.x - playerPosition.x) / mapScale;
-            const relZ = (marker.position.z - playerPosition.z) / mapScale;
-
-            // Rotate relative to player heading
-            const rotatedX = relX * Math.cos(-playerRotation) - relZ * Math.sin(-playerRotation);
-            const rotatedZ = relX * Math.sin(-playerRotation) + relZ * Math.cos(-playerRotation);
-
-            marker.element.style.left = `${centerX + rotatedX}px`;
-            marker.element.style.top = `${centerY + rotatedZ}px`;
-
-            // Hide if outside mini-map
-            const distance = Math.sqrt(rotatedX * rotatedX + rotatedZ * rotatedZ);
-            if (distance > this.miniMapContainer.clientWidth / 2) {
-                marker.element.style.display = 'none';
-            } else {
-                marker.element.style.display = 'block';
-            }
-        });
+        this.miniMap.updateMiniMap(playerPosition, playerRotation, mapScale);
     }
 
     update(data) {
