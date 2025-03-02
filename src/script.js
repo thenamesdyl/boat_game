@@ -15,6 +15,7 @@ import { initFishing, updateFishing, getFishCount } from './fishing.js';
 import { initCannons, updateCannons } from './cannons.js';
 import { animateSail } from './animations.js';
 import { applyWindInfluence, updateBoatRocking } from './character.js';
+import { initLeaderboard, updateLeaderboardData } from './leaderboard.js';
 
 
 
@@ -1202,3 +1203,25 @@ initCannons(boat, seaMonsters);
 
 // Get monsters reference for cannon system
 const monsters = getMonsters();
+
+// Add this to your initialization code, after other UI systems are initialized
+// (Near where you call initFishing, initCannons, etc.)
+initLeaderboard();
+
+// Example data
+const leaderboardData = {
+    monsterKills: [
+        { name: 'PlayerName', value: 10, color: '#ff0000' },
+        // more players...
+    ],
+    fishCount: [
+        { name: 'PlayerName', value: 25, color: '#00ff00' },
+        // more players...
+    ],
+    money: [
+        { name: 'PlayerName', value: 1000, color: '#0000ff' },
+        // more players...
+    ]
+};
+
+updateLeaderboardData(leaderboardData);
