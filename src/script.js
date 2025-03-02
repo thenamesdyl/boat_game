@@ -10,7 +10,7 @@ import { scene, camera, renderer, updateTime, getTime, boat, getWindData, boatVe
 import { setupSkybox, updateSkybox, setupSky, updateTimeOfDay, updateSunPosition, getTimeOfDay } from './skybox.js';
 import { setupClouds, updateClouds } from './clouds.js';
 import { setupBirds, updateBirds } from './birds.js';
-import { setupSeaMonsters, updateSeaMonsters, getMonsters } from './seaMonsters.js';
+import { setupSeaMonsters, updateSeaMonsters, getMonsters, updateLurkingMonster, updateHuntingMonster, updateSurfacingMonster, updateAttackingMonster, updateDivingMonster, updateDyingMonster, updateSpecialMonsterBehaviors } from './seaMonsters.js';
 import { initFishing, updateFishing, getFishCount } from './fishing.js';
 import { initCannons, updateCannons } from './cannons.js';
 import { animateSail } from './animations.js';
