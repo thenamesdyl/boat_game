@@ -1,5 +1,5 @@
 // chat.js - Integrated ship communications and radar system
-import { socket } from './network.js';
+import { sendChatMessage, getRecentMessages, onChatMessage, onRecentMessages } from './network.js';
 
 export class ChatSystem {
     constructor() {
@@ -311,65 +311,57 @@ export class ChatSystem {
 
     setupSocketEvents() {
         // Listen for new messages
-        if (socket) {
-            socket.on('new_message', (message) => {
-                this.addMessage(message);
+        // Register callback for incoming messages
+        onChatMessage((message) => {
+            console.log("message received", message);
+            this.addMessage(message);
 
-                // If chat tab is not active, increment unread count
-                if (this.commsTab.dataset.active !== 'true') {
-                    this.unreadCount++;
-                    this.updateUnreadIndicator();
+            // If chat tab is not active, increment unread count
+            if (this.commsTab.dataset.active !== 'true') {
+                this.unreadCount++;
+                this.updateUnreadIndicator();
+            }
+        });
+
+        // Register callback for receiving message history
+        onRecentMessages((messages) => {
+            console.log("message received", message);
+            // Clear existing messages
+            this.messages = [];
+            this.messagesArea.innerHTML = '';
+
+            // Add each message to the UI
+            if (messages && messages.length) {
+                // Display messages in chronological order
+                for (const message of messages) {
+                    this.addMessage(message, false);
                 }
-            });
 
-            // Request recent messages when initialized
-            socket.emit('get_recent_messages', { limit: 20 });
+                // Scroll to the bottom
+                this.scrollToBottom();
+            }
+        });
 
-            // Handle recent messages response
-            socket.on('recent_messages', (data) => {
-                // Clear existing messages
-                this.messages = [];
-                this.messagesArea.innerHTML = '';
-
-                // Add each message to the UI
-                if (data.messages && data.messages.length) {
-                    // Add in reverse order to show oldest first
-                    for (let i = data.messages.length - 1; i >= 0; i--) {
-                        this.addMessage(data.messages[i], false);
-                    }
-
-                    // Scroll to the bottom
-                    this.scrollToBottom();
-                }
-            });
-        } else {
-            console.error("Socket not initialized for chat system");
-            // Add a system message indicating the chat is not connected
-            this.addSystemMessage("COMM SYSTEM OFFLINE. RECONNECT REQUIRED.");
-        }
+        // Request recent messages when initialized
+        getRecentMessages('global', 20);
     }
 
     sendMessage() {
+        console.log("message sent");
         const content = this.messageInput.value.trim();
         if (!content) return;
 
         // Clear input field
         this.messageInput.value = '';
 
-        // Send message via Socket.IO
-        if (socket) {
-            socket.emit('send_message', {
-                content: content,
-                type: 'global'
-            });
-        } else {
-            this.addSystemMessage("TRANSMISSION FAILED: COMM SYSTEM OFFLINE");
-        }
+        // Send message via network.js function
+        sendChatMessage(content, 'global');
     }
 
     addMessage(message, shouldScroll = true) {
         // Create message element
         const messageEl = document.createElement('div');
+        console.log("message sent", message);
         messageEl.className = 'chat-message';
         messageEl.style.marginBottom = '5px';
         messageEl.style.wordBreak = 'break-word';

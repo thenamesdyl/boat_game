@@ -26,6 +26,12 @@ let character;
 let islandColliders;
 let activeIslands;
 
+// Chat system variables
+let chatMessageCallback = null;
+let recentMessagesCallback = null;
+let messageHistory = [];
+const DEFAULT_MESSAGE_LIMIT = 50;
+
 // Initialize the network connection
 export function initializeNetwork(gameScene, gamePlayerState, gameBoat, gameIslandColliders, gameActiveIslands, gamePlayerName, gamePlayerColor) {
     // Store references to game objects
@@ -125,6 +131,9 @@ function setupSocketEvents() {
 
         // Request all current players (as a backup in case the automatic all_players event wasn't received)
         socket.emit('get_all_players');
+
+        // Request initial chat messages
+        requestInitialMessages();
     });
 
     // Handle receiving all current players
@@ -200,6 +209,36 @@ function setupSocketEvents() {
         // Update UI if gameUI exists
         if (window.gameUI && typeof window.gameUI.updatePlayerStats === 'function') {
             window.gameUI.updatePlayerStats();
+        }
+    });
+
+    // Chat events
+    socket.on('new_message', (data) => {
+        console.log('Received new chat message:', data);
+
+        // Add to message history
+        messageHistory.push(data);
+
+        // Trim history if it gets too long (keep last 100 messages in memory)
+        if (messageHistory.length > 100) {
+            messageHistory = messageHistory.slice(-100);
+        }
+
+        // Notify UI if callback is registered
+        if (chatMessageCallback) {
+            chatMessageCallback(data);
+        }
+    });
+
+    socket.on('recent_messages', (data) => {
+        console.log('Received recent messages:', data.messages.length);
+
+        // Replace message history with recent messages (sorted chronologically)
+        messageHistory = data.messages.sort((a, b) => a.timestamp - b.timestamp);
+
+        // Notify UI if callback is registered
+        if (recentMessagesCallback) {
+            recentMessagesCallback(messageHistory);
         }
     });
 }
@@ -540,4 +579,52 @@ function initializePlayerStats() {
 
     // Request player stats from server
     socket.emit('get_player_stats', { id: playerId });
+}
+
+// Send a chat message
+export function sendChatMessage(content, messageType = 'global') {
+    if (!isConnected || !socket || !playerId) return false;
+
+    console.log('Sending chat message:', content);
+
+    socket.emit('send_message', {
+        content: content,
+        type: messageType
+    });
+
+    return true;
+}
+
+// Request recent messages from the server
+export function getRecentMessages(messageType = 'global', limit = DEFAULT_MESSAGE_LIMIT) {
+    if (!isConnected || !socket) return false;
+
+    console.log('Requesting recent messages...');
+
+    socket.emit('get_recent_messages', {
+        type: messageType,
+        limit: limit
+    });
+
+    return true;
+}
+
+// Register a callback function to be called when a new message is received
+export function onChatMessage(callback) {
+    chatMessageCallback = callback;
+}
+
+// Register a callback function to be called when recent messages are received
+export function onRecentMessages(callback) {
+    recentMessagesCallback = callback;
+}
+
+// Get message history from memory
+export function getChatHistory() {
+    return [...messageHistory]; // Return a copy to prevent external modification
+}
+
+// Request initial messages when connecting
+function requestInitialMessages() {
+    getRecentMessages('global', DEFAULT_MESSAGE_LIMIT);
 } 
