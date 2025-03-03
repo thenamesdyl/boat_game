@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { scene, getTime } from './gameState.js';
+import { getTimeOfDay } from './skybox.js'; // Import time of day function
 
 // Sea monster configuration
-const MONSTER_COUNT = 10;
+const MONSTER_COUNT = 15;
 const MONSTER_TYPES = {
     YELLOW_BEAST: 'yellowBeast',   // Original monster
     KRAKEN: 'kraken',              // New octopus-like monster
@@ -35,6 +36,8 @@ const MONSTER_STATE = {
 // Monster state
 let monsters = [];
 let playerBoat = null;
+let lastNightSpawn = false; // Track if we've already spawned monsters this night
+let lastTimeOfDay = ""; // Track the previous time of day
 
 export function setupSeaMonsters(boat) {
     try {
@@ -94,6 +97,19 @@ export function updateSeaMonsters(deltaTime) {
 
         if (!playerBoat) return;
 
+        // Get current time of day from skybox.js
+        const currentTimeOfDay = getTimeOfDay();
+
+        // Check if night has just started (transition from another time to night)
+        if (currentTimeOfDay === "Night" && lastTimeOfDay !== "Night") {
+            console.log("Night has fallen - preparing to respawn sea monsters");
+            respawnMonstersAtNight();
+        }
+
+        // Update last time of day
+        lastTimeOfDay = currentTimeOfDay;
+
+        // Update existing monsters
         monsters.forEach((monster, index) => {
             // Update state timer
             monster.stateTimer -= deltaTime;
@@ -1151,4 +1167,78 @@ function createElectricDischargeEffect(position) {
     }
 
     animateDischarge();
+}
+
+// Respawn monsters at night until we reach the maximum count
+function respawnMonstersAtNight() {
+    // Count how many monsters to spawn
+    const monstersToSpawn = MONSTER_COUNT - monsters.length;
+
+    if (monstersToSpawn <= 0) {
+        console.log("Monster population is already at maximum capacity");
+        return;
+    }
+
+    console.log(`Night has fallen. Respawning ${monstersToSpawn} sea monsters...`);
+
+    // Spawn monsters in positions away from the player
+    for (let i = 0; i < monstersToSpawn; i++) {
+        const monsterType = selectRandomMonsterType();
+        const spawnPosition = getRandomSpawnPosition();
+        createMonsterByType(monsterType, spawnPosition);
+    }
+
+    console.log(`Sea monsters have respawned (${monsters.length}/${MONSTER_COUNT})`);
+}
+
+// Helper function to create a monster by type
+function createMonsterByType(monsterType, position = null) {
+    switch (monsterType) {
+        case MONSTER_TYPES.KRAKEN:
+            createKrakenMonster(position);
+            break;
+        case MONSTER_TYPES.SEA_SERPENT:
+            createSeaSerpentMonster(position);
+            break;
+        case MONSTER_TYPES.PHANTOM_JELLYFISH:
+            createPhantomJellyfishMonster(position);
+            break;
+        case MONSTER_TYPES.YELLOW_BEAST:
+        default:
+            createYellowBeastMonster(position); // Original monster
+            break;
+    }
+}
+
+// Helper function to get a random spawn position away from player
+function getRandomSpawnPosition() {
+    // Get vector pointing in random direction
+    const angle = Math.random() * Math.PI * 2;
+    const direction = new THREE.Vector3(
+        Math.cos(angle),
+        0,
+        Math.sin(angle)
+    );
+
+    // Position the monster at least 300 units away from player
+    // but not more than 800 units away
+    const distance = 300 + Math.random() * 500;
+    const spawnPosition = new THREE.Vector3();
+
+    // If playerBoat exists, spawn relative to it
+    if (playerBoat) {
+        spawnPosition.copy(playerBoat.position);
+        spawnPosition.add(direction.multiplyScalar(distance));
+    } else {
+        // Fallback if no player boat
+        spawnPosition.set(
+            (Math.random() - 0.5) * 1000,
+            MONSTER_DEPTH,
+            (Math.random() - 0.5) * 1000
+        );
+    }
+
+    spawnPosition.y = MONSTER_DEPTH; // Always spawn at monster depth
+
+    return spawnPosition;
 } 
