@@ -78,48 +78,260 @@ const waterGeometry = new THREE.PlaneGeometry(1000, 1000, 256, 256);
 const waterShader = {
     uniforms: {
         time: { value: 0 },
-        waveHeight: { value: 2.0 },
-        waveSpeed: { value: 0.09 }, // Slowed down wave speed (was 1.5)
+        waveHeight: { value: 1.6 },
+        waveSpeed: { value: 0.2 },
+        windDirection: { value: new THREE.Vector2(0.5, 0.8) },
+        windStrength: { value: 0.8 },
+        waterColor: { value: new THREE.Vector3(0.004, 0.016, 0.047) },
+        waterSurfaceColor: { value: new THREE.Vector3(0.07, 0.15, 0.2) },
+        foamColor: { value: new THREE.Vector3(0.9, 0.95, 1.0) },
+        sunDirection: { value: new THREE.Vector3(0.0, 1.0, 0.0) },
+        sunColor: { value: new THREE.Vector3(1.0, 0.95, 0.85) },
+        cameraPosition: { value: new THREE.Vector3() }
     },
     vertexShader: `
+        uniform float time;
+        uniform float waveHeight;
+        uniform float waveSpeed;
+        uniform vec2 windDirection;
+        uniform float windStrength;
+        
         varying vec2 vUv;
-        varying float vHeight;
-
+        varying vec3 vWorldPosition;
+        varying vec3 vNormal;
+        varying vec3 vViewDirection;
+        varying float vWaveHeight;
+        
+        // Phillips spectrum constants for wave modeling
+        const float G = 9.81; // Gravitational constant
+        const float PI = 3.14159265359;
+        
+        // Wave spectrum parameters based on Phillips model (similar to DotD)
+        float phillips(vec2 k) {
+            // Normalize wind direction and calculate its magnitude
+            vec2 wind = normalize(windDirection) * windStrength;
+            float windLength = length(wind);
+            
+            // Wave vector magnitude squared
+            float k2 = dot(k, k);
+            if (k2 == 0.0) return 0.0;
+            
+            // Wave direction aligned with wind
+            float kw = dot(normalize(k), normalize(wind));
+            
+            // Phillips spectrum formula (simplified for real-time)
+            float phillips = exp(-1.0 / (k2 * windLength * windLength)) / (k2 * k2);
+            phillips *= pow(kw, 2.0); // Directional term
+            
+            // Suppress waves moving against the wind
+            if (kw < 0.0) phillips *= 0.07;
+            
+            return phillips;
+        }
+        
+        // Statistical wave sampling function (simplified FFT approach)
+        vec3 sampleWaves(vec2 position, float time) {
+            vec2 pos = position * 0.05; // Scale for manageable coordinates
+            
+            vec3 result = vec3(0.0);
+            
+            // Sample multiple frequencies (simplification of FFT approach)
+            for (int i = 0; i < 6; i++) {
+                float freq = pow(1.6, float(i));
+                float amp = pow(0.5, float(i)) * waveHeight;
+                
+                // Sample different wave directions for each frequency
+                for (int d = 0; d < 4; d++) {
+                    float angle = float(d) * PI / 2.0 + time * 0.05;
+                    vec2 dir = vec2(cos(angle), sin(angle));
+                    
+                    // Apply wind influence
+                    dir = mix(dir, windDirection, 0.7);
+                    dir = normalize(dir);
+                    
+                    // Wave vector based on direction and frequency
+                    vec2 k = dir * freq * 0.1;
+                    
+                    // Phillips spectrum amplitude
+                    float amplitude = amp * phillips(k);
+                    
+                    // Phase speed from dispersion relation (sqrt(g/k))
+                    float phaseSpeed = sqrt(G / length(k));
+                    
+                    // Wave phase
+                    float phase = dot(k, pos) - phaseSpeed * time * waveSpeed;
+                    
+                    // Gerstner wave displacement
+                    float steepness = 0.5;
+                    result.x += steepness * amplitude * dir.x * cos(phase);
+                    result.y += amplitude * sin(phase);
+                    result.z += steepness * amplitude * dir.y * cos(phase);
+                }
+            }
+            
+            return result;
+        }
+        
         void main() {
-        vUv = uv;
-        vHeight = position.z; // Use the CPU-updated Z (height)
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            vUv = uv;
+            
+            // Start with original position
+            vec3 newPosition = position;
+            
+            // Sample the wave displacement
+            vec3 offset = sampleWaves(position.xz, time);
+            
+            // Apply displacement
+            newPosition += offset;
+            
+            // Calculate normal through finite differences (similar to DotD approach)
+            const float epsilon = 0.01;
+            
+            // Sample waves at offset positions
+            vec3 tangent = sampleWaves(position.xz + vec2(epsilon, 0.0), time) - 
+                          sampleWaves(position.xz - vec2(epsilon, 0.0), time);
+            
+            vec3 bitangent = sampleWaves(position.xz + vec2(0.0, epsilon), time) - 
+                            sampleWaves(position.xz - vec2(0.0, epsilon), time);
+            
+            // Normalize the derivatives
+            tangent = vec3(2.0 * epsilon, tangent.y, 0.0);
+            bitangent = vec3(0.0, bitangent.y, 2.0 * epsilon);
+            
+            // Cross product for normal
+            vNormal = normalize(cross(bitangent, tangent));
+            
+            // Transform to world position
+            vWorldPosition = (modelMatrix * vec4(newPosition, 1.0)).xyz;
+            
+            // Normalized wave height for coloring
+            vWaveHeight = offset.y / waveHeight;
+            
+            // Calculate view direction for fresnel effect
+            vViewDirection = normalize(cameraPosition - vWorldPosition);
+            
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
         }
     `,
     fragmentShader: `
-    uniform float time;
-    varying vec2 vUv;
-    varying float vHeight;
-
-    void main() {
-      vec3 deepColor = vec3(0.1, 0.15, 0.3);
-      vec3 crestColor = vec3(0.4, 0.5, 0.7);
-      float heightFactor = clamp(vHeight * 0.5, 0.0, 1.0); // Scale height for color
-      vec3 waterColor = mix(deepColor, crestColor, heightFactor);
-
-      // Foam effect
-      float foam = smoothstep(0.7, 1.0, heightFactor + sin(vUv.x * 20.0 + time) * 0.1);
-      waterColor = mix(waterColor, vec3(0.9, 0.95, 1.0), foam);
-
-      // Glow effect
-      float glow = sin(vUv.x * 10.0 + time) * cos(vUv.y * 10.0 + time) * 0.2 + 0.8;
-      waterColor += vec3(0.05, 0.1, 0.15) * glow;
-
-      gl_FragColor = vec4(waterColor, 1.0);
-    }
-  `,
+        uniform float time;
+        uniform vec3 waterColor;
+        uniform vec3 waterSurfaceColor;
+        uniform vec3 foamColor;
+        uniform vec3 sunDirection;
+        uniform vec3 sunColor;
+        
+        varying vec2 vUv;
+        varying vec3 vWorldPosition;
+        varying vec3 vNormal;
+        varying vec3 vViewDirection;
+        varying float vWaveHeight;
+        
+        // Danger of the Deep uses detailed noise for small surface details
+        // Hash function for noise generation
+        float hash(vec2 p) {
+            return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+        }
+        
+        // 2D Perlin noise (simplified version of what DotD uses)
+        float perlinNoise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            
+            vec2 u = f * f * (3.0 - 2.0 * f);
+            
+            float a = hash(i);
+            float b = hash(i + vec2(1.0, 0.0));
+            float c = hash(i + vec2(0.0, 1.0));
+            float d = hash(i + vec2(1.0, 1.0));
+            
+            return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+        }
+        
+        // Fractal noise combining multiple octaves
+        float fractalNoise(vec2 p) {
+            float value = 0.0;
+            float amplitude = 0.5;
+            float frequency = 1.0;
+            
+            for (int i = 0; i < 6; i++) {
+                value += amplitude * perlinNoise(p * frequency);
+                amplitude *= 0.5;
+                frequency *= 2.0;
+            }
+            
+            return value;
+        }
+        
+        void main() {
+            // Base water color based on depth
+            // Danger of the Deep uses depth-sensitive coloring
+            vec3 baseColor = mix(waterColor, waterSurfaceColor, smoothstep(-0.5, 0.5, vWaveHeight));
+            
+            // Fresnel effect - more reflective at glancing angles (core DotD technique)
+            float fresnel = pow(1.0 - max(0.0, dot(vNormal, vViewDirection)), 5.0);
+            
+            // Wave crest detail
+            float waveHeight = vWaveHeight * 0.5 + 0.5;
+            
+            // Surface detail using fractal noise
+            vec2 detailCoord = vWorldPosition.xz * 0.3;
+            float surfaceDetail = fractalNoise(detailCoord + time * 0.05);
+            
+            // Wave crests with foam
+            float foam = smoothstep(0.65, 0.85, waveHeight + surfaceDetail * 0.2);
+            
+            // Whitecaps on wave crests with some noise variation
+            foam *= 0.8 + 0.2 * perlinNoise(vWorldPosition.xz * 5.0 + time);
+            
+            // DotD technique: Trailing foam behind wave crests
+            float trailingFoam = smoothstep(0.4, 0.6, waveHeight) * 
+                              perlinNoise(detailCoord - vec2(time * 0.08, 0.0));
+            foam = max(foam, trailingFoam * 0.3);
+            
+            // Lighting: diffuse from sun (similar to DotD lighting model)
+            float diffuse = max(0.0, dot(vNormal, normalize(sunDirection)));
+            
+            // Anisotropic specular highlight (important for realistic ocean)
+            vec3 halfDir = normalize(normalize(sunDirection) + vViewDirection);
+            float specBase = max(0.0, dot(vNormal, halfDir));
+            
+            // DotD uses angle-dependent specular with roughness variation
+            float specPower = mix(128.0, 32.0, 1.0 - waveHeight);
+            float specular = pow(specBase, specPower) * fresnel;
+            
+            // Deep water light scattering
+            vec3 scattering = vec3(0.0, 0.05, 0.1) * (1.0 - waveHeight) * (1.0 - fresnel);
+            
+            // Dynamic wave patterns similar to DotD's subsurface effects
+            vec3 subsurface = vec3(0.0, 0.05, 0.07) * 
+                           max(0.0, sin(vWorldPosition.x * 0.02 + time * 0.1) * 
+                                  sin(vWorldPosition.z * 0.02 + time * 0.15));
+            
+            // Combine all lighting components
+            vec3 finalColor = baseColor;
+            finalColor = mix(finalColor, foamColor, foam);
+            finalColor += subsurface;
+            finalColor += scattering;
+            finalColor += sunColor * diffuse * 0.3;
+            finalColor += sunColor * specular * fresnel;
+            
+            // Apply fresnel reflection
+            vec3 skyReflection = mix(vec3(0.1, 0.2, 0.5), sunColor, pow(specBase, 8.0));
+            finalColor = mix(finalColor, skyReflection, fresnel * 0.6);
+            
+            gl_FragColor = vec4(finalColor, 1.0);
+        }
+    `
 };
+
 const waterMaterial = new THREE.ShaderMaterial({
     uniforms: waterShader.uniforms,
     vertexShader: waterShader.vertexShader,
     fragmentShader: waterShader.fragmentShader,
     side: THREE.DoubleSide,
 });
+
 const water = new THREE.Mesh(waterGeometry, waterMaterial);
 water.rotation.x = -Math.PI / 2;
 scene.add(water);
