@@ -1,5 +1,7 @@
-import { gameUI } from './ui.js';
+
 import { getPlayerStats, requestLeaderboard } from './network.js';
+import { gameUI } from './ui.js';
+import { registerOpenUI, unregisterOpenUI } from './ui.js';
 
 // Sample leaderboard data (will be replaced with real data later)
 const sampleLeaderboardData = {
@@ -675,20 +677,41 @@ function createLeaderboardUI() {
     // Toggle leaderboard visibility when the book icon is clicked
     bookIcon.addEventListener('click', () => {
         if (bookPanel.style.display === 'none') {
-            bookPanel.style.display = 'block';
-            // Play a book opening sound if available
-            if (window.playSound) {
-                window.playSound('page_turn');
-            }
-            // Update player stats when opening the diary
-            updatePlayerStatsInLeaderboard();
-
-            // Request latest leaderboard data from server
-            requestLeaderboard();
+            openLeaderboard();
         } else {
-            bookPanel.style.display = 'none';
+            closeLeaderboard();
         }
     });
+
+    // Add these functions to handle opening and closing with proper registration
+    function openLeaderboard() {
+        bookPanel.style.display = 'block';
+        // Play a book opening sound if available
+        if (window.playSound) {
+            window.playSound('page_turn');
+        }
+        // Update player stats when opening the diary
+        updatePlayerStatsInLeaderboard();
+
+        // Request latest leaderboard data from server
+        requestLeaderboard();
+
+        // Register the leaderboard as open
+        registerOpenUI({
+            element: bookPanel,
+            close: closeLeaderboard
+        });
+    }
+
+    function closeLeaderboard() {
+        bookPanel.style.display = 'none';
+
+        // Unregister from open UIs
+        unregisterOpenUI({
+            element: bookPanel,
+            close: closeLeaderboard
+        });
+    }
 
     // Store references to the leaderboard elements in gameUI
     gameUI.elements.leaderboard = {

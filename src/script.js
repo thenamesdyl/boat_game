@@ -18,6 +18,14 @@ import { applyWindInfluence, updateBoatRocking } from './character.js';
 import { initLeaderboard, updateLeaderboardData } from './leaderboard.js';
 import { requestLeaderboard } from './network.js';
 import { updateVillagers } from './villagers.js';
+import {
+    islandColliders,
+    activeIslands,
+    activeWaterChunks,
+    updateVisibleChunks,
+    findNearestIsland,
+    checkIslandCollision
+} from './islands.js';
 
 
 
@@ -234,16 +242,12 @@ setTimeout(() => {
 
 
 // Island generation variables
-let islandColliders = [];
 const visibleDistance = 2000; // Increased to see islands from even further away
 const chunkSize = 600; // Size of each "chunk" of ocean
 const islandsPerChunk = 3; // Increased from 2 to have more islands per chunk
 const maxViewDistance = 5; // Increased to render islands further away
 
 // Store generated chunks
-const generatedChunks = new Set();
-const activeIslands = new Map(); // Maps island ID to island object
-const activeWaterChunks = new Map(); // Maps water chunk ID to water mesh
 
 // Function to generate a chunk key based on coordinates
 function getChunkKey(chunkX, chunkZ) {
@@ -787,99 +791,6 @@ function createRuinedTower(island, random) {
     island.add(glowLight);
 }
 
-// Function to update visible chunks based on boat position
-function updateVisibleChunks() {
-    // Get current chunk coordinates based on boat position
-    const currentChunk = getChunkCoords(boat.position.x, boat.position.z);
-
-    // Set to track chunks that should be visible
-    const chunksToKeep = new Set();
-    const waterChunksToKeep = new Set();
-
-    // Generate chunks in view distance
-    for (let xOffset = -maxViewDistance; xOffset <= maxViewDistance; xOffset++) {
-        for (let zOffset = -maxViewDistance; zOffset <= maxViewDistance; zOffset++) {
-            const chunkX = currentChunk.x + xOffset;
-            const chunkZ = currentChunk.z + zOffset;
-            const chunkKey = getChunkKey(chunkX, chunkZ);
-
-            // Add to set of chunks to keep
-            chunksToKeep.add(chunkKey);
-
-            // For water, we need a slightly larger view distance to avoid seeing edges
-            if (Math.abs(xOffset) <= maxViewDistance + 1 && Math.abs(zOffset) <= maxViewDistance + 1) {
-                waterChunksToKeep.add(chunkKey);
-                // Create water chunk if needed
-                createWaterChunk(chunkX, chunkZ);
-            }
-
-            // Generate this chunk if needed
-            generateChunk(chunkX, chunkZ);
-        }
-    }
-
-    // Remove islands that are too far away
-    const islandsToRemove = [];
-    activeIslands.forEach((island, id) => {
-        // Calculate distance to boat
-        const distance = boat.position.distanceTo(island.collider.center);
-
-        // Get the chunk this island belongs to
-        const islandChunkX = Math.floor(island.collider.center.x / chunkSize);
-        const islandChunkZ = Math.floor(island.collider.center.z / chunkSize);
-        const islandChunkKey = getChunkKey(islandChunkX, islandChunkZ);
-
-        // If the island is too far or its chunk is not in the keep set, mark for removal
-        if (distance > visibleDistance || !chunksToKeep.has(islandChunkKey)) {
-            islandsToRemove.push(id);
-        }
-    });
-
-    // Remove marked islands
-    islandsToRemove.forEach(id => {
-        const island = activeIslands.get(id);
-        if (island) {
-            // Remove from scene
-            scene.remove(island.mesh);
-
-            // Remove collider
-            const colliderIndex = islandColliders.findIndex(c => c.id === id);
-            if (colliderIndex !== -1) {
-                islandColliders.splice(colliderIndex, 1);
-            }
-
-            // Remove from active islands
-            activeIslands.delete(id);
-        }
-    });
-
-    // Remove water chunks that are too far away
-    const waterChunksToRemove = [];
-    activeWaterChunks.forEach((waterChunk, chunkKey) => {
-        if (!waterChunksToKeep.has(chunkKey)) {
-            waterChunksToRemove.push(chunkKey);
-        }
-    });
-
-    // Remove marked water chunks
-    waterChunksToRemove.forEach(chunkKey => {
-        const waterChunk = activeWaterChunks.get(chunkKey);
-        if (waterChunk) {
-            // Remove from scene
-            scene.remove(waterChunk);
-
-            // Remove from active water chunks
-            activeWaterChunks.delete(chunkKey);
-        }
-    });
-
-    // Debug info - log the number of active islands and chunks
-}
-
-// Update or replace the existing boat creation code with the function above
-// Then call it to create the boat:
-
-
 // Update camera positioning in the animation loop
 // Replace the existing camera positioning code (around line 1289) with:
 function updateCamera() {
@@ -1018,22 +929,19 @@ function animate() {
 
     // Check for island collisions
     let collided = false;
-    for (const collider of islandColliders) {
-        const distance = newPosition.distanceTo(collider.center);
-        if (distance < collider.radius + 2) {
-            collided = true;
-            break;
-        }
+    if (checkIslandCollision(newPosition)) {
+        collided = true;
     }
 
     if (!collided) {
         boat.position.copy(newPosition);
 
         if (boat.position.distanceTo(lastChunkUpdatePosition) > chunkUpdateThreshold) {
-            lastChunkUpdatePosition.copy(boat.position);
-            updateVisibleChunks();
+            updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
             // Add this line to update villagers whenever chunks update
-            updateVillagers(activeIslands);
+            if (activeIslands && activeIslands.size > 0) {
+                updateVillagers(activeIslands);
+            }
         }
     }
 
@@ -1124,21 +1032,6 @@ function calculateBoatSpeed() {
 // Get time of day based on game time
 
 // Find nearest island
-function findNearestIsland() {
-    let nearest = { distance: Infinity, name: "None" };
-
-    activeIslands.forEach((island, id) => {
-        const distance = boat.position.distanceTo(island.collider.center);
-        if (distance < nearest.distance) {
-            nearest = {
-                distance: distance,
-                name: `Island ${id.substring(0, 4)}` // Use part of the ID as a name
-            };
-        }
-    });
-
-    return nearest;
-}
 
 // Update the UI in your animate function
 function updateGameUI() {
@@ -1159,7 +1052,8 @@ function updateGameUI() {
         isConnected: Network.isNetworkConnected(),
         nearestIsland: nearestIsland,
         mapScale: 200, // Scale factor for mini-map (adjust as needed)
-        fishCount: getFishCount() // Add fish count
+        fishCount: getFishCount(),
+        activeIslands: activeIslands // Add this line to pass the islands
     });
 
     // Add island markers to mini-map
@@ -1173,16 +1067,18 @@ function updateGameUI() {
 
 // Initialize by generating the starting chunks
 lastChunkUpdatePosition.copy(boat.position);
-updateVisibleChunks();
+updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
 
 // Force an initial update to ensure islands are generated
 setTimeout(() => {
     console.log("Forcing initial chunk update...");
-    updateVisibleChunks();
+    updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
 
     // Add this line to initialize villagers after the first chunk update
-    updateVillagers(activeIslands);
-
+    if (activeIslands && activeIslands.size > 0) {
+        console.log(`Initializing villagers with ${activeIslands.size} islands`);
+        updateVillagers(activeIslands);
+    }
 }, 1000);
 
 

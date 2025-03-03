@@ -1,6 +1,7 @@
 // Enhanced UI system for the boat game
 import * as THREE from 'three';
 import { initChat, initMiniMap } from './chat.js';
+import { initShop, updateShopAvailability } from './shop.js';
 
 // Create a UI class to manage all interface elements
 class GameUI {
@@ -72,6 +73,9 @@ class GameUI {
         // Initialize the mini map and connect it to the chat system
         this.miniMap = initMiniMap();
         this.miniMap.setChatSystem(this.chat);
+
+        // Initialize the shop UI
+        this.elements.shop = initShop(this);
     }
 
     createUIElement(text) {
@@ -833,6 +837,11 @@ class GameUI {
         if (data.updateStats) {
             this.updatePlayerStats();
         }
+
+        // Update shop availability if we have position and island data
+        if (data.position && data.nearestIsland) {
+            updateShopAvailability(data.activeIslands, data.position);
+        }
     }
 
     getCardinalDirection(degrees) {
@@ -993,6 +1002,49 @@ class GameUI {
 
 // Create a global UI instance
 const gameUI = new GameUI();
+
+// Track open UI elements in a stack to handle multiple open UIs
+const openUIElements = [];
+
+// Global escape key handler
+function handleEscapeKey(event) {
+    if (event.key === 'Escape' && openUIElements.length > 0) {
+        // Get the most recently opened UI
+        const lastUI = openUIElements[openUIElements.length - 1];
+        // Close it using its close method
+        if (lastUI && typeof lastUI.close === 'function') {
+            lastUI.close();
+        }
+        // UI's close function should handle removing itself from the stack
+    }
+}
+
+// Register a UI element as open
+export function registerOpenUI(uiElement) {
+    console.log('registerOpenUI', uiElement);
+    // Add the UI to the stack of open elements
+    if (uiElement && !openUIElements.includes(uiElement)) {
+        openUIElements.push(uiElement);
+
+        // Ensure escape key handler is attached
+        if (openUIElements.length === 1) {
+            document.addEventListener('keydown', handleEscapeKey);
+        }
+    }
+}
+
+// Unregister a UI element when closed
+export function unregisterOpenUI(uiElement) {
+    const index = openUIElements.indexOf(uiElement);
+    if (index !== -1) {
+        openUIElements.splice(index, 1);
+
+        // Remove escape key handler if no more UIs are open
+        if (openUIElements.length === 0) {
+            document.removeEventListener('keydown', handleEscapeKey);
+        }
+    }
+}
 
 // Export the UI instance
 export { gameUI }; 
