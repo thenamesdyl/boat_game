@@ -802,6 +802,12 @@ function updateCamera() {
         const horizontalAngle = Math.max(Math.min(mouseControl.mouseX * mouseControl.sensitivity, mouseControl.maxAngle), -mouseControl.maxAngle);
         const verticalAngle = Math.max(Math.min(-mouseControl.mouseY * mouseControl.sensitivity, mouseControl.maxAngle), -mouseControl.maxAngle);
 
+        // Calculate subtle camera rotation amount (for the 3D ship effect)
+        const rotationZ = Math.max(Math.min(mouseControl.mouseX * mouseControl.rotationSensitivity, mouseControl.maxRotation), -mouseControl.maxRotation);
+
+        // Apply subtle rotation to camera around its z-axis
+        camera.rotation.z = rotationZ;
+
         const lookTarget = boat.position.clone();
         // Look at a higher point on the boat (near the mast)
         lookTarget.y += 4;
@@ -810,6 +816,11 @@ function updateCamera() {
         lookTarget.add(rightVector.multiplyScalar(horizontalAngle * 50));
         lookTarget.y += verticalAngle * 50;
         camera.lookAt(lookTarget);
+
+        // Add a slight "bank" to the camera based on horizontal mouse position
+        // This is separate from the z-rotation and creates a more natural feel
+        const bankAngle = horizontalAngle * 0.3; // 30% of the look angle
+        camera.up.set(Math.sin(bankAngle), 1, 0).normalize();
     } else {
         // Look at a higher point on the boat instead of just the position
         const lookTarget = boat.position.clone();
@@ -829,6 +840,8 @@ const mouseControl = {
     isEnabled: true,
     sensitivity: 0.05, // Low sensitivity for subtle movement
     maxAngle: 0.3, // Maximum rotation angle in radians (about 17 degrees)
+    rotationSensitivity: 0.015, // Very low sensitivity for subtle ship rotation
+    maxRotation: 0.1, // Maximum rotation (about 5.7 degrees)
     mouseX: 0,
     mouseY: 0
 };
