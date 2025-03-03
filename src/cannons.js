@@ -287,8 +287,9 @@ function playCannonSound() {
     oscillator.frequency.setValueAtTime(100, window.audioContext.currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(20, window.audioContext.currentTime + 0.2);
 
-    gainNode.gain.setValueAtTime(0.5, window.audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, window.audioContext.currentTime + 0.3);
+    // Reduce volume by 50% (from 0.5 to 0.25)
+    gainNode.gain.setValueAtTime(0.25, window.audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.005, window.audioContext.currentTime + 0.3);
 
     oscillator.connect(gainNode);
     gainNode.connect(window.audioContext.destination);
