@@ -1409,6 +1409,7 @@ function updateTreasureDrops() {
     for (let i = treasureDrops.length - 1; i >= 0; i--) {
         const treasureOrb = treasureDrops[i];
 
+
         // Check if treasure should disappear due to timeout (30 seconds)
         if (currentTime - treasureOrb.userData.creationTime > 30) {
             scene.remove(treasureOrb);
@@ -1416,7 +1417,6 @@ function updateTreasureDrops() {
             continue;
         }
 
-        console.log("treasureOrb.position.distanceTo(boatPosition): ", treasureOrb.position.distanceTo(boatPosition));
         // Check if boat is close enough to collect
         if (treasureOrb.position.distanceTo(boatPosition) < COLLECT_DISTANCE) {
             // Collect the treasure

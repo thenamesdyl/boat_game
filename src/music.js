@@ -6,7 +6,7 @@
 const MusicSystem = (() => {
     // Main background music
     let backgroundMusic = null;
-    let musicVolume = 0.5;
+    let musicVolume = 0.2;
     let isMuted = false;
     let musicStartedByUserInteraction = false;
 
@@ -15,7 +15,7 @@ const MusicSystem = (() => {
      */
     const init = () => {
         // Create the audio element for background music
-        backgroundMusic = new Audio('./music.mp3');
+        backgroundMusic = new Audio('./output.mp3');
         backgroundMusic.loop = true;
         backgroundMusic.volume = musicVolume;
 

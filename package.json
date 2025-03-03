@@ -25,7 +25,8 @@
         "boat"
     ],
     "staticFiles": {
-        "staticPath": "assets"
+        "staticPath": "assets",
+        "watcherGlob": "**/*"
     },
     "author": "",
     "license": "MIT"

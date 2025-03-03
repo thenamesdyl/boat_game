@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { getWindData, boatVelocity, boat, getTime } from './gameState.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { scene } from './gameState.js';
 
 // Add these variables near the top with your other boat variables
 let boatRockAngleX = 0; // Pitch (forward/backward rocking)
@@ -15,6 +17,9 @@ let isDamageFlashing = false;
 let damageFlashTimer = 0;
 const damageFlashDuration = 0.5; // Duration of flash in seconds
 let originalColors = new Map(); // Store original colors for restoration
+
+// Add a flag to track if the model has been loaded
+let boatModelLoaded = false;
 
 // Initialize wood overlay texture
 function initWoodOverlayTexture() {
@@ -273,9 +278,27 @@ export function addCharacterToBoat(boat) {
 
 // Create a larger boat
 export function createBoat(scene) {
-    // Create boat group
+    // Create a group to hold the boat
     let boat = new THREE.Group();
 
+    // Call loadGLBModel directly here, passing the boat group
+    loadGLBModel(boat);
+
+    // Position the boat
+    boat.position.set(0, 0.5, 0);
+
+    // Add a small Minecraft-style character to the boat
+    addCharacterToBoat(boat);
+
+    // Add the boat to the scene
+    scene.add(boat);
+
+    return boat;
+}
+
+// Original geometric boat creation (commented out but preserved as fallback)
+function createGeometricBoat(boat) {
+    /*
     // Create larger hull with wood texture
     const hullGeometry = new THREE.BoxGeometry(6, 2, 12);
     const hullMaterial = createWoodMaterial(0x8b4513, 'hullMaterial');
@@ -399,20 +422,10 @@ export function createBoat(scene) {
     crossBeam.position.set(0, 12, 1.5); // Position at top of sail
     crossBeam.userData.isNotPlayerColorable = true;
     boat.add(crossBeam);
-
-    // Rest of the boat code...
-    scene.add(boat);
-
-    // Position the boat
-    boat.position.set(0, 0.5, 0);
-
-    // Add a small Minecraft-style character to the front of the boat
-    addCharacterToBoat(boat);
+    */
 
     // Apply wood texture overlay to colorable parts
     applyWoodTextureToColoredParts(boat);
-
-    return boat;
 }
 
 export function updateBoatRocking(deltaTime) {
@@ -439,6 +452,11 @@ export function updateBoatRocking(deltaTime) {
     // Apply the rocking rotation (keep existing Y rotation)
     const currentYRotation = boat.rotation.y;
     boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
+
+    // Only load the model if it hasn't been loaded
+    if (!boatModelLoaded) {
+        loadGLBModel(boat);
+    }
 
     // Update damage flash effect
     updateDamageFlash(deltaTime);
@@ -509,4 +527,223 @@ export function updateDamageFlash(deltaTime) {
     if (damageFlashTimer <= 0) {
         restoreBoatColors();
     }
+}
+
+// Update the loadGLBModel function to position and rotate the model correctly
+function loadGLBModel(boat) {
+    // Don't load if already loaded
+    if (boatModelLoaded) return;
+
+    // Create a GLTF loader
+    const loader = new GLTFLoader();
+
+    // Use a relative path to the GLB file in the assets directory
+    const modelUrl = './boat.glb';
+
+    console.log(`Loading boat model from local path: ${modelUrl}`);
+
+    loader.load(
+        modelUrl,
+        // Success callback
+        function (gltf) {
+            console.log("✅ GLB model loaded successfully!");
+            const model = gltf.scene;
+
+            // Scale the model appropriately
+            model.scale.set(20, 20, 20);
+
+            // Rotate model 180 degrees to face the correct direction
+            model.rotation.y = Math.PI;
+
+            // Position the model appropriately - raise it above water level
+            model.position.set(0, 7, 0);
+
+            // Apply cartoony bright style to the model
+            makeBoatCartoony(model);
+
+            // Add model to the boat group
+            boat.add(model);
+
+            // Handle animations if present
+            if (gltf.animations && gltf.animations.length) {
+                const mixer = new THREE.AnimationMixer(model);
+                const animation = mixer.clipAction(gltf.animations[0]);
+                animation.play();
+
+                model.userData.mixer = mixer;
+
+                if (!window.modelMixers) window.modelMixers = [];
+                window.modelMixers.push(mixer);
+            }
+
+            // Set flag to indicate model is loaded
+            boatModelLoaded = true;
+        },
+        // Progress callback
+        function (xhr) {
+            if (xhr.lengthComputable) {
+                const percentComplete = xhr.loaded / xhr.total * 100;
+                console.log(`Model loading: ${percentComplete.toFixed(2)}%`);
+            }
+        },
+        // Error callback
+        function (error) {
+            console.error("❌ Error loading boat model:", error);
+            console.log("Please check that:");
+            console.log("1. The GLB file exists at: assets/models/boat.glb");
+            console.log("2. You have installed parcel-plugin-static-files-copy");
+            console.log("3. Your package.json has the correct staticFiles configuration");
+
+            // Fallback to geometric boat model
+            console.log("Falling back to geometric boat model");
+            createGeometricBoat(boat);
+        }
+    );
+}
+
+// If you have an animation loop, add this to update the animations
+export function updateGLBAnimations(deltaTime) {
+    if (window.modelMixers) {
+        for (const mixer of window.modelMixers) {
+            mixer.update(deltaTime);
+        }
+    }
+}
+
+// Function to apply interesting colors to the boat model
+function applyBoatColors(model) {
+    // Color palette for different boat parts
+    const colorPalette = {
+        hull: new THREE.Color(0x8b4513),       // Dark wood brown for hull
+        deck: new THREE.Color(0xa0522d),       // Lighter wood brown for deck
+        sail: new THREE.Color(0xf0f0f0),       // Off-white for sails
+        mast: new THREE.Color(0x5c3317),       // Dark brown for mast
+        details: new THREE.Color(0xdaa520),    // Golden for decorative elements
+        trim: new THREE.Color(0x191970),       // Navy blue for trim
+        cannon: new THREE.Color(0x2f4f4f),     // Dark slate for cannons
+        flag: new THREE.Color(0xb22222),       // Crimson for flags
+    };
+
+    // Apply colors based on mesh names or positions
+    model.traverse((child) => {
+        if (child.isMesh) {
+            // Store original material for damage flash effect
+            if (!originalColors.has(child.uuid)) {
+                originalColors.set(child.uuid, child.material.color.clone());
+            }
+
+            // Apply colors based on mesh name or position
+            // Note: Adjust these conditions based on the actual model structure
+            if (child.name.includes('hull') || child.name.includes('body')) {
+                child.material.color.copy(colorPalette.hull);
+            } else if (child.name.includes('deck')) {
+                child.material.color.copy(colorPalette.deck);
+            } else if (child.name.includes('sail')) {
+                child.material.color.copy(colorPalette.sail);
+            } else if (child.name.includes('mast')) {
+                child.material.color.copy(colorPalette.mast);
+            } else if (child.name.includes('cannon')) {
+                child.material.color.copy(colorPalette.cannon);
+            } else if (child.name.includes('flag')) {
+                child.material.color.copy(colorPalette.flag);
+            } else if (child.name.includes('trim') || child.name.includes('detail')) {
+                child.material.color.copy(colorPalette.trim);
+            } else if (child.position.y > 5) {
+                // Higher elements are likely masts or sails
+                child.material.color.copy(colorPalette.sail);
+            } else {
+                // Default to hull color
+                child.material.color.copy(colorPalette.hull);
+            }
+
+            // Apply wood texture to wooden parts
+            if (child.name.includes('wood') ||
+                child.name.includes('hull') ||
+                child.name.includes('deck') ||
+                child.name.includes('mast')) {
+                applyWoodTextureToMesh(child);
+            }
+
+            // Make sure the material updates
+            child.material.needsUpdate = true;
+        }
+    });
+
+    console.log("Applied custom colors to boat model");
+}
+
+// Function to apply wood texture to a specific mesh
+function applyWoodTextureToMesh(mesh) {
+    if (!woodOverlayTexture) {
+        woodOverlayTexture = initWoodOverlayTexture();
+    }
+
+    // Clone the texture to avoid sharing between materials
+    const texture = woodOverlayTexture.clone();
+    texture.needsUpdate = true;
+
+    // If material already has a map, use texture as bump map
+    if (mesh.material.map) {
+        mesh.material.bumpMap = texture;
+        mesh.material.bumpScale = 0.02;
+    } else {
+        mesh.material.map = texture;
+    }
+
+    mesh.material.needsUpdate = true;
+}
+
+// Add this new function to brighten the boat materials
+function makeBoatCartoony(model) {
+    model.traverse((child) => {
+        if (child.isMesh && child.material) {
+            // Handle materials in arrays
+            if (Array.isArray(child.material)) {
+                child.material.forEach(mat => {
+                    brightifyMaterial(mat);
+                });
+            } else {
+                // Handle single materials
+                brightifyMaterial(child.material);
+            }
+        }
+    });
+
+    console.log("Applied cartoony bright style to boat model");
+}
+
+// Helper function to make a material more vibrant/cartoony
+function brightifyMaterial(material) {
+    // Increase saturation by boosting the color values
+    if (material.color) {
+        // Get current HSL values
+        const hsl = {};
+        material.color.getHSL(hsl);
+
+        // Increase saturation by 30% and lightness by 20%
+        hsl.s = Math.min(hsl.s * 1.3, 1.0);
+        hsl.l = Math.min(hsl.l * 1.2, 1.0);
+
+        // Apply new HSL values
+        material.color.setHSL(hsl.h, hsl.s, hsl.l);
+    }
+
+    // Add slight emissive glow for a more vibrant look
+    if (!material.emissive) {
+        material.emissive = new THREE.Color(0x222222);
+    } else {
+        material.emissive.set(0x222222);
+    }
+
+    // Make specular highlights more pronounced for a cartoony sheen
+    if (material.shininess !== undefined) {
+        material.shininess *= 1.5;
+    }
+
+    // Reduce roughness for a more plastic-like appearance
+    if (material.roughness !== undefined) {
+        material.roughness = Math.max(material.roughness * 0.7, 0.1);
+    }
+
+    material.needsUpdate = true;
 }
