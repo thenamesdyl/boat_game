@@ -10,6 +10,12 @@ const maxRockAngle = 0.04; // Maximum rocking angle in radians (about 2.3 degree
 // Wood overlay texture for boat colored parts
 let woodOverlayTexture = null;
 
+// Variables to manage damage flash effect
+let isDamageFlashing = false;
+let damageFlashTimer = 0;
+const damageFlashDuration = 0.5; // Duration of flash in seconds
+let originalColors = new Map(); // Store original colors for restoration
+
 // Initialize wood overlay texture
 function initWoodOverlayTexture() {
     // Create a canvas for the subtle wood grain overlay
@@ -433,6 +439,9 @@ export function updateBoatRocking(deltaTime) {
     // Apply the rocking rotation (keep existing Y rotation)
     const currentYRotation = boat.rotation.y;
     boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
+
+    // Update damage flash effect
+    updateDamageFlash(deltaTime);
 }
 
 // Add this function to apply wind influence to boat movement
@@ -455,4 +464,49 @@ export function applyWindInfluence() {
 
     // Apply to boat position
     boat.position.add(windVector);
+}
+
+// Function to make the boat flash red when hit
+export function flashBoatDamage() {
+    if (isDamageFlashing) return; // Don't start a new flash if one is in progress
+
+    isDamageFlashing = true;
+    damageFlashTimer = damageFlashDuration;
+
+    // Store original colors and set to red
+    boat.traverse((child) => {
+        if (child.isMesh && child.material && !child.userData.isNotPlayerColorable) {
+            // Store original color if not already stored
+            if (!originalColors.has(child.uuid)) {
+                originalColors.set(child.uuid, child.material.color.clone());
+            }
+
+            // Set to bright red for damage indication
+            child.material.color.set(0xff0000);
+        }
+    });
+}
+
+// Function to restore boat colors after damage flash
+function restoreBoatColors() {
+    isDamageFlashing = false;
+
+    // Restore original colors
+    boat.traverse((child) => {
+        if (child.isMesh && child.material && originalColors.has(child.uuid)) {
+            const originalColor = originalColors.get(child.uuid);
+            child.material.color.copy(originalColor);
+        }
+    });
+}
+
+// Update function to handle damage flash timing
+export function updateDamageFlash(deltaTime) {
+    if (!isDamageFlashing) return;
+
+    damageFlashTimer -= deltaTime;
+
+    if (damageFlashTimer <= 0) {
+        restoreBoatColors();
+    }
 }

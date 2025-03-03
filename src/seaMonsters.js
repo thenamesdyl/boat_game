@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { scene, getTime } from './gameState.js';
+import { scene, getTime, boatVelocity } from './gameState.js';
 import { getTimeOfDay } from './skybox.js'; // Import time of day function
+import { flashBoatDamage } from './character.js'; // Add this import
 
 // Sea monster configuration
-const MONSTER_COUNT = 15;
+const MONSTER_COUNT = 50;
 const MONSTER_TYPES = {
     YELLOW_BEAST: 'yellowBeast',   // Original monster
     KRAKEN: 'kraken',              // New octopus-like monster
@@ -39,9 +40,16 @@ let playerBoat = null;
 let lastNightSpawn = false; // Track if we've already spawned monsters this night
 let lastTimeOfDay = ""; // Track the previous time of day
 
+// Add a hit cooldown system to prevent constant damage
+const HIT_COOLDOWN = 1.5; // Seconds between possible hits
+let lastHitTime = 0; // Initialize to negative value to ensure first hit works
+
 export function setupSeaMonsters(boat) {
     try {
         playerBoat = boat;
+
+        // Reset hit cooldown to ensure monsters can hit on first approach
+        lastHitTime = -999; // Set to a very negative value to ensure first hit works
 
         // Create monsters
         for (let i = 0; i < MONSTER_COUNT; i++) {
@@ -108,6 +116,9 @@ export function updateSeaMonsters(deltaTime) {
 
         // Update last time of day
         lastTimeOfDay = currentTimeOfDay;
+
+        // Debug current time and last hit time
+        console.log("getTime(): ", getTime() / 1000, "lastHitTime: ", lastHitTime);
 
         // Update existing monsters
         monsters.forEach((monster, index) => {
@@ -290,6 +301,34 @@ export function updateAttackingMonster(monster, deltaTime) {
     monster.velocity.y = 0;
 
     const distanceToPlayer = monster.mesh.position.distanceTo(playerBoat.position);
+
+    // Check if monster can hit the boat
+    const currentTime = getTime() / 1000; // Convert to seconds
+    const canHit = currentTime - lastHitTime > HIT_COOLDOWN;
+
+    // Debug monster distance
+    if (distanceToPlayer < 25) {
+        console.log(`Monster ${monster.monsterType} distance: ${distanceToPlayer.toFixed(2)}, can hit: ${canHit}, current time: ${currentTime.toFixed(2)}, last hit: ${lastHitTime.toFixed(2)}, diff: ${(currentTime - lastHitTime).toFixed(2)}`);
+    }
+
+    console.log("canHit: ", canHit);
+
+    if (distanceToPlayer < 15) { // Increased hit range for better detection
+        console.log("Monster hit the boat - triggering damage flash");
+        // Monster hit the boat - trigger damage flash
+        flashBoatDamage();
+        lastHitTime = currentTime;
+
+        // Add some physical impact - push boat slightly
+        const hitDirection = new THREE.Vector3()
+            .subVectors(playerBoat.position, monster.mesh.position)
+            .normalize();
+
+        // Use the imported boatVelocity directly instead of window.boatVelocity
+        if (boatVelocity) {
+            boatVelocity.add(hitDirection.multiplyScalar(0.5));
+        }
+    }
 
     if (monster.attackSubState === 'charging') {
         // Set charge target as player position
