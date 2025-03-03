@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 from models import db, Player, Island, Message
 from collections import defaultdict
+from sqlalchemy import inspect
 
 # Load environment variables from .env file
 load_dotenv()
@@ -33,7 +34,14 @@ socketio = SocketIO(app, cors_allowed_origins=os.environ.get('SOCKETIO_CORS_ALLO
 
 # Create database tables
 with app.app_context():
-    db.create_all()
+    # Only create tables if they don't exist yet
+    # Check if any tables exist first
+    inspector = inspect(db.engine)
+    if not inspector.get_table_names():
+        print("No tables found, creating database schema...")
+        db.create_all()
+    else:
+        print(f"Database already contains tables: {inspector.get_table_names()}")
 
 # Keep a session cache for quick access
 players = {}
