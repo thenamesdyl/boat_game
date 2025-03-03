@@ -4,7 +4,7 @@ import { getTimeOfDay } from './skybox.js'; // Import time of day function
 import { flashBoatDamage } from './character.js'; // Add this import
 
 // Sea monster configuration
-const MONSTER_COUNT = 50;
+const MONSTER_COUNT = 15;
 const MONSTER_TYPES = {
     YELLOW_BEAST: 'yellowBeast',   // Original monster
     KRAKEN: 'kraken',              // New octopus-like monster
