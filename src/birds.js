@@ -15,11 +15,27 @@ const BIRD_WANDER_FACTOR = 0.1;
 const BIRD_GOAL_FACTOR = 0.03;
 const BIRD_WING_FLAP_SPEED = 0.2;
 
+// Bird poop configuration
+const POOP_CONFIG = {
+    CHANCE_PER_BIRD: 0.0005,  // Chance per frame per bird to poop
+    SIZE: 0.3,                // Size of poop particle
+    FALL_SPEED: 0.15,         // Initial fall speed
+    ACCELERATION: 0.01,       // Gravity acceleration
+    COLOR: 0xf5f5dc,          // Off-white color
+    SPLASH_PARTICLES: 6,      // Number of splash particles
+    SPLASH_HEIGHT: 1.5,       // How high splash particles go
+    SPLASH_DURATION: 1        // How long splash particles exist
+};
+
 // Bird state
 let birds = [];
 let birdGoals = [];
 let activeIslands = null;
 let playerBoat = null;
+
+// Storage for active poop particles
+let poopParticles = [];
+let splashParticles = [];
 
 export function setupBirds(islands, boat) {
     try {
@@ -191,7 +207,18 @@ export function updateBirds(deltaTime) {
 
             // Ensure birds stay within world bounds
             keepBirdInWorld(bird);
+
+            // Random chance for bird to poop
+            if (Math.random() < POOP_CONFIG.CHANCE_PER_BIRD) {
+                createBirdPoop(bird.mesh.position.clone());
+            }
         });
+
+        // Update any active poop particles
+        updatePoopParticles(deltaTime);
+
+        // Update splash particles
+        updateSplashParticles(deltaTime);
     } catch (error) {
         console.error("Error in updateBirds:", error);
     }
@@ -435,5 +462,161 @@ function keepBirdInWorld(bird) {
         ).normalize().multiplyScalar(0.05);
 
         bird.velocity.add(towardCenter);
+    }
+}
+
+/**
+ * Create a poop particle at the given position
+ */
+function createBirdPoop(position) {
+    // Create geometry and material
+    const geometry = new THREE.SphereGeometry(POOP_CONFIG.SIZE, 8, 8);
+    const material = new THREE.MeshBasicMaterial({ color: POOP_CONFIG.COLOR });
+
+    // Create mesh
+    const poop = new THREE.Mesh(geometry, material);
+
+    // Set initial position (slightly below bird)
+    position.y -= 1;
+    poop.position.copy(position);
+
+    // Add to scene
+    scene.add(poop);
+
+    // Store with velocity data
+    poopParticles.push({
+        mesh: poop,
+        velocity: new THREE.Vector3(
+            (Math.random() - 0.5) * 0.05,  // Slight sideways movement
+            -POOP_CONFIG.FALL_SPEED,       // Initial downward velocity
+            (Math.random() - 0.5) * 0.05   // Slight sideways movement
+        ),
+        hasHitWater: false
+    });
+}
+
+/**
+ * Update all poop particles
+ */
+function updatePoopParticles(deltaTime) {
+    for (let i = poopParticles.length - 1; i >= 0; i--) {
+        const poop = poopParticles[i];
+
+        // Apply gravity
+        poop.velocity.y -= POOP_CONFIG.ACCELERATION * deltaTime;
+
+        // Update position
+        poop.mesh.position.x += poop.velocity.x;
+        poop.mesh.position.y += poop.velocity.y;
+        poop.mesh.position.z += poop.velocity.z;
+
+        // Check if hit water (y = 0)
+        if (!poop.hasHitWater && poop.mesh.position.y <= 0) {
+            poop.hasHitWater = true;
+            poop.mesh.position.y = 0; // Set to water level
+
+            // Create splash effect
+            createSplashEffect(poop.mesh.position.clone());
+
+            // Remove poop mesh after hitting water
+            scene.remove(poop.mesh);
+            poop.mesh.geometry.dispose();
+            poop.mesh.material.dispose();
+            poopParticles.splice(i, 1);
+        }
+
+        // Remove if gone too far below water (failsafe)
+        if (poop.mesh.position.y < -10) {
+            scene.remove(poop.mesh);
+            poop.mesh.geometry.dispose();
+            poop.mesh.material.dispose();
+            poopParticles.splice(i, 1);
+        }
+    }
+}
+
+/**
+ * Create splash effect when poop hits water
+ */
+function createSplashEffect(position) {
+    // Create several small particles for the splash
+    for (let i = 0; i < POOP_CONFIG.SPLASH_PARTICLES; i++) {
+        // Create small white particle
+        const geometry = new THREE.SphereGeometry(0.1 + Math.random() * 0.1, 4, 4);
+        const material = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        const splash = new THREE.Mesh(geometry, material);
+
+        // Position at impact point
+        splash.position.copy(position);
+
+        // Add random upward and outward velocity
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.03 + Math.random() * 0.05;
+        const upSpeed = 0.05 + Math.random() * 0.1;
+
+        const velocity = new THREE.Vector3(
+            Math.cos(angle) * speed,
+            upSpeed,
+            Math.sin(angle) * speed
+        );
+
+        // Add to scene
+        scene.add(splash);
+
+        // Store with metadata
+        splashParticles.push({
+            mesh: splash,
+            velocity: velocity,
+            lifetime: POOP_CONFIG.SPLASH_DURATION,
+            age: 0
+        });
+    }
+
+    // Optional: Add a sound effect here if you have audio implemented
+    // playSound('splash', position, 0.3); // Example function
+}
+
+/**
+ * Update splash particles
+ */
+function updateSplashParticles(deltaTime) {
+    for (let i = splashParticles.length - 1; i >= 0; i--) {
+        const splash = splashParticles[i];
+
+        // Update age
+        splash.age += deltaTime;
+
+        // Apply gravity to velocity
+        splash.velocity.y -= 0.003;
+
+        // Update position
+        splash.mesh.position.add(splash.velocity);
+
+        // Fade out over lifetime
+        const lifeRatio = splash.age / splash.lifetime;
+        if (lifeRatio <= 1) {
+            splash.mesh.material.opacity = 0.8 * (1 - lifeRatio);
+        }
+
+        // Check if hit water again
+        if (splash.mesh.position.y <= 0) {
+            splash.mesh.position.y = 0;
+            splash.velocity.y *= -0.5; // Bounce effect (reduced energy)
+            splash.velocity.x *= 0.9;  // Slow down x movement
+            splash.velocity.z *= 0.9;  // Slow down z movement
+        }
+
+        // Remove if lifetime exceeded
+        if (splash.age >= splash.lifetime) {
+            scene.remove(splash.mesh);
+            splash.mesh.geometry.dispose();
+            splash.mesh.material.dispose();
+            splashParticles.splice(i, 1);
+        }
     }
 } 
