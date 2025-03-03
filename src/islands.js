@@ -171,29 +171,115 @@ function createIsland(x, z, seed, scene) {
                 break;
         }
     } else {
-        // Regular island with mountains if no mega structure
-        // Multiple mountain peaks
+        // Regular island with temple structures if no mega structure
         for (let p = 0; p < 3; p++) {
-            const peakSize = 15 + random() * 15;
-            const peakHeight = 15 + random() * 20;
-            const mountainGeometry = new THREE.ConeGeometry(peakSize, peakHeight, 32);
+            const templeSize = 15 + random() * 15;
+            const templeHeight = 15 + random() * 20;
 
-            const mountainMaterial = new THREE.MeshPhongMaterial({
-                color: islandPalette[p % islandPalette.length],
-                shininess: 30,
-                specular: 0x333333
-            });
+            // Create a temple group
+            const temple = new THREE.Group();
 
-            const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
-            const peakAngle = random() * Math.PI * 2;
-            const peakDistance = random() * 25;
-            mountain.position.set(
-                Math.cos(peakAngle) * peakDistance,
+            // Create a stepped pyramid/ziggurat style temple
+            const levels = 3 + Math.floor(random() * 3); // 3-5 levels
+            const baseWidth = templeSize;
+            const topWidth = templeSize * 0.3;
+            const levelHeight = templeHeight / levels;
+
+            // Create temple texture
+            const templeColor = islandPalette[p % islandPalette.length];
+            const templeTexture = createStoneTexture(templeColor, 0.5);
+
+            // Create each level of the temple
+            for (let i = 0; i < levels; i++) {
+                // Calculate the width of this level (decreasing as we go up)
+                const t = i / (levels - 1); // 0 to 1
+                const width = baseWidth * (1 - t) + topWidth * t;
+
+                // Create the level geometry
+                const levelGeometry = new THREE.BoxGeometry(width, levelHeight, width);
+                const levelMaterial = new THREE.MeshPhongMaterial({
+                    color: templeColor,
+                    map: templeTexture,
+                    shininess: 10
+                });
+
+                const level = new THREE.Mesh(levelGeometry, levelMaterial);
+                level.position.y = i * levelHeight + levelHeight / 2;
+                temple.add(level);
+            }
+
+            // Add a small shrine/structure on top for some variation
+            if (random() < 0.7) { // 70% chance of having a top structure
+                const topStructureType = Math.floor(random() * 3);
+
+                if (topStructureType === 0) {
+                    // Small dome
+                    const domeGeometry = new THREE.SphereGeometry(topWidth * 0.5, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
+                    const domeMaterial = new THREE.MeshPhongMaterial({
+                        color: templeColor.clone().multiplyScalar(1.2), // Slightly lighter
+                        map: templeTexture
+                    });
+                    const dome = new THREE.Mesh(domeGeometry, domeMaterial);
+                    dome.position.y = levels * levelHeight;
+                    temple.add(dome);
+                } else if (topStructureType === 1) {
+                    // Small pillars in a square
+                    const pillarRadius = topWidth * 0.1;
+                    const pillarHeight = levelHeight * 0.8;
+                    const pillarGeometry = new THREE.CylinderGeometry(pillarRadius, pillarRadius, pillarHeight, 6);
+                    const pillarMaterial = new THREE.MeshPhongMaterial({
+                        color: templeColor,
+                        map: templeTexture
+                    });
+
+                    // Add pillars at corners
+                    const offset = topWidth * 0.3;
+                    const positions = [
+                        [-offset, 0, -offset],
+                        [-offset, 0, offset],
+                        [offset, 0, -offset],
+                        [offset, 0, offset]
+                    ];
+
+                    for (const pos of positions) {
+                        const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+                        pillar.position.set(pos[0], levels * levelHeight + pillarHeight / 2, pos[2]);
+                        temple.add(pillar);
+                    }
+
+                    // Small roof
+                    const roofGeometry = new THREE.BoxGeometry(topWidth * 0.8, levelHeight * 0.2, topWidth * 0.8);
+                    const roof = new THREE.Mesh(roofGeometry, pillarMaterial);
+                    roof.position.y = levels * levelHeight + pillarHeight + levelHeight * 0.1;
+                    temple.add(roof);
+                } else {
+                    // Obelisk
+                    const obeliskWidth = topWidth * 0.25;
+                    const obeliskHeight = levelHeight * 1.5;
+                    const obeliskGeometry = new THREE.CylinderGeometry(0, obeliskWidth, obeliskHeight, 4);
+                    const obeliskMaterial = new THREE.MeshPhongMaterial({
+                        color: templeColor.clone().multiplyScalar(0.8), // Slightly darker
+                        map: templeTexture
+                    });
+                    const obelisk = new THREE.Mesh(obeliskGeometry, obeliskMaterial);
+                    obelisk.position.y = levels * levelHeight + obeliskHeight / 2;
+                    temple.add(obelisk);
+                }
+            }
+
+            // Position the temple on the island
+            const templeAngle = random() * Math.PI * 2;
+            const templeDistance = random() * 25;
+            temple.position.set(
+                Math.cos(templeAngle) * templeDistance,
                 2.5,
-                Math.sin(peakAngle) * peakDistance
+                Math.sin(templeAngle) * templeDistance
             );
-            mountain.rotation.y = random() * Math.PI * 2;
-            island.add(mountain);
+
+            // Add some rotation for variety
+            temple.rotation.y = random() * Math.PI * 2;
+
+            island.add(temple);
         }
     }
 
