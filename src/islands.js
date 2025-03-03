@@ -12,6 +12,9 @@ const generatedChunks = new Set();
 const activeIslands = new Map(); // Maps island ID to island object
 const activeWaterChunks = new Map(); // Maps water chunk ID to water mesh
 
+// Cache for structure textures to improve performance
+const structureTextureCache = {};
+
 // Function to generate a chunk key based on coordinates
 function getChunkKey(chunkX, chunkZ) {
     return `${chunkX},${chunkZ}`;
@@ -222,12 +225,86 @@ function createIsland(x, z, seed, scene) {
     return island;
 }
 
+// Function to create and cache a stone texture with imperfections
+function createStoneTexture(color, roughness) {
+    // Use cached texture if available
+    const cacheKey = `stone_${color.getHexString()}_${roughness}`;
+    if (structureTextureCache[cacheKey]) {
+        return structureTextureCache[cacheKey];
+    }
+
+    // Create canvas for texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // Base color
+    ctx.fillStyle = `#${color.getHexString()}`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Add noise/imperfections
+    for (let i = 0; i < 3000; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const size = 1 + Math.random() * 2;
+
+        // Random darker or lighter spots
+        const shade = Math.random() > 0.5 ? 0 : 255;
+        ctx.fillStyle = `rgba(${shade}, ${shade}, ${shade}, ${0.05 + Math.random() * roughness * 0.1})`;
+        ctx.fillRect(x, y, size, size);
+    }
+
+    // Add some cracks/lines
+    ctx.strokeStyle = `rgba(0, 0, 0, ${roughness * 0.2})`;
+    for (let i = 0; i < 10; i++) {
+        ctx.beginPath();
+        ctx.lineWidth = 0.5 + Math.random() * 1;
+
+        // Random start point
+        const startX = Math.random() * canvas.width;
+        const startY = Math.random() * canvas.height;
+
+        ctx.moveTo(startX, startY);
+
+        // Create jaggy line
+        let x = startX;
+        let y = startY;
+        const segments = 3 + Math.floor(Math.random() * 4);
+
+        for (let j = 0; j < segments; j++) {
+            x += (Math.random() - 0.5) * 40;
+            y += (Math.random() - 0.5) * 40;
+            ctx.lineTo(x, y);
+        }
+
+        ctx.stroke();
+    }
+
+    // Create texture
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+
+    // Cache the texture
+    structureTextureCache[cacheKey] = texture;
+
+    return texture;
+}
+
 // Function to create an ancient temple mega structure
 function createAncientTemple(island, random) {
+    // Create stone texture for temple
+    const templeColor = new THREE.Color(0xd2b48c);
+    const stoneTexture = createStoneTexture(templeColor, 0.7);
+
     // Base platform
     const baseGeometry = new THREE.BoxGeometry(40, 10, 40);
     const baseMaterial = new THREE.MeshPhongMaterial({
         color: 0xd2b48c,
+        map: stoneTexture,
+        bumpMap: stoneTexture,
+        bumpScale: 0.05,
         roughness: 0.8,
         metalness: 0.2
     });
@@ -245,6 +322,9 @@ function createAncientTemple(island, random) {
     const templeGeometry = new THREE.BoxGeometry(20, 15, 20);
     const templeMaterial = new THREE.MeshPhongMaterial({
         color: 0xc2a278,
+        map: stoneTexture,
+        bumpMap: stoneTexture,
+        bumpScale: 0.03,
         roughness: 0.7,
         metalness: 0.1
     });
@@ -254,7 +334,13 @@ function createAncientTemple(island, random) {
 
     // Temple roof
     const roofGeometry = new THREE.ConeGeometry(15, 10, 4);
-    const roofMaterial = new THREE.MeshPhongMaterial({ color: 0xa52a2a });
+    const roofTexture = createStoneTexture(new THREE.Color(0xa52a2a), 0.4);
+    const roofMaterial = new THREE.MeshPhongMaterial({
+        color: 0xa52a2a,
+        map: roofTexture,
+        bumpMap: roofTexture,
+        bumpScale: 0.02
+    });
     const roof = new THREE.Mesh(roofGeometry, roofMaterial);
     roof.position.y = 35;
     roof.rotation.y = Math.PI / 4; // Rotate 45 degrees
@@ -275,65 +361,78 @@ function createAncientTemple(island, random) {
 
 // Function to create a lighthouse mega structure
 function createLighthouse(island, random) {
+    // Create stone and metal textures
+    const stoneTexture = createStoneTexture(new THREE.Color(0x808080), 0.6);
+    const metalTexture = createStoneTexture(new THREE.Color(0x333333), 0.3);
+
     // Base
     const baseGeometry = new THREE.CylinderGeometry(15, 18, 10, 32);
-    const baseMaterial = new THREE.MeshPhongMaterial({ color: 0x808080 });
+    const baseMaterial = new THREE.MeshPhongMaterial({
+        color: 0x808080,
+        map: stoneTexture,
+        bumpMap: stoneTexture,
+        bumpScale: 0.04
+    });
     const base = new THREE.Mesh(baseGeometry, baseMaterial);
     base.position.y = 5;
     island.add(base);
 
     // Tower
     const towerGeometry = new THREE.CylinderGeometry(8, 12, 40, 32);
+
+    // Create a special texture for the lighthouse with stripes
+    const lighthouseCanvas = document.createElement('canvas');
+    lighthouseCanvas.width = 256;
+    lighthouseCanvas.height = 256;
+    const lhCtx = lighthouseCanvas.getContext('2d');
+
+    // White base with subtle imperfections
+    lhCtx.fillStyle = '#ffffff';
+    lhCtx.fillRect(0, 0, lighthouseCanvas.width, lighthouseCanvas.height);
+
+    // Add noise
+    for (let i = 0; i < 2000; i++) {
+        const x = Math.random() * lighthouseCanvas.width;
+        const y = Math.random() * lighthouseCanvas.height;
+        lhCtx.fillStyle = `rgba(0, 0, 0, ${0.01 + Math.random() * 0.03})`;
+        lhCtx.fillRect(x, y, 1, 1);
+    }
+
+    // Add red stripes
+    const stripeHeight = lighthouseCanvas.height / 5;
+    for (let i = 0; i < 5; i += 2) {
+        lhCtx.fillStyle = 'rgba(255, 0, 0, 0.9)';
+        lhCtx.fillRect(0, i * stripeHeight, lighthouseCanvas.width, stripeHeight);
+
+        // Add weathering to red stripes
+        for (let j = 0; j < 500; j++) {
+            const x = Math.random() * lighthouseCanvas.width;
+            const y = i * stripeHeight + Math.random() * stripeHeight;
+            lhCtx.fillStyle = `rgba(255, 255, 255, ${0.05 + Math.random() * 0.1})`;
+            lhCtx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+        }
+    }
+
+    const lighthouseTexture = new THREE.CanvasTexture(lighthouseCanvas);
+    lighthouseTexture.wrapS = THREE.RepeatWrapping;
+    lighthouseTexture.wrapT = THREE.RepeatWrapping;
+
     const towerMaterial = new THREE.MeshPhongMaterial({
         color: 0xffffff,
+        map: lighthouseTexture,
         roughness: 0.5
     });
     const tower = new THREE.Mesh(towerGeometry, towerMaterial);
     tower.position.y = 30;
     island.add(tower);
 
-    // Red stripes
-    const stripesGeometry = new THREE.CylinderGeometry(8.1, 12.1, 40, 32, 5, true);
-    const stripesMaterial = new THREE.MeshPhongMaterial({
-        color: 0xff0000,
-        side: THREE.BackSide
-    });
-    const stripes = new THREE.Mesh(stripesGeometry, stripesMaterial);
-    stripes.position.y = 30;
-
-    // Only show stripes on certain segments
-    const count = stripesGeometry.attributes.position.count;
-    const visible = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
-        // Every other segment
-        visible[i] = (Math.floor(i / (count / 5)) % 2 ? 1.0 : 0.0);
-    }
-    stripesGeometry.setAttribute('visible', new THREE.BufferAttribute(visible, 1));
-    stripesMaterial.onBeforeCompile = (shader) => {
-        shader.vertexShader = shader.vertexShader.replace(
-            'void main() {',
-            `attribute float visible;
-            varying float vVisible;
-            void main() {
-                vVisible = visible;`
-        );
-        shader.vertexShader = shader.vertexShader.replace(
-            '#include <begin_vertex>',
-            '#include <begin_vertex>\nif (vVisible < 0.5) { transformed = vec3(0.0);}'
-        );
-        shader.fragmentShader = shader.fragmentShader.replace(
-            'void main() {',
-            `varying float vVisible;
-            void main() {
-                if (vVisible < 0.5) discard;`
-        );
-    };
-    island.add(stripes);
-
     // Lantern room
     const lanternGeometry = new THREE.CylinderGeometry(10, 10, 8, 16);
     const lanternMaterial = new THREE.MeshPhongMaterial({
         color: 0x333333,
+        map: metalTexture,
+        bumpMap: metalTexture,
+        bumpScale: 0.02,
         metalness: 0.8,
         roughness: 0.2
     });
@@ -360,9 +459,18 @@ function createLighthouse(island, random) {
 
 // Function to create a giant statue mega structure
 function createGiantStatue(island, random) {
+    // Create metal texture for statue
+    const goldTexture = createStoneTexture(new THREE.Color(0xd4af37), 0.3);
+    const stoneTexture = createStoneTexture(new THREE.Color(0x555555), 0.8);
+
     // Base/pedestal
     const baseGeometry = new THREE.BoxGeometry(20, 10, 20);
-    const baseMaterial = new THREE.MeshPhongMaterial({ color: 0x555555 });
+    const baseMaterial = new THREE.MeshPhongMaterial({
+        color: 0x555555,
+        map: stoneTexture,
+        bumpMap: stoneTexture,
+        bumpScale: 0.05
+    });
     const base = new THREE.Mesh(baseGeometry, baseMaterial);
     base.position.y = 5;
     island.add(base);
@@ -371,6 +479,9 @@ function createGiantStatue(island, random) {
     const bodyGeometry = new THREE.CylinderGeometry(5, 8, 25, 16);
     const bodyMaterial = new THREE.MeshPhongMaterial({
         color: 0xd4af37, // Gold color
+        map: goldTexture,
+        bumpMap: goldTexture,
+        bumpScale: 0.02,
         metalness: 0.8,
         roughness: 0.2
     });
@@ -408,10 +519,16 @@ function createGiantStatue(island, random) {
 
 // Function to create a ruined tower mega structure
 function createRuinedTower(island, random) {
+    // Create stone texture with heavy weathering
+    const weatheredStoneTexture = createStoneTexture(new THREE.Color(0x777777), 1.0);
+
     // Base of the tower
     const baseGeometry = new THREE.CylinderGeometry(15, 18, 10, 16);
     const stoneMaterial = new THREE.MeshPhongMaterial({
         color: 0x777777,
+        map: weatheredStoneTexture,
+        bumpMap: weatheredStoneTexture,
+        bumpScale: 0.08,
         roughness: 0.9
     });
     const base = new THREE.Mesh(baseGeometry, stoneMaterial);
