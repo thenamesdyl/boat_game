@@ -285,18 +285,64 @@ function createIsland(x, z, seed, scene) {
 
     // Vegetation (always add some trees regardless of structure)
     for (let v = 0; v < 10; v++) {
-        const treeGeometry = new THREE.CylinderGeometry(0, 8, 15, 8);
-        const treeColor = new THREE.Color().setHSL(0.3 + random() * 0.1, 0.9, 0.4 + random() * 0.2);
-        const treeMaterial = new THREE.MeshPhongMaterial({ color: treeColor });
-        const tree = new THREE.Mesh(treeGeometry, treeMaterial);
+        // Create a tree group to hold trunk and foliage
+        const tree = new THREE.Group();
 
+        // Random tree properties with variation
+        const treeHeight = 10 + random() * 8;
+        const trunkHeight = treeHeight * 0.6;
+        const trunkRadius = 0.5 + random() * 0.3;
+        const foliageRadius = 3 + random() * 3;
+        const foliageHeight = treeHeight - trunkHeight;
+
+        // Tree type variation (0: cone, 1: rounded)
+        const treeType = random() < 0.7 ? 0 : 1;
+
+        // Create trunk
+        const trunkGeometry = new THREE.CylinderGeometry(trunkRadius * 0.7, trunkRadius, trunkHeight, 8);
+        const trunkColor = new THREE.Color().setHSL(0.07 + random() * 0.05, 0.5 + random() * 0.2, 0.2 + random() * 0.1);
+        const trunkMaterial = new THREE.MeshPhongMaterial({ color: trunkColor });
+        const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+        trunk.position.y = trunkHeight / 2;
+        tree.add(trunk);
+
+        // Create foliage
+        let foliageGeometry;
+        if (treeType === 0) {
+            // Cone-shaped foliage (palm-like)
+            foliageGeometry = new THREE.ConeGeometry(foliageRadius, foliageHeight, 8);
+        } else {
+            // Rounded foliage (deciduous-like)
+            foliageGeometry = new THREE.SphereGeometry(foliageRadius, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.8);
+        }
+
+        const foliageColor = new THREE.Color().setHSL(0.25 + random() * 0.15, 0.8, 0.3 + random() * 0.2);
+        const foliageMaterial = new THREE.MeshPhongMaterial({ color: foliageColor });
+        const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+
+        // Position foliage on top of trunk
+        foliage.position.y = trunkHeight + (treeType === 0 ? foliageHeight / 2 : 0);
+        if (treeType === 1) {
+            // Move rounded foliage slightly up so it sits better on trunk
+            foliage.position.y += foliageHeight / 4;
+        }
+
+        tree.add(foliage);
+
+        // Add some random rotation to the tree for variety
+        tree.rotation.y = random() * Math.PI * 2;
+        tree.rotation.x = (random() - 0.5) * 0.05; // Slight random tilt
+        tree.rotation.z = (random() - 0.5) * 0.05; // Slight random tilt
+
+        // Position the tree on the island
         const treeAngle = random() * Math.PI * 2;
         const treeDistance = 20 + random() * 25; // Place trees more toward the edges
         tree.position.set(
             Math.cos(treeAngle) * treeDistance,
-            5,
+            2,
             Math.sin(treeAngle) * treeDistance
         );
+
         island.add(tree);
     }
 
