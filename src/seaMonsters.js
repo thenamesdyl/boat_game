@@ -278,25 +278,85 @@ export function updateSurfacingMonster(monster, deltaTime) {
 }
 
 export function updateAttackingMonster(monster, deltaTime) {
-    // Aggressively pursue player on surface
-    const directionToPlayer = new THREE.Vector3()
-        .subVectors(playerBoat.position, monster.mesh.position)
-        .normalize();
+    // Initialize sub-state for attacking if not present
+    if (!monster.attackSubState) {
+        monster.attackSubState = 'charging';
+        monster.chargeTarget = new THREE.Vector3();
+        monster.repositionTimer = 0; // Initialize reposition timer
+    }
 
-    // Keep at surface level
-    directionToPlayer.y = 0;
-    monster.mesh.position.y = Math.sin(getTime() * 0.5) * 0.5; // Bob slightly on surface
-
-    // Set velocity toward player with increased speed
-    monster.velocity.x = directionToPlayer.x * MONSTER_SPEED * 2;
-    monster.velocity.z = directionToPlayer.z * MONSTER_SPEED * 2;
+    // Keep at surface level with slight bobbing
+    monster.mesh.position.y = Math.sin(getTime() * 0.5) * 0.5;
     monster.velocity.y = 0;
 
-    // If attack time expires or player gets too far, dive
     const distanceToPlayer = monster.mesh.position.distanceTo(playerBoat.position);
+
+    if (monster.attackSubState === 'charging') {
+        // Set charge target as player position
+        monster.chargeTarget.copy(playerBoat.position);
+
+        // Calculate direction to the charge target
+        const directionToTarget = new THREE.Vector3()
+            .subVectors(monster.chargeTarget, monster.mesh.position)
+            .normalize();
+
+        // Set velocity to charge through player at increased speed
+        monster.velocity.x = directionToTarget.x * MONSTER_SPEED * 3;
+        monster.velocity.z = directionToTarget.z * MONSTER_SPEED * 3;
+
+        // Check if we've passed the player (dot product becomes negative)
+        const toPlayer = new THREE.Vector3().subVectors(playerBoat.position, monster.mesh.position);
+        const movingDirection = new THREE.Vector3(monster.velocity.x, 0, monster.velocity.z).normalize();
+        const dotProduct = toPlayer.dot(movingDirection);
+
+        // If passed player or gotten very close, switch to repositioning
+        if (dotProduct < -5 || distanceToPlayer < 5) {
+            monster.attackSubState = 'repositioning';
+
+            // Set a random reposition timer between 5-7 seconds
+            monster.repositionTimer = 5 + Math.random() * 2;
+
+            // Calculate a position to swim away to - not too far from player
+            const swimAwayDistance = MONSTER_ATTACK_RANGE * 1.5; // Not too far
+
+            // Calculate direction away from player
+            const awayFromPlayerDir = new THREE.Vector3()
+                .subVectors(monster.mesh.position, playerBoat.position)
+                .normalize();
+
+            // Set the target position to swim away to
+            monster.chargeTarget.set(
+                playerBoat.position.x + awayFromPlayerDir.x * swimAwayDistance,
+                0,
+                playerBoat.position.z + awayFromPlayerDir.z * swimAwayDistance
+            );
+        }
+    } else { // repositioning
+        // Update reposition timer
+        monster.repositionTimer -= deltaTime;
+
+        // During repositioning phase
+        if (monster.repositionTimer > 0) {
+            // Move toward reposition target at moderate speed
+            const directionToTarget = new THREE.Vector3()
+                .subVectors(monster.chargeTarget, monster.mesh.position)
+                .normalize();
+
+            monster.velocity.x = directionToTarget.x * MONSTER_SPEED * 1.2;
+            monster.velocity.z = directionToTarget.z * MONSTER_SPEED * 1.2;
+        } else {
+            // Timer expired, prepare for another charge
+            monster.attackSubState = 'charging';
+        }
+    }
+
+    // If attack time expires or player gets too far, dive
     if (monster.stateTimer <= 0 || distanceToPlayer > MONSTER_ATTACK_RANGE * 3) {
         monster.state = MONSTER_STATE.DIVING;
         monster.stateTimer = 5; // Time to dive
+        delete monster.attackSubState; // Clean up attack sub-state
+        delete monster.chargeTarget;
+        delete monster.repositionTimer;
     }
 }
 
