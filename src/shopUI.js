@@ -1,14 +1,15 @@
 // Shop UI component for selling fish - Parchment/Merchant Style
 import * as THREE from 'three';
 
-// Sample fish data for demonstration
+// Sample fish data based on the fish types in fishing.js
 const sampleFishInventory = {
-    "Tuna": { count: 3, value: 15, color: 0x3498db },
-    "Salmon": { count: 5, value: 8, color: 0xe74c3c },
-    "Trout": { count: 8, value: 5, color: 0x2ecc71 },
-    "Cod": { count: 12, value: 3, color: 0xf1c40f },
-    "Sardine": { count: 20, value: 1, color: 0x95a5a6 },
-    "Marlin": { count: 1, value: 50, color: 0x9b59b6 }
+    "Anchovy": { count: 12, value: 1, color: 0xCCCCCC },
+    "Cod": { count: 8, value: 2, color: 0xBBBB88 },
+    "Salmon": { count: 5, value: 3, color: 0xFF9977 },
+    "Tuna": { count: 3, value: 5, color: 0x6688AA },
+    "Swordfish": { count: 2, value: 10, color: 0x4477AA },
+    "Shark": { count: 1, value: 20, color: 0x778899 },
+    "Golden Fish": { count: 1, value: 50, color: 0xFFD700 }
 };
 
 let playerMoney = 100;
