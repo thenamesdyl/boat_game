@@ -7,7 +7,7 @@ let boatRockAngleZ = 0; // Roll (side-to-side rocking)
 const rockSpeed = 1.5; // How fast the boat rocks
 const maxRockAngle = 0.04; // Maximum rocking angle in radians (about 2.3 degrees)
 
-// Function to create a wooden texture material
+// Function to create a wooden texture material with a cartoony style
 function createWoodMaterial(baseColor, name) {
     // Create a canvas for the wood texture
     const canvas = document.createElement('canvas');
@@ -19,56 +19,58 @@ function createWoodMaterial(baseColor, name) {
     context.fillStyle = '#' + new THREE.Color(baseColor).getHexString();
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Add wood grain
-    const grainLayers = 15; // Number of grain layers
+    // Add wood grain - fewer layers for cartoon style
+    const grainLayers = 6; // Reduced from 15 for a more cartoon look
 
     for (let i = 0; i < grainLayers; i++) {
-        // Vary the grain color slightly for each layer
+        // Less random color variation for cartoon style
         const grainColor = new THREE.Color(baseColor);
-        const darkening = Math.random() * 0.2;
+        const darkening = 0.1 + (i % 3) * 0.05; // More consistent darkening
         grainColor.r -= darkening;
         grainColor.g -= darkening;
         grainColor.b -= darkening;
 
         context.strokeStyle = '#' + grainColor.getHexString();
-        context.lineWidth = 1 + Math.random() * 2;
+        context.lineWidth = 3 + (i % 3); // Thicker, more cartoon-like lines
 
-        // Create wavy grain lines
-        const grainCount = 10 + Math.floor(Math.random() * 20);
+        // Create fewer, more defined grain lines
+        const grainCount = 5 + Math.floor(i * 0.8); // Fewer lines for cartoon style
         const yStep = canvas.height / grainCount;
 
         for (let j = 0; j < grainCount; j++) {
-            const y = j * yStep + Math.random() * yStep * 0.5;
+            const y = j * yStep + yStep * 0.3;
 
             context.beginPath();
             context.moveTo(0, y);
 
-            // Create a wavy line for wood grain
-            const segments = 10;
+            // Create gentler waves for cartoon style
+            const segments = 6; // Fewer segments
             const xStep = canvas.width / segments;
 
             for (let k = 1; k <= segments; k++) {
                 const x = k * xStep;
-                const yOffset = (Math.random() - 0.5) * yStep * 0.8;
+                // Smaller yOffset for straighter, more cartoon-like lines
+                const yOffset = (Math.random() - 0.5) * yStep * 0.4;
                 context.lineTo(x, y + yOffset);
             }
 
             context.stroke();
         }
 
-        // Add some knots randomly
-        if (Math.random() < 0.4) {
+        // Add fewer knots (cartoon style usually has fewer details)
+        if (Math.random() < 0.2) { // 0.2 instead of 0.4
             const knotX = Math.random() * canvas.width;
             const knotY = Math.random() * canvas.height;
-            const knotSize = 5 + Math.random() * 15;
+            const knotSize = 8 + Math.random() * 12; // Slightly larger, more defined knots
 
             const gradient = context.createRadialGradient(
                 knotX, knotY, 1,
                 knotX, knotY, knotSize
             );
 
+            // More contrast in knot colors for cartoon style
             gradient.addColorStop(0, '#3d2c17');
-            gradient.addColorStop(0.6, '#' + new THREE.Color(baseColor).getHexString());
+            gradient.addColorStop(0.5, '#' + new THREE.Color(baseColor).getHexString());
             gradient.addColorStop(1, '#' + new THREE.Color(baseColor).getHexString());
 
             context.fillStyle = gradient;
@@ -89,8 +91,8 @@ function createWoodMaterial(baseColor, name) {
         color: baseColor,
         name: name || 'woodMaterial',
         bumpMap: texture,
-        bumpScale: 0.05,
-        shininess: 5
+        bumpScale: 0.03, // Reduced bump scale for smoother cartoon look
+        shininess: 3     // Lower shininess for a more matte, cartoon-like finish
     });
 
     return material;

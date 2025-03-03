@@ -274,6 +274,9 @@ class InventoryUI {
         // Toggle inventory when chest is clicked
         inventoryChest.addEventListener('click', () => {
             if (inventoryPanel.style.display === 'none') {
+                // Play chest opening sound
+                this.playChestOpenSound();
+
                 inventoryPanel.style.display = 'flex';
                 this.isOpen = true;
                 // Register this as an open UI with the main game UI if available
@@ -281,6 +284,9 @@ class InventoryUI {
                     this.registerOpenUI('inventory');
                 }
             } else {
+                // Play chest closing sound (slightly different)
+                this.playChestCloseSound();
+
                 inventoryPanel.style.display = 'none';
                 this.isOpen = false;
                 // Unregister this as an open UI if available
@@ -424,6 +430,78 @@ class InventoryUI {
             tierSection.appendChild(fishGrid);
             fishContent.appendChild(tierSection);
         });
+    }
+
+    // Play a simple, pleasant chest open sound
+    playChestOpenSound() {
+        // Create audio context if not already created
+        if (!window.audioContext) {
+            try {
+                window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.warn('Web Audio API not supported in this browser');
+                return;
+            }
+        }
+
+        // Create a gentle "chip" sound
+        const currentTime = window.audioContext.currentTime;
+
+        // Simple oscillator for a pleasant tone
+        const osc = window.audioContext.createOscillator();
+        const gain = window.audioContext.createGain();
+
+        // Use sine wave for a smooth sound
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(700, currentTime);
+        osc.frequency.exponentialRampToValueAtTime(900, currentTime + 0.05);
+
+        // Very short duration with quick fade
+        gain.gain.setValueAtTime(0.1, currentTime); // Lower volume (0.1 instead of 0.6)
+        gain.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.08);
+
+        osc.connect(gain);
+        gain.connect(window.audioContext.destination);
+
+        // Start and stop - very brief sound
+        osc.start(currentTime);
+        osc.stop(currentTime + 0.08);
+    }
+
+    // Play a subtle chest close sound
+    playChestCloseSound() {
+        // Create audio context if not already created
+        if (!window.audioContext) {
+            try {
+                window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.warn('Web Audio API not supported in this browser');
+                return;
+            }
+        }
+
+        // Create a gentle "chip" sound (slightly different than open)
+        const currentTime = window.audioContext.currentTime;
+
+        // Simple oscillator
+        const osc = window.audioContext.createOscillator();
+        const gain = window.audioContext.createGain();
+
+        // Use sine wave for a clean sound
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, currentTime);
+        osc.frequency.exponentialRampToValueAtTime(600, currentTime + 0.05);
+
+        // Very short duration with quick fade
+        gain.gain.setValueAtTime(0.08, currentTime); // Even lower volume
+        gain.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.06);
+
+        osc.connect(gain);
+        gain.connect(window.audioContext.destination);
+
+        // Start and stop - very brief sound
+        osc.start(currentTime);
+        osc.stop(currentTime + 0.06);
     }
 }
 
