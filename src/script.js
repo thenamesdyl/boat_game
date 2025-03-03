@@ -896,7 +896,7 @@ function animate() {
     lastTime = now;
 
     requestAnimationFrame(animate);
-    updateTime(0.05);
+    updateTime(0.09);
 
     // Update time of day
     updateTimeOfDay(deltaTime);
