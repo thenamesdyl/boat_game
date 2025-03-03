@@ -5,7 +5,7 @@ import { flashBoatDamage } from './character.js'; // Add this import
 import { getFishInventory } from './fishing.js'; // Import the fish inventory
 
 // Sea monster configuration
-const MONSTER_COUNT = 50;
+const MONSTER_COUNT = 15;
 const MONSTER_TYPES = {
     YELLOW_BEAST: 'yellowBeast',   // Original monster
     KRAKEN: 'kraken',              // New octopus-like monster
