@@ -37,6 +37,9 @@ let boat = null;
 let fishingStartPosition = new THREE.Vector3();
 let fishingEndPosition = new THREE.Vector3();
 let fishInventory = {};
+let bobberAnimationInterval = null;
+let fishEscapeTimeout = null;
+let minigameTimeout = null;
 
 // Initialize fishing system
 export function initFishing(playerBoat) {
@@ -181,9 +184,16 @@ function fishBite() {
     gameUI.elements.fishing.status.textContent = 'Fish on! Click to catch!';
     gameUI.elements.fishing.status.style.color = 'rgba(255, 200, 0, 1)';
 
+    // Clear any previous timeouts to prevent conflicts
+    if (fishingTimeout) {
+        clearTimeout(fishingTimeout);
+        fishingTimeout = null;
+    }
+
     // Make bobber move more vigorously
     if (fishingBobber) {
         fishingBobber.position.y = 0.3;
+        // Store the animation interval to clear it properly later
         const bobberAnimation = setInterval(() => {
             if (fishingBobber) {
                 fishingBobber.position.y = 0.3 + Math.sin(Date.now() * 0.01) * 0.3;
@@ -192,26 +202,21 @@ function fishBite() {
             }
         }, 16);
 
-        // Clear animation after 5 seconds if not caught
-        setTimeout(() => {
-            clearInterval(bobberAnimation);
+        // Save the interval ID for reference
+        bobberAnimationInterval = bobberAnimation;
+
+        // Set timeout for fish to get away, but only if minigame isn't started
+        fishEscapeTimeout = setTimeout(() => {
+            // Only execute if still fishing and minigame not active
             if (isFishing && !minigameActive) {
+                clearInterval(bobberAnimation);
                 gameUI.elements.fishing.status.textContent = 'The fish got away!';
                 gameUI.elements.fishing.status.style.color = 'rgba(255, 100, 100, 1)';
 
                 // Reset after a moment
                 setTimeout(() => {
                     if (isFishing) {
-                        gameUI.elements.fishing.status.textContent = 'Waiting for a bite...';
-                        gameUI.elements.fishing.status.style.color = 'white';
-
-                        // Set timeout for next fish bite
-                        const biteTime = FISH_BITE_MIN_TIME + Math.random() * (FISH_BITE_MAX_TIME - FISH_BITE_MIN_TIME);
-                        fishingTimeout = setTimeout(() => {
-                            if (isFishing) {
-                                fishBite();
-                            }
-                        }, biteTime * 1000);
+                        resetFishingState();
                     }
                 }, 2000);
             }
@@ -225,6 +230,15 @@ function fishBite() {
 
 // Start fishing minigame
 function startMinigame() {
+    // Prevent multiple minigame instances
+    if (minigameActive) return;
+
+    // Clear fish escape timeout since the player is attempting to catch
+    if (fishEscapeTimeout) {
+        clearTimeout(fishEscapeTimeout);
+        fishEscapeTimeout = null;
+    }
+
     // Reset cast button
     gameUI.elements.fishing.castButton.textContent = 'Reel In';
     gameUI.elements.fishing.castButton.onclick = toggleFishing;
@@ -243,7 +257,7 @@ function startMinigame() {
     minigameInterval = setInterval(updateMinigame, 16);
 
     // Set timeout to end minigame if player doesn't catch in time
-    setTimeout(() => {
+    minigameTimeout = setTimeout(() => {
         if (minigameActive) {
             stopMinigame(false);
             gameUI.elements.fishing.status.textContent = 'The fish got away!';
@@ -252,16 +266,7 @@ function startMinigame() {
             // Reset after a moment
             setTimeout(() => {
                 if (isFishing) {
-                    gameUI.elements.fishing.status.textContent = 'Waiting for a bite...';
-                    gameUI.elements.fishing.status.style.color = 'white';
-
-                    // Set timeout for next fish bite
-                    const biteTime = FISH_BITE_MIN_TIME + Math.random() * (FISH_BITE_MAX_TIME - FISH_BITE_MIN_TIME);
-                    fishingTimeout = setTimeout(() => {
-                        if (isFishing) {
-                            fishBite();
-                        }
-                    }, biteTime * 1000);
+                    resetFishingState();
                 }
             }, 2000);
         }
@@ -333,14 +338,48 @@ function stopMinigame(success) {
 
     minigameActive = false;
 
-    // Clear interval
+    // Clear all intervals and timeouts to prevent conflicts
     if (minigameInterval) {
         clearInterval(minigameInterval);
         minigameInterval = null;
     }
 
+    if (minigameTimeout) {
+        clearTimeout(minigameTimeout);
+        minigameTimeout = null;
+    }
+
+    if (bobberAnimationInterval) {
+        clearInterval(bobberAnimationInterval);
+        bobberAnimationInterval = null;
+    }
+
     // Hide minigame UI
     gameUI.elements.fishing.minigame.container.style.display = 'none';
+}
+
+// Helper function to reset fishing state and set up for next bite
+function resetFishingState() {
+    // Clear any existing timeouts
+    if (fishingTimeout) {
+        clearTimeout(fishingTimeout);
+    }
+
+    if (fishEscapeTimeout) {
+        clearTimeout(fishEscapeTimeout);
+    }
+
+    // Reset UI
+    gameUI.elements.fishing.status.textContent = 'Waiting for a bite...';
+    gameUI.elements.fishing.status.style.color = 'white';
+
+    // Set timeout for next fish bite
+    const biteTime = FISH_BITE_MIN_TIME + Math.random() * (FISH_BITE_MAX_TIME - FISH_BITE_MIN_TIME);
+    fishingTimeout = setTimeout(() => {
+        if (isFishing) {
+            fishBite();
+        }
+    }, biteTime * 1000);
 }
 
 // Catch a fish

@@ -1,4 +1,3 @@
-
 import { getPlayerStats, requestLeaderboard } from './network.js';
 import { gameUI } from './ui.js';
 import { registerOpenUI, unregisterOpenUI } from './ui.js';
@@ -384,6 +383,7 @@ function createLeaderboardUI() {
 
     // Create book panel (hidden by default)
     const bookPanel = document.createElement('div');
+    bookPanel.id = 'leaderboard-panel';
     bookPanel.style.position = 'absolute';
     bookPanel.style.top = '50%';
     bookPanel.style.left = '50%';
@@ -712,6 +712,32 @@ function createLeaderboardUI() {
             close: closeLeaderboard
         });
     }
+
+    // Add close button (X) with dark background for visibility
+    const closeButton = document.createElement('div');
+    closeButton.textContent = 'X';
+    closeButton.style.position = 'absolute';
+    closeButton.style.top = '10px';
+    closeButton.style.right = '10px';
+    closeButton.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'; // Dark background for visibility
+    closeButton.style.color = '#ffffff'; // White text
+    closeButton.style.width = '24px';
+    closeButton.style.height = '24px';
+    closeButton.style.borderRadius = '12px'; // Circle shape
+    closeButton.style.display = 'flex';
+    closeButton.style.justifyContent = 'center';
+    closeButton.style.alignItems = 'center';
+    closeButton.style.fontSize = '14px';
+    closeButton.style.fontWeight = 'bold';
+    closeButton.style.cursor = 'pointer';
+    closeButton.style.zIndex = '1001';
+
+    // Add click event to close the diary
+    closeButton.addEventListener('click', () => {
+        closeLeaderboard();
+    });
+
+    bookPanel.appendChild(closeButton);
 
     // Store references to the leaderboard elements in gameUI
     gameUI.elements.leaderboard = {
