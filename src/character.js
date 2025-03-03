@@ -7,6 +7,53 @@ let boatRockAngleZ = 0; // Roll (side-to-side rocking)
 const rockSpeed = 1.5; // How fast the boat rocks
 const maxRockAngle = 0.04; // Maximum rocking angle in radians (about 2.3 degrees)
 
+// Wood overlay texture for boat colored parts
+let woodOverlayTexture = null;
+
+// Initialize wood overlay texture
+function initWoodOverlayTexture() {
+    // Create a canvas for the subtle wood grain overlay
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const context = canvas.getContext('2d');
+
+    // Fill with transparent background
+    context.fillStyle = 'rgba(255, 255, 255, 0)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Add very subtle wood grain lines
+    const grainCount = 12;
+    context.strokeStyle = 'rgba(0, 0, 0, 0.1)'; // Very transparent black
+    context.lineWidth = 1;
+
+    for (let i = 0; i < grainCount; i++) {
+        const y = i * (canvas.height / grainCount) + (Math.random() * 10 - 5);
+
+        context.beginPath();
+        context.moveTo(0, y);
+
+        // Create wavy lines
+        const segments = 8;
+        const xStep = canvas.width / segments;
+
+        for (let j = 1; j <= segments; j++) {
+            const x = j * xStep;
+            const yOffset = (Math.random() - 0.5) * 8;
+            context.lineTo(x, y + yOffset);
+        }
+
+        context.stroke();
+    }
+
+    // Create the texture
+    woodOverlayTexture = new THREE.CanvasTexture(canvas);
+    woodOverlayTexture.wrapS = THREE.RepeatWrapping;
+    woodOverlayTexture.wrapT = THREE.RepeatWrapping;
+
+    return woodOverlayTexture;
+}
+
 // Function to create a wooden texture material with a cartoony style
 function createWoodMaterial(baseColor, name) {
     // Create a canvas for the wood texture
@@ -96,6 +143,59 @@ function createWoodMaterial(baseColor, name) {
     });
 
     return material;
+}
+
+// Applies wood texture overlay to materials that get color changes
+export function applyWoodTextureToColoredParts(boatObject) {
+    if (!woodOverlayTexture) {
+        woodOverlayTexture = initWoodOverlayTexture();
+    }
+
+    boatObject.traverse((child) => {
+        if (child.isMesh && !child.userData.isNotPlayerColorable) {
+            // Only apply to parts that can change color but don't already have wood texture
+            if (!child.material.name || !child.material.name.includes('wood')) {
+                // Clone the texture to avoid sharing between materials
+                const texture = woodOverlayTexture.clone();
+                texture.needsUpdate = true;
+
+                // If material already has a map, use texture as bump map
+                if (child.material.map) {
+                    child.material.bumpMap = texture;
+                    child.material.bumpScale = 0.02;
+                } else {
+                    child.material.map = texture;
+                }
+
+                // Store original color application method to hook into color changes
+                if (!child.userData.originalApplyColor) {
+                    // Store original color setter
+                    const originalColorSetter = Object.getOwnPropertyDescriptor(child.material.color, 'set');
+
+                    // Hook into color setting to reapply texture
+                    if (originalColorSetter) {
+                        child.userData.originalApplyColor = true;
+                        Object.defineProperty(child.material.color, 'set', {
+                            value: function (color) {
+                                // Call original setter
+                                originalColorSetter.value.call(this, color);
+
+                                // Reapply texture after color change
+                                if (!child.material.map) {
+                                    child.material.map = texture.clone();
+                                }
+
+                                child.material.needsUpdate = true;
+                                return this;
+                            }
+                        });
+                    }
+                }
+
+                child.material.needsUpdate = true;
+            }
+        }
+    });
 }
 
 // Add a small Minecraft-style character to the front of the boat
@@ -302,6 +402,9 @@ export function createBoat(scene) {
 
     // Add a small Minecraft-style character to the front of the boat
     addCharacterToBoat(boat);
+
+    // Apply wood texture overlay to colorable parts
+    applyWoodTextureToColoredParts(boat);
 
     return boat;
 }

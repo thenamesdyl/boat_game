@@ -72,19 +72,117 @@ export function initializeNetwork(gameScene, gamePlayerState, gameBoat, gameIsla
 
 // Helper function to apply color to a boat
 function applyColorToBoat(boatMesh, color) {
+    // Initialize texture if needed (first time function is called)
+    if (!window.boatTextureCache) {
+        createBoatTextures();
+    }
+
     // Find the hull in the boat group
     boatMesh.traverse((child) => {
         if (child instanceof THREE.Mesh && child.geometry instanceof THREE.BoxGeometry) {
             // Only change color if it's NOT flagged as not player colorable
             if (child.material && !child.userData.isNotPlayerColorable) {
-                // Create a new material with the player's color
+                // Create a new material with the player's color and texture
                 const newMaterial = new THREE.MeshPhongMaterial({
-                    color: new THREE.Color(color.r, color.g, color.b)
+                    color: new THREE.Color(color.r, color.g, color.b),
+                    map: window.boatTextureCache.imperfectionMap,
+                    bumpMap: window.boatTextureCache.bumpMap,
+                    bumpScale: 0.02,
+                    shininess: 40, // Slightly glossy finish
+                    specular: new THREE.Color(0x333333) // Subtle specular highlights
                 });
+
                 child.material = newMaterial;
             }
         }
     });
+}
+
+// Create textures for boat materials (called once)
+function createBoatTextures() {
+    // Create cache object for textures
+    window.boatTextureCache = {};
+
+    // Create a canvas for the imperfection texture
+    const impCanvas = document.createElement('canvas');
+    impCanvas.width = 512;
+    impCanvas.height = 512;
+    const impCtx = impCanvas.getContext('2d');
+
+    // Fill with nearly transparent white (allows color to show through)
+    impCtx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+    impCtx.fillRect(0, 0, impCanvas.width, impCanvas.height);
+
+    // Add subtle scratches and imperfections
+    impCtx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+
+    // Add random scratches
+    for (let i = 0; i < 30; i++) {
+        impCtx.lineWidth = 0.5 + Math.random() * 1.5;
+        impCtx.beginPath();
+        const x1 = Math.random() * impCanvas.width;
+        const y1 = Math.random() * impCanvas.height;
+        const length = 10 + Math.random() * 40;
+        const angle = Math.random() * Math.PI * 2;
+        impCtx.moveTo(x1, y1);
+        impCtx.lineTo(
+            x1 + Math.cos(angle) * length,
+            y1 + Math.sin(angle) * length
+        );
+        impCtx.stroke();
+    }
+
+    // Add some subtle noise/grain
+    for (let i = 0; i < 2000; i++) {
+        const x = Math.random() * impCanvas.width;
+        const y = Math.random() * impCanvas.height;
+        const size = 1 + Math.random() * 2;
+        impCtx.fillStyle = `rgba(0, 0, 0, ${0.03 + Math.random() * 0.05})`;
+        impCtx.fillRect(x, y, size, size);
+    }
+
+    // Create the imperfection texture
+    const imperfectionMap = new THREE.CanvasTexture(impCanvas);
+    imperfectionMap.wrapS = THREE.RepeatWrapping;
+    imperfectionMap.wrapT = THREE.RepeatWrapping;
+    window.boatTextureCache.imperfectionMap = imperfectionMap;
+
+    // Create bump map for surface detail
+    const bumpCanvas = document.createElement('canvas');
+    bumpCanvas.width = 512;
+    bumpCanvas.height = 512;
+    const bumpCtx = bumpCanvas.getContext('2d');
+
+    // Fill with middle gray (neutral bump)
+    bumpCtx.fillStyle = 'rgb(128, 128, 128)';
+    bumpCtx.fillRect(0, 0, bumpCanvas.width, bumpCanvas.height);
+
+    // Add wood-like grain for bump
+    for (let i = 0; i < 15; i++) {
+        const y = i * (bumpCanvas.height / 15) + (Math.random() * 10 - 5);
+        bumpCtx.strokeStyle = `rgb(${100 + Math.random() * 30}, ${100 + Math.random() * 30}, ${100 + Math.random() * 30})`;
+        bumpCtx.lineWidth = 2 + Math.random() * 3;
+
+        bumpCtx.beginPath();
+        bumpCtx.moveTo(0, y);
+
+        const segments = 8;
+        const xStep = bumpCanvas.width / segments;
+
+        for (let j = 1; j <= segments; j++) {
+            const x = j * xStep;
+            const yOffset = (Math.random() - 0.5) * 15;
+            bumpCtx.lineTo(x, y + yOffset);
+        }
+
+        bumpCtx.stroke();
+    }
+
+    // Create the bump texture
+    const bumpMap = new THREE.CanvasTexture(bumpCanvas);
+    bumpMap.wrapS = THREE.RepeatWrapping;
+    bumpMap.wrapT = THREE.RepeatWrapping;
+    window.boatTextureCache.bumpMap = bumpMap;
 }
 
 // Set up Socket.IO event handlers
