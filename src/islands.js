@@ -346,8 +346,6 @@ function createIsland(x, z, seed, scene) {
         island.add(tree);
     }
 
-    console.log("Created island:", islandId);
-
     // Store the island with its ID
     activeIslands.set(islandId, {
         mesh: island,

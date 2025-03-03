@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { scene, getTime } from './gameState.js';
 import { gameUI } from './ui.js';
 import { onMonsterKilled } from './network.js';
+import { createTreasureDrop } from './seaMonsters.js';
 
 // Cannon system configuration
 const CANNON_RANGE = 100; // Maximum range for cannons
@@ -323,6 +324,9 @@ function hitMonster(monster) {
 
     // Check if monster is defeated
     if (monster.health <= 0) {
+        // Create treasure drop before monster disappears
+        createTreasureDrop(monster);
+
         // Monster is defeated, make it dive and eventually remove it
         monster.state = 'dying';
         monster.stateTimer = 3; // Time for death animation

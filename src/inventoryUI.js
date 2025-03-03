@@ -12,6 +12,9 @@ class InventoryUI {
 
         // Track if the inventory is currently open
         this.isOpen = false;
+
+        // Make the instance globally accessible
+        window.inventoryUI = this;
     }
 
     // Create the inventory chest and panel
@@ -430,6 +433,93 @@ class InventoryUI {
             tierSection.appendChild(fishGrid);
             fishContent.appendChild(tierSection);
         });
+    }
+
+    // Update treasure inventory display
+    updateTreasureInventory(treasureInventory) {
+        const treasureContent = this.elements.treasureContent;
+        if (!treasureContent) return;
+
+        // Clear existing content
+        treasureContent.innerHTML = '';
+
+        // If no treasures, show message
+        if (Object.keys(treasureInventory).length === 0) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.textContent = 'No treasures found yet. Defeat sea monsters to collect treasures!';
+            emptyMessage.style.textAlign = 'center';
+            emptyMessage.style.padding = '20px';
+            emptyMessage.style.color = 'rgba(200, 200, 200, 0.7)';
+            treasureContent.appendChild(emptyMessage);
+            return;
+        }
+
+        // Create treasure grid
+        const treasureGrid = document.createElement('div');
+        treasureGrid.style.display = 'grid';
+        treasureGrid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(150px, 1fr))';
+        treasureGrid.style.gap = '15px';
+        treasureGrid.style.padding = '10px';
+
+        // Add each treasure to the grid
+        for (const [treasureName, treasureData] of Object.entries(treasureInventory)) {
+            const treasureCard = document.createElement('div');
+            treasureCard.style.backgroundColor = 'rgba(50, 70, 110, 0.7)';
+            treasureCard.style.borderRadius = '5px';
+            treasureCard.style.padding = '12px';
+            treasureCard.style.display = 'flex';
+            treasureCard.style.flexDirection = 'column';
+            treasureCard.style.alignItems = 'center';
+            treasureCard.style.border = `1px solid rgba(200, 170, 100, 0.8)`;
+
+            // Treasure icon
+            const treasureIcon = document.createElement('div');
+            treasureIcon.style.width = '60px';
+            treasureIcon.style.height = '60px';
+            treasureIcon.style.backgroundColor = `#${treasureData.color.toString(16).padStart(6, '0')}`;
+            treasureIcon.style.borderRadius = '50%';
+            treasureIcon.style.marginBottom = '10px';
+            treasureIcon.style.boxShadow = '0 0 10px rgba(255, 255, 200, 0.5)';
+            treasureCard.appendChild(treasureIcon);
+
+            // Treasure name
+            const nameElement = document.createElement('div');
+            nameElement.textContent = treasureName;
+            nameElement.style.fontWeight = 'bold';
+            nameElement.style.marginBottom = '8px';
+            nameElement.style.textAlign = 'center';
+            nameElement.style.color = 'rgba(255, 220, 150, 1)';
+            treasureCard.appendChild(nameElement);
+
+            // Treasure count
+            const countElement = document.createElement('div');
+            countElement.textContent = `Count: ${treasureData.count}`;
+            countElement.style.fontSize = '12px';
+            countElement.style.marginBottom = '5px';
+            treasureCard.appendChild(countElement);
+
+            // Treasure value
+            const valueElement = document.createElement('div');
+            valueElement.textContent = `Value: ${treasureData.value}`;
+            valueElement.style.fontSize = '12px';
+            treasureCard.appendChild(valueElement);
+
+            // Treasure description
+            if (treasureData.description) {
+                const descElement = document.createElement('div');
+                descElement.textContent = treasureData.description;
+                descElement.style.fontSize = '11px';
+                descElement.style.marginTop = '8px';
+                descElement.style.color = 'rgba(200, 200, 200, 0.9)';
+                descElement.style.fontStyle = 'italic';
+                descElement.style.textAlign = 'center';
+                treasureCard.appendChild(descElement);
+            }
+
+            treasureGrid.appendChild(treasureCard);
+        }
+
+        treasureContent.appendChild(treasureGrid);
     }
 
     // Play a simple, pleasant chest open sound
