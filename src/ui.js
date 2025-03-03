@@ -14,7 +14,7 @@ class GameUI {
         this.container = document.createElement('div');
         this.container.id = 'game-ui';
         this.container.style.position = 'absolute';
-        this.container.style.top = '10px';
+        this.container.style.top = '35px';
         this.container.style.left = '10px';
         this.container.style.color = 'white';
         this.container.style.fontFamily = 'Arial, sans-serif';
@@ -38,6 +38,9 @@ class GameUI {
 
         // Initialize elements as an empty object first
         this.elements = {};
+
+        // Create FPS counter (at the very top left, above all other elements)
+        this.elements.fpsCounter = this.createFPSCounter();
 
         // Create basic UI elements
         this.elements.speed = this.createUIElement('Speed: 0 knots');
@@ -567,6 +570,9 @@ class GameUI {
         if (data.position && data.nearestIsland) {
             updateShopAvailability(data.activeIslands, data.position);
         }
+
+        // Update FPS counter
+        this.updateFPS();
     }
 
     getCardinalDirection(degrees) {
@@ -617,6 +623,61 @@ class GameUI {
     updateInventory(fishInventory) {
         // Use the inventory UI to update the display
         this.inventoryUI.updateInventory(fishInventory);
+    }
+
+    createFPSCounter() {
+        const fpsContainer = document.createElement('div');
+        fpsContainer.id = 'fps-counter';
+        fpsContainer.style.position = 'absolute';
+        fpsContainer.style.top = '5px';
+        fpsContainer.style.left = '5px';
+        fpsContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        fpsContainer.style.color = 'lime';
+        fpsContainer.style.fontFamily = 'monospace';
+        fpsContainer.style.fontSize = '14px';
+        fpsContainer.style.padding = '3px 6px';
+        fpsContainer.style.borderRadius = '3px';
+        fpsContainer.style.zIndex = '9999'; // Ensure it's above everything
+        fpsContainer.textContent = 'FPS: 0';
+        document.body.appendChild(fpsContainer);
+
+        // Initialize FPS tracking variables
+        this.frameCount = 0;
+        this.lastFpsUpdate = performance.now();
+        this.currentFps = 0;
+
+        return fpsContainer;
+    }
+
+    // New method to update FPS counter
+    updateFPS() {
+        // Increment frame count
+        this.frameCount++;
+
+        // Calculate FPS every 500ms for stability
+        const now = performance.now();
+        const elapsed = now - this.lastFpsUpdate;
+
+        if (elapsed >= 500) {
+            // Calculate FPS
+            this.currentFps = Math.round((this.frameCount * 1000) / elapsed);
+
+            // Update counter text with color based on performance
+            let fpsColor = 'lime'; // Good performance
+
+            if (this.currentFps < 30) {
+                fpsColor = 'red'; // Poor performance
+            } else if (this.currentFps < 50) {
+                fpsColor = 'yellow'; // Moderate performance
+            }
+
+            this.elements.fpsCounter.textContent = `FPS: ${this.currentFps}`;
+            this.elements.fpsCounter.style.color = fpsColor;
+
+            // Reset counters
+            this.lastFpsUpdate = now;
+            this.frameCount = 0;
+        }
     }
 }
 
