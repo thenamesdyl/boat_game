@@ -26,6 +26,7 @@ import {
     findNearestIsland,
     checkIslandCollision
 } from './islands.js';
+import MusicSystem from './music.js';
 
 
 
@@ -71,6 +72,8 @@ composer.addPass(bloomPass);
 // Add sky setup here
 setupSky();
 requestLeaderboard();
+MusicSystem.playMusic();
+MusicSystem.setVolume(0.3); // 30% volume
 
 
 // Expanded Water with Slower Shader

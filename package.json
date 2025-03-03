@@ -9,11 +9,12 @@
         "dev": "parcel index.html"
     },
     "dependencies": {
-        "three": "^0.152.0",
-        "socket.io-client": "^4.5.4"
+        "socket.io-client": "^4.5.4",
+        "three": "^0.152.0"
     },
     "devDependencies": {
-        "parcel-bundler": "^1.12.5"
+        "parcel-bundler": "^1.12.5",
+        "parcel-plugin-static-files-copy": "^2.6.0"
     },
     "keywords": [
         "three.js",
@@ -23,6 +24,9 @@
         "3d",
         "boat"
     ],
+    "staticFiles": {
+        "staticPath": "assets"
+    },
     "author": "",
     "license": "MIT"
 }

@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 import json
 import logging
@@ -9,6 +9,7 @@ from datetime import datetime
 from models import db, Player, Island, Message
 from collections import defaultdict
 from sqlalchemy import inspect
+import mimetypes
 
 # Load environment variables from .env file
 load_dotenv()
@@ -50,6 +51,17 @@ islands = {}
 # Add this near your other global variables
 last_db_update = defaultdict(float)  # Track last database update time for each player
 DB_UPDATE_INTERVAL = 5.0  # seconds between database updates
+
+# Add these MIME type registrations after your existing imports
+# Register GLB and GLTF MIME types
+mimetypes.add_type('model/gltf-binary', '.glb')
+mimetypes.add_type('model/gltf+json', '.gltf')
+
+# Add this configuration near your app initialization
+# Set up the static file directory path - adjust this to your preferred location
+STATIC_FILES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+# Create the directory if it doesn't exist
+os.makedirs(STATIC_FILES_DIR, exist_ok=True)
 
 # Helper function to get or create a player
 def get_or_create_player(player_id, **kwargs):
@@ -673,7 +685,62 @@ def send_message_api():
             'error': str(e)
         }), 500
 
+# Add this new endpoint to serve static files
+@app.route('/files/<path:filename>')
+def serve_static_file(filename):
+    """
+    Serve static files from the static directory
+    Access files via: http://localhost:5000/files/models/boat.glb
+    """
+    try:
+        logger.info(f"Serving static file: {filename}")
+        response = send_from_directory(STATIC_FILES_DIR, filename)
+        
+        # Add CORS headers if needed
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        
+        # Log the MIME type for debugging
+        logger.info(f"Serving {filename} with MIME type: {response.mimetype}")
+        
+        return response
+    except Exception as e:
+        logger.error(f"Error serving static file {filename}: {e}")
+        return jsonify({
+            'success': False,
+            'error': f"File not found or error: {str(e)}"
+        }), 404
+
+# Add an info endpoint to help with debugging file paths
+@app.route('/file-system-info')
+def file_system_info():
+    """Return information about the static file system configuration"""
+    files = []
+    
+    # Walk through the static directory and list all files
+    for root, dirs, filenames in os.walk(STATIC_FILES_DIR):
+        for filename in filenames:
+            # Get relative path
+            rel_path = os.path.relpath(os.path.join(root, filename), STATIC_FILES_DIR)
+            files.append({
+                'path': rel_path,
+                'url': f"/files/{rel_path.replace(os.sep, '/')}",
+                'mime': mimetypes.guess_type(filename)[0]
+            })
+            
+    return jsonify({
+        'static_dir': STATIC_FILES_DIR,
+        'files': files,
+        'mime_types': {
+            '.glb': mimetypes.guess_type('model.glb')[0],
+            '.gltf': mimetypes.guess_type('model.gltf')[0],
+            '.png': mimetypes.guess_type('image.png')[0],
+            '.jpg': mimetypes.guess_type('image.jpg')[0],
+            '.mp3': mimetypes.guess_type('audio.mp3')[0]
+        }
+    })
+
 if __name__ == '__main__':
     # Run the Socket.IO server with debug and reloader enabled
-   # socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=True) 
-   socketio.run(app, host='0.0.0.0') 
+   socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=True) 
+   # socketio.run(app, host='0.0.0.0') 
