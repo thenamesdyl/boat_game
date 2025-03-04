@@ -62,7 +62,7 @@ function onMouseDown(event) {
             x: event.clientX,
             y: event.clientY
         };
-        event.preventDefault();
+        //event.preventDefault();
     }
 }
 
