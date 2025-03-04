@@ -28,8 +28,34 @@ import {
 } from './islands.js';
 import MusicSystem from './music.js';
 import { initCameraControls, updateCameraPosition } from './cameraControls.js';
+import { setupWater, updateWater } from './water.js';
+
+const water = setupWater();
+
+/*
+const cubeTextureLoader = new THREE.CubeTextureLoader();
+cubeTextureLoader.setPath('/threejs-water-shader/');
+const environmentMap = cubeTextureLoader.load([
+    './px.png', // positive x
+    './nx.png', // negative x 
+    './py.png', // positive y
+    './ny.png', // negative y
+    './pz.png', // positive z
+    './nz.png'  // negative z
+]);
 
 
+const waterResolution = { size: 124 };
+const water2 = new Water({
+    environmentMap,
+    resolution: waterResolution.size
+});
+//scene.add(water2);
+
+
+
+scene.background = environmentMap;
+scene.environment = environmentMap;*/
 
 
 // Add these variables to your global scope
@@ -76,7 +102,7 @@ composer.addPass(bloomPass);
 setupSky();
 requestLeaderboard();
 MusicSystem.playMusic();
-MusicSystem.setVolume(0.3); // 30% volume
+MusicSystem.setVolume(0.1); // 30% volume
 
 
 // Expanded Water with Slower Shader
@@ -126,9 +152,9 @@ const waterMaterial = new THREE.ShaderMaterial({
     fragmentShader: waterShader.fragmentShader,
     side: THREE.DoubleSide,
 });
-const water = new THREE.Mesh(waterGeometry, waterMaterial);
-water.rotation.x = -Math.PI / 2;
-scene.add(water);
+//const water = new THREE.Mesh(waterGeometry, waterMaterial);
+//water.rotation.x = -Math.PI / 2;
+//scene.add(water);
 
 
 // Add this at the beginning of your script.js file
@@ -898,8 +924,6 @@ function animate() {
     const now = performance.now();
     const deltaTime = (now - (lastTime || now)) / 1000; // Convert to seconds
     lastTime = now;
-
-    requestAnimationFrame(animate);
     updateTime(0.09);
 
     // Update time of day
@@ -927,7 +951,7 @@ function animate() {
 
         positions[i + 2] = vertex.z; // Update height
     }
-    water.geometry.attributes.position.needsUpdate = true;
+    // water.geometry.attributes.position.needsUpdate = true;
     //water.geometry.computeVertexNormals(); // For lighting in shader
 
     // Boat movement
@@ -991,8 +1015,31 @@ function animate() {
         h01 * (1 - xFraction) * zFraction +
         h11 * xFraction * zFraction;
 
-    const floatOffset = 0.5;
-    boat.position.y = interpolatedHeight + floatOffset;
+    // Add these lines for more consistent water placement
+    // Baseline height detection and correction
+    const normalWaterLevel = 0; // Expected average water level
+    const baseWaterLevel = normalWaterLevel; // Default water level if calculation fails
+
+    // Dampen bobbing effect to 50%
+    const bobbingFactor = 0.5; // Reduce vertical movement by 50%
+    const dampedHeight = baseWaterLevel * (1 - bobbingFactor) + interpolatedHeight * bobbingFactor;
+
+    // Set appropriate float offset (lower value = lower in water)
+    const floatOffset = 0.7; // Reduced from 1.5 to sit lower in water
+
+    // Smooth transitions between heights to prevent jumps
+    if (!boat.lastHeight) boat.lastHeight = dampedHeight + floatOffset;
+    const targetHeight = dampedHeight + floatOffset;
+    const smoothingFactor = 0.1; // Lower = smoother but slower transitions
+    boat.position.y = boat.lastHeight + (targetHeight - boat.lastHeight) * smoothingFactor;
+    boat.lastHeight = boat.position.y;
+
+    // Add safeguard against extreme heights (in case of calculation errors)
+    if (Math.abs(boat.position.y) > 10) { // If boat gets too high or low
+        console.warn("Boat height correction triggered:", boat.position.y);
+        boat.position.y = normalWaterLevel + floatOffset; // Reset to normal level
+        boat.lastHeight = boat.position.y;
+    }
 
     // Update leaderboard periodically
     if (getTime() - lastLeaderboardUpdate > LEADERBOARD_UPDATE_INTERVAL) {
@@ -1036,7 +1083,13 @@ function animate() {
 
     applyWindInfluence();
 
+    // Update water
+    //updateWater(deltaTime);
+
+    //water2.update(deltaTime);
+
     renderer.render(scene, camera);
+    requestAnimationFrame(animate);
     //composer.render();
 }
 

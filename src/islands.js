@@ -60,7 +60,7 @@ function createWaterChunk(chunkX, chunkZ, scene, waterShader) {
     );
 
     // Add to scene
-    scene.add(water);
+    //scene.add(water);
 
     // Store in active water chunks
     activeWaterChunks.set(chunkKey, water);

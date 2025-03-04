@@ -20,6 +20,10 @@ let originalColors = new Map(); // Store original colors for restoration
 
 // Add a flag to track if the model has been loaded
 let boatModelLoaded = false;
+let boatModelLoading = false; // Flag for tracking if model is currently loading
+
+// Add these variables near other boat-related declarations
+let damageOverlay; // Reference to the damage overlay mesh
 
 // Initialize wood overlay texture
 function initWoodOverlayTexture() {
@@ -276,7 +280,61 @@ export function addCharacterToBoat(boat) {
     return character;
 }
 
-// Create a larger boat
+// Create a damage overlay instead of changing materials
+function createDamageOverlay(boat) {
+    // Create a box that's slightly larger than the boat
+    const boatBoundingBox = new THREE.Box3().setFromObject(boat);
+    const size = new THREE.Vector3();
+    boatBoundingBox.getSize(size);
+
+    // Make the overlay slightly larger than the boat
+    const overlayGeometry = new THREE.BoxGeometry(
+        size.x * 1.1,
+        size.y * 1.1,
+        size.z * 1.1
+    );
+
+    // Create a semi-transparent red material
+    const overlayMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false, // Prevents z-fighting
+        side: THREE.DoubleSide
+    });
+
+    // Create the overlay mesh
+    damageOverlay = new THREE.Mesh(overlayGeometry, overlayMaterial);
+
+    // Position at boat's center
+    const center = new THREE.Vector3();
+    boatBoundingBox.getCenter(center);
+    damageOverlay.position.copy(center);
+
+    // Add to boat but hide initially
+    boat.add(damageOverlay);
+    damageOverlay.visible = false;
+
+    return damageOverlay;
+}
+
+// Function to flash boat damage using the overlay
+export function flashBoatDamage() {
+    if (isDamageFlashing) return; // Don't start a new flash if one is in progress
+
+    // Create overlay if it doesn't exist
+    if (!damageOverlay) {
+        damageOverlay = createDamageOverlay(boat);
+    }
+
+    isDamageFlashing = true;
+    damageFlashTimer = damageFlashDuration;
+
+    // Show the overlay
+    damageOverlay.visible = true;
+}
+
+// Modify createBoat to initialize the damage overlay
 export function createBoat(scene) {
     // Create a group to hold the boat
     let boat = new THREE.Group();
@@ -289,6 +347,9 @@ export function createBoat(scene) {
 
     // Add a small Minecraft-style character to the boat
     addCharacterToBoat(boat);
+
+    // Create the damage overlay
+    createDamageOverlay(boat);
 
     // Add the boat to the scene
     scene.add(boat);
@@ -453,8 +514,8 @@ export function updateBoatRocking(deltaTime) {
     const currentYRotation = boat.rotation.y;
     boat.rotation.set(boatRockAngleX, currentYRotation, boatRockAngleZ);
 
-    // Only load the model if it hasn't been loaded
-    if (!boatModelLoaded) {
+    // Only attempt to load the model once and only if not already loaded/loading
+    if (!boatModelLoaded && !boatModelLoading) {
         loadGLBModel(boat);
     }
 
@@ -484,40 +545,6 @@ export function applyWindInfluence() {
     boat.position.add(windVector);
 }
 
-// Function to make the boat flash red when hit
-export function flashBoatDamage() {
-    if (isDamageFlashing) return; // Don't start a new flash if one is in progress
-
-    isDamageFlashing = true;
-    damageFlashTimer = damageFlashDuration;
-
-    // Store original colors and set to red
-    boat.traverse((child) => {
-        if (child.isMesh && child.material && !child.userData.isNotPlayerColorable) {
-            // Store original color if not already stored
-            if (!originalColors.has(child.uuid)) {
-                originalColors.set(child.uuid, child.material.color.clone());
-            }
-
-            // Set to bright red for damage indication
-            child.material.color.set(0xff0000);
-        }
-    });
-}
-
-// Function to restore boat colors after damage flash
-function restoreBoatColors() {
-    isDamageFlashing = false;
-
-    // Restore original colors
-    boat.traverse((child) => {
-        if (child.isMesh && child.material && originalColors.has(child.uuid)) {
-            const originalColor = originalColors.get(child.uuid);
-            child.material.color.copy(originalColor);
-        }
-    });
-}
-
 // Update function to handle damage flash timing
 export function updateDamageFlash(deltaTime) {
     if (!isDamageFlashing) return;
@@ -525,14 +552,21 @@ export function updateDamageFlash(deltaTime) {
     damageFlashTimer -= deltaTime;
 
     if (damageFlashTimer <= 0) {
-        restoreBoatColors();
+        // Hide the overlay instead of restoring colors
+        if (damageOverlay) {
+            damageOverlay.visible = false;
+        }
+        isDamageFlashing = false;
     }
 }
 
 // Update the loadGLBModel function to position and rotate the model correctly
 function loadGLBModel(boat) {
-    // Don't load if already loaded
-    if (boatModelLoaded) return;
+    // Don't load if already loaded or currently loading
+    if (boatModelLoaded || boatModelLoading) return;
+
+    // Set loading flag to prevent concurrent load attempts
+    boatModelLoading = true;
 
     // Create a GLTF loader
     const loader = new GLTFLoader();
@@ -549,20 +583,36 @@ function loadGLBModel(boat) {
             console.log("✅ GLB model loaded successfully!");
             const model = gltf.scene;
 
-            // Scale the model appropriately
+            // Add LOD system
+            const lod = new THREE.LOD();
+
+            // Add highest detail model
             model.scale.set(20, 20, 20);
-
-            // Rotate model 180 degrees to face the correct direction
             model.rotation.y = Math.PI;
-
-            // Position the model appropriately - raise it above water level
             model.position.set(0, 7, 0);
+            lod.addLevel(model, 0);  // Highest detail at close range
 
-            // Apply cartoony bright style to the model
-            makeBoatCartoony(model);
+            // Create simplified version for distance
+            const simplifiedModel = model.clone();
+            simplifiedModel.traverse(child => {
+                if (child.isMesh && child.geometry) {
+                    // Remove unnecessary details for distant view
+                    if (child.name.includes('detail') || child.name.includes('accessory')) {
+                        child.visible = false;
+                    }
+                }
+            });
+            lod.addLevel(simplifiedModel, 100);  // Medium detail
 
-            // Add model to the boat group
-            boat.add(model);
+            // Add very simplified version for far distance
+            const boxGeometry = new THREE.BoxGeometry(6, 2, 12);
+            const boxMaterial = new THREE.MeshBasicMaterial({ color: 0x8b4513 });
+            const boxModel = new THREE.Mesh(boxGeometry, boxMaterial);
+            boxModel.position.set(0, 7, 0);
+            lod.addLevel(boxModel, 500);  // Low detail at far range
+
+            // Add LOD to boat
+            boat.add(lod);
 
             // Handle animations if present
             if (gltf.animations && gltf.animations.length) {
@@ -576,26 +626,26 @@ function loadGLBModel(boat) {
                 window.modelMixers.push(mixer);
             }
 
-            // Set flag to indicate model is loaded
+            // Set flags to indicate model is loaded and no longer loading
             boatModelLoaded = true;
+            boatModelLoading = false;
         },
         // Progress callback
         function (xhr) {
             if (xhr.lengthComputable) {
                 const percentComplete = xhr.loaded / xhr.total * 100;
-                console.log(`Model loading: ${percentComplete.toFixed(2)}%`);
+                console.log(`Model loading: ${Math.round(percentComplete)}%`);
             }
         },
         // Error callback
         function (error) {
             console.error("❌ Error loading boat model:", error);
-            console.log("Please check that:");
-            console.log("1. The GLB file exists at: assets/models/boat.glb");
-            console.log("2. You have installed parcel-plugin-static-files-copy");
-            console.log("3. Your package.json has the correct staticFiles configuration");
+            console.log("Falling back to geometric boat model");
+
+            // Reset loading flag but don't mark as loaded
+            boatModelLoading = false;
 
             // Fallback to geometric boat model
-            console.log("Falling back to geometric boat model");
             createGeometricBoat(boat);
         }
     );

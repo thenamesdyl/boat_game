@@ -6,8 +6,8 @@
 const MusicSystem = (() => {
     // Main background music
     let backgroundMusic = null;
-    let musicVolume = 0.2;
-    let isMuted = false;
+    let musicVolume = 0.1;
+    let isMuted = true;
     let musicStartedByUserInteraction = false;
 
     /**

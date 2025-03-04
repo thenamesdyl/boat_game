@@ -2,13 +2,16 @@ import * as THREE from 'three';
 import { scene, camera, directionalLight, ambientLight, getTime } from './gameState.js';
 
 const skyRadius = 20001; // Larger sky radius
-const sunSize = 100; // Increased from 10 to make the sun larger
+const sunSize = 500; // Increased from 10 to make the sun larger
 let skyMaterial;
 let skyMesh;
 let lastTimeOfDay = "";
 let skyboxTransitionProgress = 0;
 let skyboxTransitionDuration = 20; // Seconds for transition
 let sunMesh;
+
+// Add a flag to track which skybox system is active
+let useRealisticSky = false;
 
 scene.add(ambientLight);
 
@@ -89,16 +92,16 @@ export function getGradualSkyboxColor() {
     return resultColor;
 }
 
-// Update skybox in animation loop
+// Modify updateSkybox to respect the active skybox type
 export function updateSkybox() {
-    if (window.skybox) {
-        // Get gradually changing color based on time
+    if (useRealisticSky && window.realisticSkyMesh) {
+        // Use the new realistic sky system
+        const deltaTime = 1 / 60; // Approximation when not provided
+        updateRealisticSky(window.realisticSkyMesh, deltaTime);
+    } else if (window.skybox) {
+        // Use the traditional skybox system
         const newColor = getGradualSkyboxColor();
-
-        // Apply with slight easing for smoother transitions
         window.skybox.material.color.lerp(newColor, 0.03);
-
-        // Keep skybox centered on camera
         window.skybox.position.copy(camera.position);
     }
 }
@@ -149,6 +152,7 @@ export function setupSky() {
     sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
     sunMesh.add(sunGlow); // Add glow as a child of the sun
     sunMesh.renderOrder = 1000; // Ensure sun renders after everything else
+    sunMesh.frustumCulled = false; // This prevents the sun from being culled when far away
 
     // Position it at the same position as the directional light
     // but scaled to be at the edge of the skybox
@@ -158,8 +162,17 @@ export function setupSky() {
     sunMesh.position.copy(lightDirection.multiplyScalar(skyRadius * 0.95));
 
     scene.add(sunMesh);
+
+    // Also ensure camera far plane is sufficient
+    // Add this right after the above code
+    if (camera.far < skyRadius * 2) {
+        camera.far = skyRadius * 2;
+        camera.updateProjectionMatrix();
+        console.log("Increased camera far plane to see sun:", camera.far);
+    }
 }
 
+// Modify updateTimeOfDay to skip skybox material changes when using realistic sky
 export function updateTimeOfDay(deltaTime) {
     const timeOfDay = getTimeOfDay().toLowerCase();
 
@@ -176,12 +189,12 @@ export function updateTimeOfDay(deltaTime) {
         skyboxTransitionProgress = Math.min(skyboxTransitionProgress, 1);
 
         // Get target colors and settings
-        const targetSkyColor = getSkyColor(timeOfDay);
         const targetAmbientLight = getAmbientLight(timeOfDay);
         const targetDirectionalLight = getDirectionalLight(timeOfDay);
 
-        // Make color transition more dramatic (0.05 instead of 0.01)
-        if (skyMaterial) {
+        // Skip skyMaterial update if using realistic sky
+        if (skyMaterial && !useRealisticSky) {
+            const targetSkyColor = getSkyColor(timeOfDay);
             skyMaterial.color.lerp(targetSkyColor, 0.05);
         }
 
@@ -225,8 +238,10 @@ export function updateTimeOfDay(deltaTime) {
             }
         }
 
-        // Update skybox to match time of day
-        updateSkybox();
+        // Update skybox to match time of day - but only when NOT using realistic sky
+        if (!useRealisticSky) {
+            updateSkybox();
+        }
     }
 
     // Always update moon glow when it's night
@@ -270,6 +285,7 @@ export function getDirectionalLight(timeOfDay) {
     }
 }
 
+// Update updateSunPosition to avoid conflicts with realistic sky
 export function updateSunPosition() {
     if (sunMesh && directionalLight) {
         // Get gradual sun position
@@ -443,4 +459,234 @@ function updateMoonGlow() {
             sunMesh.material.opacity = 1.0; // Full opacity
         }
     }
+}
+
+// Create a shader-based sky with realistic gradients
+export function setupRealisticSky() {
+    // Create a sphere for the sky
+    const skyGeometry = new THREE.SphereGeometry(skyRadius, 64, 64);
+    // Inside faces
+    skyGeometry.scale(-1, 1, 1);
+
+    // Create a shader material for realistic sky gradients with enhanced gradients
+    const skyShaderMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            sunPosition: { value: new THREE.Vector3(0, 0, 0) },
+            sunColor: { value: new THREE.Color(0xffaa44) },
+            horizonColor: { value: new THREE.Color(0xff7700) },
+            zenithColor: { value: new THREE.Color(0x1a3b80) },
+            fadeExponent: { value: 2.5 },        // Increased for more dramatic gradient
+            sunSize: { value: 0.04 },            // Increased sun size
+            sunFuzziness: { value: 0.02 },       // Increased fuzziness
+            gradientSharpness: { value: 0.6 },   // New parameter for gradient control
+            time: { value: 0.0 }
+        },
+        vertexShader: `
+            varying vec3 vWorldPosition;
+            varying vec3 vSunDirection;
+            uniform vec3 sunPosition;
+
+            void main() {
+                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                vWorldPosition = worldPosition.xyz;
+                
+                // Compute sun direction for each vertex
+                vSunDirection = normalize(sunPosition);
+                
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            varying vec3 vWorldPosition;
+            varying vec3 vSunDirection;
+            
+            uniform vec3 sunColor;
+            uniform vec3 horizonColor;
+            uniform vec3 zenithColor;
+            uniform float fadeExponent;
+            uniform float sunSize;
+            uniform float sunFuzziness;
+            uniform float gradientSharpness;
+            uniform float time;
+            
+            vec3 getSkyColor(vec3 direction) {
+                // Calculate gradient based on height (y-coordinate)
+                float y = normalize(direction).y;
+                
+                // More pronounced horizon band
+                float horizonBand = 1.0 - pow(abs(y), gradientSharpness);
+                
+                // Main sky gradient - more dramatic from zenith to horizon
+                float horizonFactor = pow(1.0 - abs(y), fadeExponent);
+                
+                // Add sun-influenced warmth on the sun's side of the sky
+                float sunSideFactor = max(0.0, dot(normalize(direction), normalize(vec3(vSunDirection.x, 0.0, vSunDirection.z))));
+                sunSideFactor = pow(sunSideFactor, 2.0); // More concentrated toward sun direction
+                
+                // Mix zenith color with horizon color based on enhanced factors
+                vec3 baseColor = mix(zenithColor, horizonColor, horizonFactor);
+                
+                // Add sun-side warming effect to the base color
+                baseColor = mix(baseColor, mix(horizonColor, sunColor, 0.3), sunSideFactor * 0.5);
+                
+                return baseColor;
+            }
+            
+            void main() {
+                // Normalize the world position to get the ray direction
+                vec3 direction = normalize(vWorldPosition);
+                
+                // Get base sky gradient
+                vec3 skyColor = getSkyColor(direction);
+                
+                // Calculate sun effect with larger, more diffuse sun
+                float angle = max(0.0, dot(direction, vSunDirection));
+                float sunFactor = smoothstep(1.0 - sunSize - sunFuzziness, 1.0 - sunSize + sunFuzziness, angle);
+                
+                // Add much stronger atmospheric scattering effect
+                float scatterAngle = max(0.0, dot(direction, vec3(vSunDirection.x, 0.0, vSunDirection.z)));
+                float scatter = pow(scatterAngle, 4.0) * 0.8;
+                scatter *= (1.0 - direction.y * 0.75); // More scattering near horizon
+                
+                // Add direction-based color variation
+                // This creates a more pronounced gradient that depends on view angle relative to the sun
+                float eastWestFactor = abs(dot(normalize(vec3(direction.x, 0.0, direction.z)), 
+                                            normalize(vec3(vSunDirection.x, 0.0, vSunDirection.z))));
+                eastWestFactor = pow(eastWestFactor, 3.0); // More concentrated
+                
+                // Enhance colors opposite to the sun (purplish/pinkish hues at dusk/dawn)
+                float oppositeSun = 1.0 - eastWestFactor;
+                vec3 oppositeTint = mix(vec3(0.4, 0.2, 0.6), vec3(0.7, 0.3, 0.5), oppositeSun);
+                
+                // Mix sky with sun and scattering colors
+                vec3 finalColor = mix(skyColor, sunColor, sunFactor);
+                
+                // Apply scatter effect (stronger)
+                finalColor = mix(finalColor, mix(horizonColor, sunColor, 0.7), scatter);
+                
+                // Apply opposite-sun coloring in a more subtle way
+                if (vSunDirection.y < 0.3 && vSunDirection.y > -0.3) { // Only during dawn/dusk
+                    finalColor = mix(finalColor, finalColor * oppositeTint, oppositeSun * (1.0 - abs(direction.y)) * 0.3);
+                }
+                
+                // Add subtle cloud-like variations
+                float noise = sin(direction.x * 50.0 + time * 0.2) * 
+                              sin(direction.z * 50.0 + time * 0.1) * 
+                              sin(direction.y * 30.0 + time * 0.15) * 0.03;
+                              
+                finalColor += noise * vec3(1.0, 0.8, 0.6) * (1.0 - abs(direction.y));
+                
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `,
+        side: THREE.BackSide,
+        depthWrite: false
+    });
+
+    // Create the sky mesh with shader material
+    const realisticSkyMesh = new THREE.Mesh(skyGeometry, skyShaderMaterial);
+    realisticSkyMesh.renderOrder = -1; // Ensure it renders first
+    scene.add(realisticSkyMesh);
+
+    // Store reference globally for updates
+    window.realisticSkyMesh = realisticSkyMesh;
+    useRealisticSky = true;
+
+    return realisticSkyMesh;
+}
+
+// Update realistic sky shader with current sun position and time of day
+export function updateRealisticSky(skyMesh, deltaTime) {
+    if (!skyMesh || !skyMesh.material || !skyMesh.material.uniforms) return;
+
+    // Get time of day using existing function
+    const timeOfDay = getTimeOfDay().toLowerCase();
+    const sunPosition = getGradualSunPosition();
+
+    // Update sun position uniform
+    skyMesh.material.uniforms.sunPosition.value.copy(sunPosition);
+
+    // Update time uniform for animated effects - slow it down
+    skyMesh.material.uniforms.time.value += deltaTime * 0.5;
+
+    // Determine sky colors based on time of day - with more dramatic colors
+    let sunColor, horizonColor, zenithColor, fadeExponent, sunSize, sunFuzziness, gradientSharpness;
+
+    switch (timeOfDay) {
+        case 'dawn':
+            sunColor = new THREE.Color(0xff9933);       // More orange
+            horizonColor = new THREE.Color(0xff5500);   // More red-orange
+            zenithColor = new THREE.Color(0x0a1a50);    // Deeper blue
+            fadeExponent = 3.0;                         // Sharper gradient
+            sunSize = 0.035;                            // Larger sun
+            sunFuzziness = 0.025;                       // More fuzzy
+            gradientSharpness = 0.4;                    // More spread out
+            break;
+
+        case 'day':
+            sunColor = new THREE.Color(0xffffcc);
+            horizonColor = new THREE.Color(0x64c8ff);   // Lighter blue
+            zenithColor = new THREE.Color(0x0044aa);    // Deep sky blue
+            fadeExponent = 2.2;
+            sunSize = 0.03;
+            sunFuzziness = 0.015;
+            gradientSharpness = 0.7;                    // More concentrated
+            break;
+
+        case 'afternoon':
+            sunColor = new THREE.Color(0xffeeaa);       // Warmer afternoon sun
+            horizonColor = new THREE.Color(0x75c1ff);   // Light blue
+            zenithColor = new THREE.Color(0x0040a0);    // Deep blue
+            fadeExponent = 2.5;
+            sunSize = 0.03;
+            sunFuzziness = 0.015;
+            gradientSharpness = 0.6;
+            break;
+
+        case 'dusk':
+            sunColor = new THREE.Color(0xff6600);       // More intense orange
+            horizonColor = new THREE.Color(0xff3300);   // More intense red
+            zenithColor = new THREE.Color(0x0a1a60);    // Rich blue
+            fadeExponent = 3.2;                         // Even sharper
+            sunSize = 0.038;                            // Larger setting sun
+            sunFuzziness = 0.025;                       // More fuzzy
+            gradientSharpness = 0.3;                    // More spread out
+            break;
+
+        case 'night':
+            sunColor = new THREE.Color(0xaaddff);       // Bluer moon
+            horizonColor = new THREE.Color(0x061430);   // Dark blue
+            zenithColor = new THREE.Color(0x000008);    // Near black
+            fadeExponent = 2.8;
+            sunSize = 0.022;
+            sunFuzziness = 0.01;
+            gradientSharpness = 0.5;
+            break;
+
+        default:
+            // Default to day
+            sunColor = new THREE.Color(0xffffcc);
+            horizonColor = new THREE.Color(0x64c8ff);
+            zenithColor = new THREE.Color(0x0044aa);
+            fadeExponent = 2.2;
+            sunSize = 0.03;
+            sunFuzziness = 0.015;
+            gradientSharpness = 0.7;
+    }
+
+    // Update all shader uniforms
+    skyMesh.material.uniforms.sunColor.value.copy(sunColor);
+    skyMesh.material.uniforms.horizonColor.value.copy(horizonColor);
+    skyMesh.material.uniforms.zenithColor.value.copy(zenithColor);
+    skyMesh.material.uniforms.fadeExponent.value = fadeExponent;
+    skyMesh.material.uniforms.sunSize.value = sunSize;
+    skyMesh.material.uniforms.sunFuzziness.value = sunFuzziness;
+
+    // Add the new gradient sharpness parameter
+    if (skyMesh.material.uniforms.gradientSharpness) {
+        skyMesh.material.uniforms.gradientSharpness.value = gradientSharpness;
+    }
+
+    // Keep skybox centered on camera
+    skyMesh.position.copy(camera.position);
 }
