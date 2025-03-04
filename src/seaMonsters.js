@@ -320,12 +320,8 @@ export function updateAttackingMonster(monster, deltaTime) {
     const canHit = currentTime - lastHitTime > HIT_COOLDOWN;
 
     // Debug monster distance
-    if (distanceToPlayer < 25) {
-        console.log(`Monster ${monster.monsterType} distance: ${distanceToPlayer.toFixed(2)}, can hit: ${canHit}, current time: ${currentTime.toFixed(2)}, last hit: ${lastHitTime.toFixed(2)}, diff: ${(currentTime - lastHitTime).toFixed(2)}`);
-    }
 
     if (distanceToPlayer < 15) { // Increased hit range for better detection
-        console.log("Monster hit the boat - triggering damage flash");
         // Monster hit the boat - trigger damage flash
         flashBoatDamage();
         lastHitTime = currentTime;

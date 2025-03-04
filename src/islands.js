@@ -172,7 +172,8 @@ function createIsland(x, z, seed, scene) {
         }
     } else {
         // Regular island with temple structures if no mega structure
-        for (let p = 0; p < 3; p++) {
+
+        for (let p = 0; p < 1; p++) {
             const templeSize = 15 + random() * 15;
             const templeHeight = 15 + random() * 20;
 
@@ -284,7 +285,8 @@ function createIsland(x, z, seed, scene) {
     }
 
     // Vegetation (always add some trees regardless of structure)
-    for (let v = 0; v < 10; v++) {
+
+    for (let v = 0; v < 2; v++) {
         // Create a tree group to hold trunk and foliage
         const tree = new THREE.Group();
 
@@ -345,6 +347,7 @@ function createIsland(x, z, seed, scene) {
 
         island.add(tree);
     }
+
 
     // Store the island with its ID
     activeIslands.set(islandId, {

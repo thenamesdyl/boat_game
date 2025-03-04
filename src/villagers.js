@@ -109,7 +109,7 @@ function createSampleVillagers(islands) {
 
     islands.forEach((island, id) => {
         // Create 2-4 villagers per island
-        const count = 2 + Math.floor(Math.random() * 3);
+        const count = 1;
 
         for (let i = 0; i < count; i++) {
             // Get island position and extract y-height from the mesh

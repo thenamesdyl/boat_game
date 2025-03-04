@@ -981,7 +981,7 @@ function animate() {
             updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
             // Add this line to update villagers whenever chunks update
             if (activeIslands && activeIslands.size > 0) {
-                updateVillagers(activeIslands);
+                //updateVillagers(activeIslands);
             }
         }
     }
@@ -1111,6 +1111,7 @@ function updateGameUI() {
 
     const windData = getWindData();
     const nearestIsland = findNearestIsland();
+    const monsters = getMonsters(); // Get current monsters
 
     // Update UI with all available data
     gameUI.update({
@@ -1125,7 +1126,8 @@ function updateGameUI() {
         nearestIsland: nearestIsland,
         mapScale: 200, // Scale factor for mini-map (adjust as needed)
         fishCount: getFishCount(),
-        activeIslands: activeIslands // Add this line to pass the islands
+        activeIslands: activeIslands, // Add this line to pass the islands
+        monsters: monsters // Pass monsters to UI for radar display
     });
 
     // Add island markers to mini-map
@@ -1144,12 +1146,12 @@ updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
 // Force an initial update to ensure islands are generated
 setTimeout(() => {
     console.log("Forcing initial chunk update...");
-    updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
+    //updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
 
     // Add this line to initialize villagers after the first chunk update
     if (activeIslands && activeIslands.size > 0) {
         console.log(`Initializing villagers with ${activeIslands.size} islands`);
-        updateVillagers(activeIslands);
+        //updateVillagers(activeIslands);
     }
 }, 1000);
 

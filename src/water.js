@@ -4,7 +4,7 @@ import { scene, camera, renderer, getTime, getWindData } from './gameState.js';
 
 let waterMesh;
 let waterNormals;
-const waterSize = 100000; // Very large water plane
+const waterSize = 10000; // Very large water plane
 const waterSegments = 200; // Increased from 100 for more detailed waves
 
 // Initialize the advanced water effect
@@ -36,7 +36,7 @@ export function setupWater() {
         waterColor: 0x000133,         // Darker blue color
         distortionScale: 3.7,         // Increased from 3.7 for more pronounced waves
         fog: scene.fog !== undefined,
-        alpha: 100.0              // Slightly higher opacity
+        alpha: 100.0                  // Slightly higher opacity
     });
 
     // Position water at sea level
