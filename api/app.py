@@ -6,9 +6,10 @@ import json
 import logging
 import time
 from datetime import datetime
-from models import db, Player, Island, Message
+import firebase_admin
+from firebase_admin import credentials, firestore
+import firestore_models  # Import our new Firestore models
 from collections import defaultdict
-from sqlalchemy import inspect
 import mimetypes
 
 # Load environment variables from .env file
@@ -25,24 +26,17 @@ werkzeug_logger.setLevel(logging.ERROR)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'ship_game_secret_key')
 
-# Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///game.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)  # Initialize db with app
+# Initialize Firebase and Firestore (instead of SQLAlchemy)
+firebase_cred_path = os.environ.get('FIREBASE_CREDENTIALS', 'firebasekey.json')
+cred = credentials.Certificate(firebase_cred_path)
+firebase_app = firebase_admin.initialize_app(cred)
+db = firestore.client()
+
+# Initialize our Firestore models with the Firestore client
+firestore_models.init_firestore(db)
 
 # Set up Socket.IO
 socketio = SocketIO(app, cors_allowed_origins=os.environ.get('SOCKETIO_CORS_ALLOWED_ORIGINS', '*'))
-
-# Create database tables
-with app.app_context():
-    # Only create tables if they don't exist yet
-    # Check if any tables exist first
-    inspector = inspect(db.engine)
-    if not inspector.get_table_names():
-        print("No tables found, creating database schema...")
-        db.create_all()
-    else:
-        print(f"Database already contains tables: {inspector.get_table_names()}")
 
 # Keep a session cache for quick access
 players = {}
@@ -57,83 +51,61 @@ DB_UPDATE_INTERVAL = 5.0  # seconds between database updates
 mimetypes.add_type('model/gltf-binary', '.glb')
 mimetypes.add_type('model/gltf+json', '.gltf')
 
-# Add this configuration near your app initialization
-# Set up the static file directory path - adjust this to your preferred location
+# Set up the static file directory path
 STATIC_FILES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
-# Create the directory if it doesn't exist
 os.makedirs(STATIC_FILES_DIR, exist_ok=True)
 
-# Helper function to get or create a player
-def get_or_create_player(player_id, **kwargs):
-    try:
-        player = Player.query.get(player_id)
-        if not player:
-            try:
-                player = Player(id=player_id, **kwargs)
-                db.session.add(player)
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                # If the error was due to the player already existing (race condition),
-                # try to get the player again
-                if "unique constraint" in str(e).lower() or "duplicate key" in str(e).lower():
-                    player = Player.query.get(player_id)
-                    if not player:  # If still no player, re-raise the exception
-                        logger.error(f"Failed to create or get player {player_id}: {e}")
-                        raise
-                else:
-                    logger.error(f"Error creating player {player_id}: {e}")
-                    raise
-        
-        # Update cache
-        players[player_id] = player.to_dict()
-        return player
-    finally:
-        db.session.close()
-
-# Helper function to update a player
-def update_player(player_id, **kwargs):
-    player = Player.query.get(player_id)
-    if player:
-        for key, value in kwargs.items():
-            setattr(player, key, value)
-        db.session.commit()
-        # Update cache
-        players[player_id] = player.to_dict()
-    return player
-
-# Load players and islands from database on startup
-def load_data_from_db():
-    db_players = Player.query.all()
+# Load data from Firestore on startup
+def load_data_from_firestore():
+    # Load players
+    db_players = firestore_models.Player.get_all()
     for player in db_players:
         # Set all players to inactive on server start
-        if player.active:
-            player.active = False
-            db.session.add(player)
-        players[player.id] = player.to_dict()
+        if player.get('active', False):
+            firestore_models.Player.update(player['id'], active=False)
+            player['active'] = False
+        players[player['id']] = player
     
-    db.session.commit()
-    
-    db_islands = Island.query.all()
+    # Load islands
+    db_islands = firestore_models.Island.get_all()
     for island in db_islands:
-        islands[island.id] = island.to_dict()
+        islands[island['id']] = island
     
-    logger.info(f"Loaded {len(players)} players and {len(islands)} islands from database")
+    logger.info(f"Loaded {len(players)} players and {len(islands)} islands from Firestore")
 
 # Call the function during app startup
-with app.app_context():
-    load_data_from_db()
+load_data_from_firestore()
+
+# Socket.IO event handlers
+@socketio.on('connect')
+def handle_connect():
+    logger.info(f"Client connected: {request.sid}")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    logger.info(f"Client disconnected: {request.sid}")
+    
+    # If this was a player, mark them as inactive
+    player_id = request.sid
+    if player_id in players:
+        # Update player in Firestore and cache
+        firestore_models.Player.update(player_id, active=False, last_update=time.time())
+        if player_id in players:
+            players[player_id]['active'] = False
+            
+            # Broadcast that the player disconnected
+            emit('player_disconnected', {'id': player_id}, broadcast=True)
 
 @socketio.on('player_join')
 def handle_player_join(data):
     player_id = request.sid
-    print(f"New player joined: {player_id}")
-    print(f"Name: {data.get('name', 'Unknown')}")
-    print(f"Color: {data.get('color')}")
+    logger.info(f"New player joined: {player_id}")
+    logger.info(f"Name: {data.get('name', 'Unknown')}")
+    logger.info(f"Color: {data.get('color')}")
     
     # Create new player entry with stats
     player_data = {
-        'name': data.get('name', f'Sailor {len(players) + 1}'),
+        'name': data.get('name', f'Sailor {player_id[:4]}'),
         'color': data.get('color', {'r': 0.3, 'g': 0.6, 'b': 0.8}),
         'position': data.get('position', {'x': 0, 'y': 0, 'z': 0}),
         'rotation': data.get('rotation', 0),
@@ -145,547 +117,223 @@ def handle_player_join(data):
         'active': True  # Mark as active when they join
     }
     
-    # Create and store in database
-    get_or_create_player(player_id, **player_data)
+    # Create player in Firestore and cache the result
+    player = firestore_models.Player.create(player_id, **player_data)
+    players[player_id] = player
     
     # Broadcast to all clients that a new player joined
-    emit('player_joined', players[player_id], broadcast=True)
+    emit('player_joined', player, broadcast=True)
     
     # Send existing ACTIVE players to the new player
-    for pid, player_data in players.items():
-        if pid != player_id and player_data.get('active', True):  # Only send active players
-            emit('player_joined', player_data)
-    
-    # Send current leaderboard data to the new player
-    emit('leaderboard_update', get_leaderboard_data())
-
-# Socket.IO event handlers
-@socketio.on('connect')
-def handle_connect():
-    """Handle new client connections"""
-    print(f"Client connected: {request.sid}")
-    logger.info(f"Client connected: {request.sid}")
-    emit('connection_response', {'status': 'connected', 'id': request.sid})
-    
-    # Send only active players to the newly connected client
-    if players:
-        active_players = [p for p in players.values() if p.get('active', False)]
-        emit('all_players', active_players)
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    """Handle client disconnections"""
-    logger.info(f"Client disconnected: {request.sid}")
-    if request.sid in players:
-        # Mark player as inactive in database
-        update_player(request.sid, active=False)
-        
-        # Notify other players about the disconnection
-        emit('player_disconnected', {'id': request.sid}, broadcast=True)
-        
-        # No need to remove from memory cache as we want to preserve state
-        players[request.sid]['active'] = False
-        
-        logger.info(f"Player {players[request.sid]['name']} marked as inactive")
-
-@socketio.on('get_all_players')
-def handle_get_all_players():
-    """Send only active players to the requesting client (despite the name)"""
     active_players = [p for p in players.values() if p.get('active', False)]
     emit('all_players', active_players)
-    logger.info(f"Sent {len(active_players)} active players to client")
+    
+    # Send all islands to the new player
+    emit('all_islands', list(islands.values()))
+    
+    # Send recent messages to the new player
+    recent_messages = firestore_models.Message.get_recent_messages(limit=20)
+    emit('chat_history', recent_messages)
+    
+    # Send leaderboard data to the new player
+    emit('leaderboard_update', firestore_models.Player.get_combined_leaderboard())
 
-@socketio.on('update_position')
-def handle_position_update(data):
-    """Handle player position updates"""
+@socketio.on('player_update')
+def handle_player_update(data):
     player_id = request.sid
+    
+    # Ensure player exists
+    if player_id not in players:
+        return
+    
     current_time = time.time()
     
-    # Update player data
-    if player_id not in players:
-        # New player - always save to database
-        player_data = {
-            'name': data.get('name', f'Player_{player_id[:5]}'),
-            'color': data.get('color', {'r': 0.3, 'g': 0.6, 'b': 0.8}),
-            'position': {
-                'x': data.get('x', 0),
-                'y': data.get('y', 0),
-                'z': data.get('z', 0)
-            },
-            'rotation': data.get('rotation', 0),
-            'mode': data.get('mode', 'boat'),
-            'last_update': current_time,
-            'fishCount': 0,
-            'monsterKills': 0,
-            'money': 0
-        }
-        get_or_create_player(player_id, **player_data)
+    # Update in-memory cache immediately
+    for key, value in data.items():
+        if key in ['position', 'rotation', 'mode']:
+            players[player_id][key] = value
+    
+    players[player_id]['last_update'] = current_time
+    
+    # Throttle database updates (only update every DB_UPDATE_INTERVAL seconds)
+    if current_time - last_db_update[player_id] > DB_UPDATE_INTERVAL:
         last_db_update[player_id] = current_time
-        # Notify all clients about the new player
-        emit('player_joined', players[player_id], broadcast=True)
-    else:
-        # Existing player - update position in memory
-        position = players[player_id]['position'].copy()
-        position['x'] = data.get('x', position['x'])
-        position['y'] = data.get('y', position['y'])
-        position['z'] = data.get('z', position['z'])
         
-        # Update in-memory cache
-        players[player_id]['position'] = position
-        players[player_id]['rotation'] = data.get('rotation', players[player_id]['rotation'])
-        players[player_id]['mode'] = data.get('mode', players[player_id]['mode'])
-        players[player_id]['last_update'] = current_time
-        
-        # Update name and color if provided (in memory)
-        if 'name' in data:
-            players[player_id]['name'] = data['name']
-        if 'color' in data:
-            players[player_id]['color'] = data['color']
-        
-        # Only update database if 5+ seconds have passed since last update
-        if current_time - last_db_update.get(player_id, 0) >= DB_UPDATE_INTERVAL:
-            update_data = {
-                'position': position,
-                'rotation': players[player_id]['rotation'],
-                'mode': players[player_id]['mode'],
-                'last_update': current_time
-            }
-            
-            # Include name and color if they were updated
-            if 'name' in data:
-                update_data['name'] = data['name']
-            if 'color' in data:
-                update_data['color'] = data['color']
-                
-            # Update database
-            update_player(player_id, **update_data)
-            last_db_update[player_id] = current_time
-            logger.debug(f"Updated database for player {player_id}")
-        
-        # Broadcast the updated position to all other clients
-        emit('player_moved', {
-            'id': player_id,
+        # Only update necessary fields in Firestore
+        update_data = {
             'position': players[player_id]['position'],
             'rotation': players[player_id]['rotation'],
             'mode': players[player_id]['mode'],
-            'color': players[player_id]['color']
-        }, broadcast=True)
-
-@socketio.on('update_player_name')
-def handle_name_update(data):
-    """Handle player name updates"""
-    player_id = request.sid
-    if player_id in players and 'name' in data:
-        players[player_id]['name'] = data['name']
-        emit('player_updated', {'id': player_id, 'name': data['name']}, broadcast=True)
-
-@socketio.on('update_player_color')
-def handle_color_update(data):
-    """Handle player color updates"""
-    player_id = request.sid
-    if player_id in players and 'color' in data:
-        players[player_id]['color'] = data['color']
-        emit('player_updated', {'id': player_id, 'color': data['color']}, broadcast=True)
-
-@socketio.on('register_island')
-def handle_island_registration(data):
-    """Register a new island in the world"""
-    island_id = data.get('id')
-    if island_id and island_id not in islands:
-        islands[island_id] = {
-            'id': island_id,
-            'position': {
-                'x': data.get('x', 0),
-                'y': data.get('y', 0),
-                'z': data.get('z', 0)
-            },
-            'radius': data.get('radius', 50),
-            'type': data.get('type', 'default')
+            'last_update': current_time
         }
-        logger.info(f"Registered island: {island_id}")
-        emit('island_registered', islands[island_id])
-
-# Helper function to format leaderboard data
-def get_leaderboard_data():
-    """Format player data for leaderboards using the Player model.
-    Includes both active and inactive players to maintain historical records."""
-    # Use the new model method to get formatted leaderboard data
-    from models import Player
-    return Player.get_combined_leaderboard()
-
-# Helper function to check and update leaderboards
-def update_leaderboards_if_needed(player_id):
-    """Check if player is in any top 10 and update leaderboards if needed"""
-    leaderboard_data = get_leaderboard_data()
+        
+        firestore_models.Player.update(player_id, **update_data)
     
-    # Check if the player is in any of the leaderboards
-    player_name = players[player_id]['name'] if player_id in players else None
-    is_in_leaderboard = False
-    
-    if player_name:
-        for category in ['fishCount', 'monsterKills', 'money']:
-            for entry in leaderboard_data[category]:
-                if entry['name'] == player_name:
-                    is_in_leaderboard = True
-                    break
-            if is_in_leaderboard:
-                break
-    
-    # If player is in any leaderboard, broadcast the update
-    if is_in_leaderboard:
-        print(f"Player {player_name} is in top 10, updating leaderboards")
-        logger.info(f"Player {player_name} is in top 10, updating leaderboards")
-        emit('leaderboard_update', leaderboard_data, broadcast=True)
-    
-    return leaderboard_data
+    # Broadcast update to all other clients
+    emit('player_moved', {
+        'id': player_id,
+        'position': players[player_id]['position'],
+        'rotation': players[player_id]['rotation'],
+        'mode': players[player_id]['mode']
+    }, broadcast=True, include_self=False)
 
-@socketio.on('get_leaderboard')
-def handle_get_leaderboard():
-    """Send leaderboard data to the requesting client"""
-    logger.info(f"Sending leaderboard data to client")
-    emit('leaderboard_update', get_leaderboard_data())
-
-# New event handler for updating player stats
-@socketio.on('update_stats')
-def handle_stats_update(data):
-    print(f"Received stats update from {request.sid}")
-    """Handle player stats updates"""
+@socketio.on('player_action')
+def handle_player_action(data):
     player_id = request.sid
+    action_type = data.get('type')
+    
+    # Ensure player exists
     if player_id not in players:
         return
     
-    # Store previous values to check for changes
-    previous_stats = {
-        'fishCount': players[player_id].get('fishCount', 0),
-        'monsterKills': players[player_id].get('monsterKills', 0),
-        'money': players[player_id].get('money', 0)
-    }
+    if action_type == 'fish_caught':
+        # Increment fish count
+        if 'fishCount' not in players[player_id]:
+            players[player_id]['fishCount'] = 0
+        players[player_id]['fishCount'] += 1
+        
+        # Update player in Firestore
+        firestore_models.Player.update(player_id, 
+                                     fishCount=players[player_id]['fishCount'])
+        
+        # Broadcast achievement to all players
+        emit('player_achievement', {
+            'id': player_id,
+            'name': players[player_id]['name'],
+            'achievement': 'Caught a fish!',
+            'fishCount': players[player_id]['fishCount']
+        }, broadcast=True)
+        
+        # Update leaderboard
+        emit('leaderboard_update', 
+             firestore_models.Player.get_combined_leaderboard(), 
+             broadcast=True)
     
-    # Update stats if provided
-    if 'fishCount' in data:
-        players[player_id]['fishCount'] = data['fishCount']
-    if 'monsterKills' in data:
-        players[player_id]['monsterKills'] = data['monsterKills']
-    if 'money' in data:
-        players[player_id]['money'] = data['money']
+    elif action_type == 'monster_killed':
+        # Increment monster kills
+        if 'monsterKills' not in players[player_id]:
+            players[player_id]['monsterKills'] = 0
+        players[player_id]['monsterKills'] += 1
+        
+        # Update player in Firestore
+        firestore_models.Player.update(player_id, 
+                                     monsterKills=players[player_id]['monsterKills'])
+        
+        # Broadcast achievement to all players
+        emit('player_achievement', {
+            'id': player_id,
+            'name': players[player_id]['name'],
+            'achievement': 'Defeated a sea monster!',
+            'monsterKills': players[player_id]['monsterKills']
+        }, broadcast=True)
+        
+        # Update leaderboard
+        emit('leaderboard_update', 
+             firestore_models.Player.get_combined_leaderboard(), 
+             broadcast=True)
     
-    logger.info(f"Updated stats for player {players[player_id]['name']}: Fish: {players[player_id]['fishCount']}, Monsters: {players[player_id]['monsterKills']}, Money: {players[player_id]['money']}")
-    
-    # Update player in database
-    from models import Player, db
-    player_db = Player.query.get(player_id)
-    if player_db:
-        player_db.fishCount = players[player_id]['fishCount']
-        player_db.monsterKills = players[player_id]['monsterKills']
-        player_db.money = players[player_id]['money']
-        db.session.commit()
-    
-    # Check if any stats changed and update leaderboards if needed
-    if (previous_stats['fishCount'] != players[player_id]['fishCount'] or
-        previous_stats['monsterKills'] != players[player_id]['monsterKills'] or
-        previous_stats['money'] != players[player_id]['money']):
-        print(f"Updating leaderboards for player {player_id}")
-        update_leaderboards_if_needed(player_id)
+    elif action_type == 'money_earned':
+        amount = data.get('amount', 0)
+        
+        # Add money
+        if 'money' not in players[player_id]:
+            players[player_id]['money'] = 0
+        players[player_id]['money'] += amount
+        
+        # Update player in Firestore
+        firestore_models.Player.update(player_id, 
+                                     money=players[player_id]['money'])
+        
+        # Broadcast achievement to all players
+        emit('player_achievement', {
+            'id': player_id,
+            'name': players[player_id]['name'],
+            'achievement': f'Earned {amount} coins!',
+            'money': players[player_id]['money']
+        }, broadcast=True)
+        
+        # Update leaderboard
+        emit('leaderboard_update', 
+             firestore_models.Player.get_combined_leaderboard(), 
+             broadcast=True)
 
-# New REST API endpoint for getting leaderboard data
-@app.route('/api/leaderboard', methods=['GET'])
-def get_leaderboard_api():
-    """Get current leaderboard data"""
-    return jsonify(get_leaderboard_data())
+@socketio.on('chat_message')
+def handle_chat_message(data):
+    player_id = request.sid
+    content = data.get('content', '').strip()
+    
+    # Validate message
+    if not content or len(content) > 500:
+        return
+    
+    # Create message in Firestore
+    message = firestore_models.Message.create(
+        player_id,
+        content,
+        message_type='global'
+    )
+    
+    if message:
+        # Broadcast message to all clients
+        emit('chat_message', message, broadcast=True)
 
-# New REST API endpoint for updating player stats
-@app.route('/api/stats/<player_id>', methods=['POST'])
-def update_player_stats(player_id):
-    """Update stats for a specific player"""
-    if player_id not in players:
-        return jsonify({'error': 'Player not found'}), 404
-    
-    data = request.json
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
-    
-    # Store previous values to check for changes
-    previous_stats = {
-        'fishCount': players[player_id].get('fishCount', 0),
-        'monsterKills': players[player_id].get('monsterKills', 0),
-        'money': players[player_id].get('money', 0)
-    }
-    
-    # Update stats if provided
-    if 'fishCount' in data:
-        players[player_id]['fishCount'] = data['fishCount']
-    if 'monsterKills' in data:
-        players[player_id]['monsterKills'] = data['monsterKills']
-    if 'money' in data:
-        players[player_id]['money'] = data['money']
-    
-    # Update player in database
-    from models import Player, db
-    player_db = Player.query.get(player_id)
-    if player_db:
-        if 'fishCount' in data:
-            player_db.fishCount = data['fishCount']
-        if 'monsterKills' in data:
-            player_db.monsterKills = data['monsterKills']
-        if 'money' in data:
-            player_db.money = data['money']
-        db.session.commit()
-    
-    logger.info(f"API: Updated stats for player {players[player_id]['name']}")
-    
-    # Check if any stats changed and update leaderboards if needed
-    leaderboard_data = None
-    if (previous_stats['fishCount'] != players[player_id]['fishCount'] or
-        previous_stats['monsterKills'] != players[player_id]['monsterKills'] or
-        previous_stats['money'] != players[player_id]['money']):
-        leaderboard_data = update_leaderboards_if_needed(player_id)
-    
-    return jsonify({
-        'success': True, 
-        'player': players[player_id],
-        'leaderboard': leaderboard_data
-    })
-
-# Increment stats endpoint - more convenient for individual updates
-@app.route('/api/stats/<player_id>/increment', methods=['POST'])
-def increment_player_stats(player_id):
-    """Increment stats for a specific player"""
-    if player_id not in players:
-        return jsonify({'error': 'Player not found'}), 404
-    
-    data = request.json
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
-    
-    # Store previous values to check for changes
-    previous_stats = {
-        'fishCount': players[player_id].get('fishCount', 0),
-        'monsterKills': players[player_id].get('monsterKills', 0),
-        'money': players[player_id].get('money', 0)
-    }
-    
-    # Update player in memory
-    if 'fishCount' in data:
-        players[player_id]['fishCount'] += data['fishCount']
-    if 'monsterKills' in data:
-        players[player_id]['monsterKills'] += data['monsterKills']
-    if 'money' in data:
-        players[player_id]['money'] += data['money']
-    
-    # Update player in database
-    from models import Player, db
-    player_db = Player.query.get(player_id)
-    if player_db:
-        if 'fishCount' in data:
-            player_db.fishCount += data['fishCount']
-        if 'monsterKills' in data:
-            player_db.monsterKills += data['monsterKills']
-        if 'money' in data:
-            player_db.money += data['money']
-        db.session.commit()
-    
-    logger.info(f"API: Incremented stats for player {players[player_id]['name']}")
-    
-    # Check if any stats changed and update leaderboards if needed
-    leaderboard_data = None
-    if (previous_stats['fishCount'] != players[player_id]['fishCount'] or
-        previous_stats['monsterKills'] != players[player_id]['monsterKills'] or
-        previous_stats['money'] != players[player_id]['money']):
-        leaderboard_data = update_leaderboards_if_needed(player_id)
-    
-    return jsonify({
-        'success': True, 
-        'player': players[player_id],
-        'leaderboard': leaderboard_data
-    })
-
-# Periodic cleanup of inactive players (could be moved to a background task)
-def cleanup_inactive_players():
-    """Remove players who haven't updated their position in a while"""
-    current_time = time.time()
-    inactive_threshold = 60  # seconds
-    
-    inactive_players = []
-    for player_id, player_data in players.items():
-        if current_time - player_data['last_update'] > inactive_threshold:
-            inactive_players.append(player_id)
-    
-    for player_id in inactive_players:
-        logger.info(f"Removing inactive player: {player_id}")
-        del players[player_id]
-        emit('player_disconnected', {'id': player_id})
-
-# Add a new event handler for getting only active players
-@socketio.on('get_active_players')
-def handle_get_active_players():
-    """Send only active players to the requesting client (same as get_all_players now)"""
-    active_players = [p for p in players.values() if p.get('active', False)]
-    emit('active_players', active_players)
-    logger.info(f"Sent {len(active_players)} active players to client")
-
-# New REST API endpoint for getting active players
-@app.route('/api/players/active', methods=['GET'])
-def get_active_players_api():
-    """Get all currently active players"""
+# API endpoints
+@app.route('/api/players', methods=['GET'])
+def get_players():
+    """Get all active players"""
     active_players = [p for p in players.values() if p.get('active', False)]
     return jsonify(active_players)
 
-@socketio.on('send_message')
-def handle_send_message(data):
-    """Handle new chat messages from clients"""
-    player_id = request.sid
-    
-    if player_id not in players:
-        return
-    
-    content = data.get('content', '').strip()
-    if not content:
-        return
-    
-    # Limit message length
-    content = content[:500]
-    
-    # Get message type (default to global)
-    message_type = data.get('type', 'global')
-    
-    # Create new message in database
-    try:
-        new_message = Message(
-            sender_id=player_id,
-            content=content,
-            message_type=message_type
-        )
-        db.session.add(new_message)
-        db.session.commit()
-        
-        # Convert to dict for broadcast
-        message_data = new_message.to_dict()
-        
-        # Broadcast to all connected clients
-        emit('new_message', message_data, broadcast=True)
-        
-        logger.info(f"Chat message from {players[player_id]['name']}: {content}")
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error saving message: {e}")
+@app.route('/api/players/<player_id>', methods=['GET'])
+def get_player(player_id):
+    """Get a specific player"""
+    player = firestore_models.Player.get(player_id)
+    if player:
+        return jsonify(player)
+    return jsonify({'error': 'Player not found'}), 404
 
-@socketio.on('get_recent_messages')
-def handle_get_recent_messages(data):
-    """Send recent chat messages to the requesting client"""
-    # Get message type (default to global)
-    message_type = data.get('type', 'global')
-    
-    # Get limit (default to 50)
-    limit = min(int(data.get('limit', 50)), 100)  # Cap at 100 messages
-    
-    try:
-        # Get messages from database
-        messages = Message.get_recent_messages(limit=limit, message_type=message_type)
-        
-        # Convert to dict for sending
-        message_data = [message.to_dict() for message in messages]
-        
-        # Send to requesting client
-        emit('recent_messages', {
-            'messages': message_data,
-            'type': message_type
-        })
-        
-        logger.info(f"Sent {len(message_data)} recent messages to client")
-    except Exception as e:
-        logger.error(f"Error retrieving messages: {e}")
+@app.route('/api/islands', methods=['GET'])
+def get_islands():
+    """Get all islands"""
+    return jsonify(list(islands.values()))
 
-# REST API endpoints for chat
+@app.route('/api/leaderboard', methods=['GET'])
+def get_leaderboard():
+    """Get the combined leaderboard"""
+    return jsonify(firestore_models.Player.get_combined_leaderboard())
 
 @app.route('/api/messages', methods=['GET'])
-def get_messages_api():
+def get_messages():
     """Get recent chat messages"""
-    # Get message type from query params (default to global)
     message_type = request.args.get('type', 'global')
-    
-    # Get limit from query params (default to 50, max 100)
-    try:
-        limit = min(int(request.args.get('limit', 50)), 100)
-    except ValueError:
-        limit = 50
-    
-    try:
-        # Get messages from database
-        messages = Message.get_recent_messages(limit=limit, message_type=message_type)
-        
-        # Return as JSON
-        return jsonify({
-            'success': True,
-            'messages': [message.to_dict() for message in messages],
-            'count': len(messages),
-            'type': message_type
-        })
-    except Exception as e:
-        logger.error(f"API error retrieving messages: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+    limit = int(request.args.get('limit', 50))
+    messages = firestore_models.Message.get_recent_messages(limit=limit, message_type=message_type)
+    return jsonify(messages)
 
-@app.route('/api/messages', methods=['POST'])
-def send_message_api():
-    """Send a new chat message"""
+@app.route('/api/admin/create_island', methods=['POST'])
+def create_island():
+    """Admin endpoint to create an island"""
     data = request.json
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
     
-    # Verify required fields
-    if 'sender_id' not in data or 'content' not in data:
-        return jsonify({'error': 'Missing required fields'}), 400
+    # Basic validation
+    if not data or 'position' not in data:
+        return jsonify({'error': 'Invalid island data'}), 400
     
-    sender_id = data['sender_id']
-    content = data['content'].strip()
+    # Generate island ID
+    island_id = f"island_{int(time.time())}"
     
-    # Validate sender exists
-    if sender_id not in players:
-        return jsonify({'error': 'Invalid sender ID'}), 404
+    # Create island in Firestore
+    island = firestore_models.Island.create(island_id, **data)
     
-    # Validate content
-    if not content:
-        return jsonify({'error': 'Message content cannot be empty'}), 400
+    # Add to cache
+    islands[island_id] = island
     
-    # Limit message length
-    content = content[:500]
+    # Broadcast to all clients
+    socketio.emit('island_created', island)
     
-    # Get message type (default to global)
-    message_type = data.get('type', 'global')
-    
-    try:
-        # Create new message
-        new_message = Message(
-            sender_id=sender_id,
-            content=content,
-            message_type=message_type
-        )
-        db.session.add(new_message)
-        db.session.commit()
-        
-        # Get message data
-        message_data = new_message.to_dict()
-        
-        # Broadcast to all connected clients via Socket.IO
-        socketio.emit('new_message', message_data)
-        
-        logger.info(f"API: Chat message from {players[sender_id]['name']}: {content}")
-        
-        return jsonify({
-            'success': True,
-            'message': message_data
-        })
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"API error saving message: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+    return jsonify(island)
 
-# Add this new endpoint to serve static files
+# Serve static files
 @app.route('/files/<path:filename>')
 def serve_static_file(filename):
     """
@@ -742,5 +390,4 @@ def file_system_info():
 
 if __name__ == '__main__':
     # Run the Socket.IO server with debug and reloader enabled
-   socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=True) 
-   # socketio.run(app, host='0.0.0.0') 
+    socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=True) 

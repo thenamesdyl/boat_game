@@ -64,3 +64,5 @@ build/
 
 
 .env
+api/firebasekey.json
+.parcel-cache
