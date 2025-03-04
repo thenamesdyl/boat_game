@@ -5,3 +5,13 @@ for the boat staying afloat, it could be to where the boat has a center point th
 ISMAN
 
 like if there is a wave it goes up 7 chunks so the center of the boat just flows with the water, it also will be 7 chunks high? or just making the center of the boat == height of water
+
+
+
+    Note - Brave users enter the game, add a note how to enable gpu acceleration and a link to a page that explains it (see if it's possible to check if gpu acceleration is enabled)
+        if user does not have it enabled, add a note to the screen that explains it and has a button to go to the settings page to enable it
+FNT selfestr
+12:16:34
+
+i think brave used to have some problems with gpu acceleration
+

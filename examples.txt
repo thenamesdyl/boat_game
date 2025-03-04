@@ -18,3 +18,118 @@ Skybox
 
 
 
+
+
+Rendering engine changes
+
+const performanceConfig = {
+  targetFPS: 60,
+  currentQuality: 'auto', // 'low', 'medium', 'high', 'auto'
+  adaptiveQuality: true,
+  fpsHistory: [],
+  lastOptimizationTime: 0
+};
+
+function optimizeRenderingPerformance(deltaTime) {
+  // Track FPS
+  const currentFPS = 1 / deltaTime;
+  performanceConfig.fpsHistory.push(currentFPS);
+  
+  // Keep last 10 samples
+  if (performanceConfig.fpsHistory.length > 10) {
+    performanceConfig.fpsHistory.shift();
+  }
+  
+  // Check if we need to adjust quality
+  const now = performance.now();
+  if (performanceConfig.adaptiveQuality && 
+      now - performanceConfig.lastOptimizationTime > 5000) { // Check every 5 seconds
+    
+    const avgFPS = performanceConfig.fpsHistory.reduce((sum, fps) => sum + fps, 0) / 
+                   performanceConfig.fpsHistory.length;
+    
+    // Adjust quality based on performance
+    if (avgFPS < 25 && performanceConfig.currentQuality !== 'low') {
+      setGameQuality('low');
+      performanceConfig.currentQuality = 'low';
+    } else if (avgFPS > 50 && avgFPS < 58 && performanceConfig.currentQuality !== 'medium') {
+      setGameQuality('medium');
+      performanceConfig.currentQuality = 'medium';
+    } else if (avgFPS > 58 && performanceConfig.currentQuality !== 'high') {
+      setGameQuality('high');
+      performanceConfig.currentQuality = 'high';
+    }
+    
+    performanceConfig.lastOptimizationTime = now;
+  }
+}
+
+function setGameQuality(quality) {
+  console.log(`Setting game quality to: ${quality}`);
+  
+  switch (quality) {
+    case 'low':
+      // Disable post-processing
+      bloomPass.enabled = false;
+      
+      // Reduce water quality
+      setWaterQuality('low');
+      
+      // Reduce entity counts
+      BIRD_COUNT = 10;
+      
+      // Disable shadows
+      renderer.shadowMap.enabled = false;
+      
+      // Reduce draw distance
+      camera.far = 2000;
+      camera.updateProjectionMatrix();
+      
+      // Simplify skybox
+      useRealisticSky = false;
+      break;
+      
+    case 'medium':
+      // Enable minimal post-processing
+      bloomPass.enabled = true;
+      bloomPass.strength = 0.3;
+      
+      // Medium water quality
+      setWaterQuality('medium');
+      
+      // Medium entity counts
+      BIRD_COUNT = 20;
+      
+      // Basic shadows
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.BasicShadowMap;
+      
+      // Medium draw distance
+      camera.far = 5000;
+      camera.updateProjectionMatrix();
+      break;
+      
+    case 'high':
+      // Full effects
+      bloomPass.enabled = true;
+      bloomPass.strength = 0.5;
+      
+      // High water quality
+      setWaterQuality('high');
+      
+      // Full entity counts
+      BIRD_COUNT = 30;
+      
+      // High quality shadows
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      
+      // Far draw distance
+      camera.far = 10000;
+      camera.updateProjectionMatrix();
+      
+      // Full skybox
+      useRealisticSky = true;
+      break;
+  }
+}
