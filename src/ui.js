@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { initChat, initMiniMap } from './chat.js';
 import { initShop, updateShopAvailability } from './shop.js';
 import InventoryUI from './inventoryUI.js';
+import { getDiagnosticsData, ENABLE_DIAGNOSTICS, isBraveBrowser } from './diagnostics.js';
 
 // Create a UI class to manage all interface elements
 class GameUI {
@@ -573,6 +574,18 @@ class GameUI {
 
         // Update FPS counter
         this.updateFPS();
+
+        /*
+        // Update monster positions on the radar if we have access to the minimap
+        if (data.monsters && this.miniMap) {
+            // console.log('Updating monster markers');
+            this.miniMap.updateMonsterMarkers(
+                data.monsters,
+                data.position,
+                data.heading,
+                data.mapScale
+            );
+        }*/
     }
 
     getCardinalDirection(degrees) {
@@ -677,6 +690,65 @@ class GameUI {
             // Reset counters
             this.lastFpsUpdate = now;
             this.frameCount = 0;
+        }
+
+        // Add this single line at the end of the existing method
+        this.displayDiagnosticsInfo();
+    }
+
+    displayDiagnosticsInfo() {
+        // Only do something if diagnostics is enabled
+        if (!ENABLE_DIAGNOSTICS) return;
+
+        const diagnosticsData = getDiagnosticsData();
+
+        // Check if this is likely a browser-specific performance issue
+        if (this.elements.fpsCounter && diagnosticsData.performanceScore > 0) {
+            const fps = this.currentFps || 0;
+
+            // If we have good hardware but low FPS, show a small indicator
+            if (fps < 30 && diagnosticsData.performanceScore > 50) {
+                // Only show browser warning if not already showing
+                if (!this.elements.browserWarning) {
+                    const browserWarning = document.createElement('div');
+                    browserWarning.id = 'browser-performance-warning';
+                    browserWarning.style.position = 'absolute';
+                    browserWarning.style.top = '30px';
+                    browserWarning.style.left = '5px';
+                    browserWarning.style.backgroundColor = 'rgba(255, 60, 60, 0.8)';
+                    browserWarning.style.color = 'white';
+                    browserWarning.style.padding = '5px';
+                    browserWarning.style.borderRadius = '3px';
+                    browserWarning.style.fontSize = '12px';
+                    browserWarning.style.zIndex = '9999';
+
+                    // Different message for Brave
+                    if (isBraveBrowser()) {
+                        browserWarning.innerHTML = '⚠️ Performance may be affected by Brave settings. <a href="#" id="browser-help">Help</a>';
+                    } else {
+                        browserWarning.innerHTML = '⚠️ Browser settings may affect performance. <a href="#" id="browser-help">Help</a>';
+                    }
+
+                    document.body.appendChild(browserWarning);
+                    this.elements.browserWarning = browserWarning;
+
+                    // Add help click handler
+                    document.getElementById('browser-help').addEventListener('click', (e) => {
+                        e.preventDefault();
+                        alert('To improve performance:\n\n' +
+                            '1. Enable hardware acceleration in your browser settings\n' +
+                            '2. Update your graphics drivers\n' +
+                            '3. Close other browser tabs and applications\n' +
+                            (isBraveBrowser() ?
+                                '4. In Brave, go to brave://settings/system and ensure hardware acceleration is enabled' :
+                                ''));
+                    });
+                }
+            } else if (this.elements.browserWarning) {
+                // Remove the warning if FPS is now good
+                document.body.removeChild(this.elements.browserWarning);
+                this.elements.browserWarning = null;
+            }
         }
     }
 }

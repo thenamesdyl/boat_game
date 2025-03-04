@@ -29,6 +29,7 @@ import {
 import MusicSystem from './music.js';
 import { initCameraControls, updateCameraPosition } from './cameraControls.js';
 import { setupWater, updateWater } from './water.js';
+import { initDiagnostics, updateDiagnosticsDisplay, ENABLE_DIAGNOSTICS } from './diagnostics.js';
 
 const water = setupWater();
 
@@ -1091,6 +1092,12 @@ function animate() {
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
     //composer.render();
+
+    // Update FPS counter
+    const currentFps = 1 / deltaTime;
+
+    // Update diagnostics with current FPS (only does something if diagnostics is enabled)
+    updateDiagnosticsDisplay(currentFps);
 }
 
 // Calculate boat speed based on velocity
@@ -1218,3 +1225,7 @@ const leaderboardData = {
 };
 
 updateLeaderboardData(leaderboardData);
+
+// Add this after your other initialization code (near where you initialize other systems)
+// This function is already configured to do nothing if ENABLE_DIAGNOSTICS is false
+initDiagnostics();
