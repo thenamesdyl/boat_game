@@ -8,7 +8,7 @@ export const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
 export const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
 
 export const boatVelocity = new THREE.Vector3(0, 0, 0);
-export const boatSpeed = 0.5; // Much slower speed (was 0.03)
+export const boatSpeed = 0.2; // Much slower speed (was 0.03)
 export const rotationSpeed = 0.03; // Slower turning (was 0.03)
 export const keys = { forward: false, backward: false, left: false, right: false };
 export const boat = createBoat(scene);
