@@ -931,8 +931,8 @@ document.addEventListener('mousemove', (event) => {
 // Keyboard input
 document.addEventListener('keydown', (event) => {
     switch (event.key) {
-        case 'w': case 'ArrowUp': keys.backward = true; break;
-        case 's': case 'ArrowDown': keys.forward = true; break;
+        case 'w': case 'ArrowUp': keys.forward = true; break;
+        case 's': case 'ArrowDown': keys.backward = true; break;
         case 'a': case 'ArrowLeft': keys.left = true; break;
         case 'd': case 'ArrowRight': keys.right = true; break;
         // Toggle mouse camera control with 'c' key
@@ -941,8 +941,8 @@ document.addEventListener('keydown', (event) => {
 });
 document.addEventListener('keyup', (event) => {
     switch (event.key) {
-        case 'w': case 'ArrowUp': keys.backward = false; break;
-        case 's': case 'ArrowDown': keys.forward = false; break;
+        case 'w': case 'ArrowUp': keys.forward = false; break;
+        case 's': case 'ArrowDown': keys.backward = false; break;
         case 'a': case 'ArrowLeft': keys.left = false; break;
         case 'd': case 'ArrowRight': keys.right = false; break;
     }
