@@ -5,11 +5,12 @@
     "scripts": {
         "dev": "parcel index.html --open",
         "build": "parcel build index.html --public-url ./ && cp -r public/* dist/",
-        "start": "serve -s dist -l $PORT"
+        "start": "http-server dist -p $PORT"
     },
     "dependencies": {
         "@types/three": "^0.174.0",
         "firebase": "^11.4.0",
+        "http-server": "^14.1.1",
         "socket.io-client": "^4.5.4",
         "three": "^0.174.0"
     },
