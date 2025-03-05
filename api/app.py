@@ -162,13 +162,23 @@ def handle_player_join(data):
             # Store in our socket-to-user mapping
             logger.info(f"Mapped socket {request.sid} to user {player_id}")
             
-            # Send connection_response with the assigned player ID
-            emit('connection_response', {'id': player_id})
-            
             # Now proceed with database operations
-            existing_player = firestore_models.Player.get("firebase_" + player_id)
             docid = "firebase_" + player_id
-            socket_to_user_map[request.sid] = docid
+            
+            # Get existing player from Firestore before sending connection response
+            existing_player = firestore_models.Player.get(docid)
+            
+            # Send connection_response with the assigned player ID AND name if it exists
+            connection_data = {
+                'id': player_id
+            }
+            
+            # Add player name if they have one (already registered)
+            if existing_player and 'name' in existing_player:
+                connection_data['name'] = existing_player['name']
+                logger.info(f"Player {docid} already has name: {existing_player['name']}")
+            
+            emit('connection_response', connection_data)
             
             if existing_player:
                 # Update the existing player in database

@@ -248,6 +248,10 @@ function setupSocketEvents() {
 
         // This may be different from the socket ID now - it could be the Firebase UID
 
+        if (!data.name) {
+            showLoginScreen();
+        }
+
         // Set player name
         setPlayerName(playerName);
 
@@ -259,8 +263,6 @@ function setupSocketEvents() {
 
         // Request all current players (as a backup in case the automatic all_players event wasn't received)
         socket.emit('get_all_players');
-
-        showLoginScreen();
 
         // Request initial chat messages
         // requestInitialMessages();
