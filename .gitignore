@@ -64,3 +64,5 @@ build/
 
 
 .env
+.parcel-cache/data.mdb
+.parcel-cache
