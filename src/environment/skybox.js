@@ -329,11 +329,11 @@ export function getTimeOfDay() {
     // Cycle through different times of day
     const dayPhase = (getTime() * 0.005) % 1; // 0 to 1 representing full day cycle
 
-    if (dayPhase < 0.2) return "Dawn";
-    if (dayPhase < 0.4) return "Day";
-    if (dayPhase < 0.6) return "Afternoon";
-    if (dayPhase < 0.8) return "Dusk";
-    return "Night";
+    if (dayPhase < 0.02) return "Dawn";       // Very brief dawn (2%)
+    if (dayPhase < 0.82) return "Day";        // Extended "Day" phase (80% - 10x longer)
+    if (dayPhase < 0.84) return "Afternoon";  // Very brief afternoon (2%)
+    if (dayPhase < 0.92) return "Dusk";       // Dusk (8%)
+    return "Night";                          // Night (8%)
 }
 
 function getSkyColor(timeOfDay) {
