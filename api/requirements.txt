@@ -3,7 +3,6 @@ Flask-SocketIO==5.3.4
 python-socketio==5.8.0
 python-dotenv==1.0.0
 python-engineio==4.5.1
-firebase-admin>=6.0.0
 flask-sqlalchemy>=3.0.0
 psycopg2-binary>=2.9.0
 eventlet==0.33.3 
