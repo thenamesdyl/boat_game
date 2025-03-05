@@ -559,60 +559,6 @@ def create_island():
     
     return jsonify(island)
 
-# Serve static files
-@app.route('/files/<path:filename>')
-def serve_static_file(filename):
-    """
-    Serve static files from the static directory
-    Access files via: http://localhost:5000/files/models/boat.glb
-    """
-    try:
-        logger.info(f"Serving static file: {filename}")
-        response = send_from_directory(STATIC_FILES_DIR, filename)
-        
-        # Add CORS headers if needed
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
-        
-        # Log the MIME type for debugging
-        logger.info(f"Serving {filename} with MIME type: {response.mimetype}")
-        
-        return response
-    except Exception as e:
-        logger.error(f"Error serving static file {filename}: {e}")
-        return jsonify({
-            'success': False,
-            'error': f"File not found or error: {str(e)}"
-        }), 404
-
-# Add an info endpoint to help with debugging file paths
-@app.route('/file-system-info')
-def file_system_info():
-    """Return information about the static file system configuration"""
-    files = []
-    
-    # Walk through the static directory and list all files
-    for root, dirs, filenames in os.walk(STATIC_FILES_DIR):
-        for filename in filenames:
-            # Get relative path
-            rel_path = os.path.relpath(os.path.join(root, filename), STATIC_FILES_DIR)
-            files.append({
-                'path': rel_path,
-                'url': f"/files/{rel_path.replace(os.sep, '/')}",
-                'mime': mimetypes.guess_type(filename)[0]
-            })
-            
-    return jsonify({
-        'static_dir': STATIC_FILES_DIR,
-        'files': files,
-        'mime_types': {
-            '.glb': mimetypes.guess_type('model.glb')[0],
-            '.gltf': mimetypes.guess_type('model.gltf')[0],
-            '.png': mimetypes.guess_type('image.png')[0],
-            '.jpg': mimetypes.guess_type('image.jpg')[0],
-            '.mp3': mimetypes.guess_type('audio.mp3')[0]
-        }
-    })
 
 if __name__ == '__main__':
     # Run the Socket.IO server with debug and reloader enabled
