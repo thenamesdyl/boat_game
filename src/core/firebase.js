@@ -143,7 +143,7 @@ export function showAuthPopup(onSuccess) {
         return;
     }
 
-    // Check if user is already signed in from a previous session
+    // Check if user is already signed in
     if (currentUser) {
         console.log("User already signed in from previous session");
         if (onSuccess && typeof onSuccess === 'function') {
@@ -213,6 +213,29 @@ export function showAuthPopup(onSuccess) {
                 Sign in with Google
             </button>
         </div>
+
+        <!-- Add the OR divider -->
+        <div style="text-align: center; margin-bottom: 15px; color: #757575;">OR</div>
+
+        <!-- Add the Play Offline button -->
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button id="offline-play" style="
+                background-color: #a9a9a9;
+                color: white;
+                border: 1px solid #dadce0;
+                border-radius: 4px;
+                padding: 10px 15px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                cursor: pointer;
+                font-family: 'Roboto', sans-serif;
+                margin-bottom: 15px;
+            ">
+                Play Offline
+            </button>
+        </div>
         
         <div style="margin-bottom: 15px;">
             <input type="email" id="email" placeholder="Email" style="width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box;">
@@ -245,6 +268,12 @@ export function showAuthPopup(onSuccess) {
             showError(error.message);
             console.error("Google sign-in error:", error);
         }
+    });
+
+    // Offline Play
+    document.getElementById('offline-play').addEventListener('click', () => {
+        // Close the auth popup
+        document.body.removeChild(authContainer);
     });
 
     // Email/Password Sign In

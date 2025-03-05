@@ -55,7 +55,7 @@ islands = {}
 
 # Add this near your other global variables
 last_db_update = defaultdict(float)  # Track last database update time for each player
-DB_UPDATE_INTERVAL = 5.0  # seconds between database updates
+DB_UPDATE_INTERVAL = 0.2  # seconds between database updates
 
 # Add this near your other global variables (at the top of the file)
 socket_to_user_map = {}
