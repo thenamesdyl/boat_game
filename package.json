@@ -3,9 +3,9 @@
     "version": "1.0.0",
     "description": "A multiplayer 3D boat game with procedurally generated islands",
     "scripts": {
-        "start": "parcel index.html --open",
+        "dev": "parcel index.html --open",
         "build": "parcel build index.html --public-url ./ && cp -r public/* dist/",
-        "dev": "parcel index.html"
+        "start": "npm run build && serve -s dist"
     },
     "dependencies": {
         "@types/three": "^0.174.0",
