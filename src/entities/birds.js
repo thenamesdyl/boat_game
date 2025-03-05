@@ -27,6 +27,7 @@ const POOP_CONFIG = {
     SPLASH_DURATION: 1        // How long splash particles exist
 };
 
+
 // Bird state
 let birds = [];
 let birdGoals = [];
