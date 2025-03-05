@@ -57,7 +57,7 @@ islands = {}
 last_db_update = defaultdict(float)  # Track last database update time for each player
 DB_UPDATE_INTERVAL = 0.2  # seconds between database updates
 # Add new distance threshold constant and tracking dictionary
-MIN_POSITION_UPDATE_DISTANCE = 1000  # minimum distance in units to trigger a database update
+MIN_POSITION_UPDATE_DISTANCE = 1.5  # minimum distance in units to trigger a database update
 last_db_positions = {}  # Track last database position for each player
 
 # Add this near your other global variables (at the top of the file)
