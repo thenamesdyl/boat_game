@@ -454,7 +454,7 @@ def handle_chat_message(data):
     
     #if message:
         # Broadcast message to all clients
-    emit('new_message', message, broadcast=True)
+    emit('new_message', content, broadcast=True)
 
 @socketio.on('update_player_color')
 def handle_update_player_color(data):
