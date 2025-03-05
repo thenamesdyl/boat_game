@@ -90,7 +90,7 @@ export function updatePlayerStatsInLeaderboard() {
     if (!gameUI.elements.leaderboard || !gameUI.elements.leaderboard.playerStatsContent) return;
 
     // Get player stats
-    const playerStats = getPlayerStateFromDb();
+    let playerStats = getPlayerStateFromDb();
     if (!playerStats) {
         playerStats = getPlayerStats();
     }
