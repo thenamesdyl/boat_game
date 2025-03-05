@@ -16,7 +16,7 @@ import { initCannons, updateCannons } from '../gameplay/cannons.js';
 import { animateSail } from '../animations/animations.js';
 import { applyWindInfluence, updateBoatRocking } from '../entities/character.js';
 import { initLeaderboard, updateLeaderboardData } from '../ui/leaderboard.js';
-import { requestLeaderboard } from './network.js';
+import { requestLeaderboard, setPlayerName, setPlayerColor } from './network.js';
 import { updateVillagers } from '../entities/villagers.js';
 import {
     islandColliders,
@@ -30,6 +30,8 @@ import MusicSystem from '../audio/music.js';
 import { initCameraControls, updateCameraPosition } from '../controls/cameraControls.js';
 import { setupWater, updateWater } from '../environment/water.js';
 import { initDiagnostics, updateDiagnosticsDisplay, ENABLE_DIAGNOSTICS } from '../ui/diagnostics.js';
+import * as Firebase from './firebase.js';
+
 
 const water = setupWater();
 
@@ -61,6 +63,9 @@ scene.environment = environmentMap;*/
 
 // Add these variables to your global scope
 let lastTime = null;
+
+// Add this near the top with other variables
+let firebaseInitialized = false;
 
 // Scene setup
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -162,8 +167,33 @@ const waterMaterial = new THREE.ShaderMaterial({
 let playerName = '';
 let playerColor = '#3498db'; // Default blue
 
+// Add this function after your other initialization code
+async function initializeFirebaseAuth() {
+    console.log("Initializing Firebase authentication...");
+
+    // Try to initialize Firebase
+    firebaseInitialized = await Firebase.initializeFirebase();
+
+    if (!firebaseInitialized) {
+        console.warn("Firebase initialization failed");
+        return;
+    }
+
+    // Show Firebase auth popup
+    Firebase.showAuthPopup((user) => {
+        console.log("Firebase authentication successful:", user);
+
+        // Pass the user directly to initializeNetworkWithPlayerInfo
+        initializeNetworkWithPlayerInfo(user);
+    });
+}
+
+// Add this call early in your initialization sequence 
+// (can be placed right before or after other initialization code)
+initializeFirebaseAuth();
+
 // Create a simple login UI
-function showLoginScreen() {
+export function showLoginScreen() {
     // Create container
     const loginContainer = document.createElement('div');
     loginContainer.style.position = 'fixed';
@@ -232,8 +262,10 @@ function showLoginScreen() {
         // Remove login screen
         document.body.removeChild(loginContainer);
 
+        setPlayerName(playerName);
+
         // Connect to server with player info
-        initializeNetworkWithPlayerInfo();
+        //initializeNetworkWithPlayerInfo();
     });
 
     loginContainer.appendChild(form);
@@ -241,7 +273,7 @@ function showLoginScreen() {
 }
 
 // Initialize network with player info
-function initializeNetworkWithPlayerInfo() {
+function initializeNetworkWithPlayerInfo(firebaseUser = null) {
     console.log(`Connecting as: ${playerName} with color: ${playerColor}`);
 
     // Convert hex color to RGB (0-1 range for Three.js)
@@ -253,9 +285,19 @@ function initializeNetworkWithPlayerInfo() {
     };
 
     const rgbColor = hexToRgb(playerColor);
+    setPlayerColor(rgbColor);
     console.log("RGB Color:", rgbColor);
 
-    // Initialize network connection
+    // Get Firebase user ID from the passed user parameter
+    let firebaseUserId = null;
+    if (firebaseUser) {
+        firebaseUserId = firebaseUser.uid;
+        console.log("Using Firebase authentication with UID:", firebaseUserId);
+    } else {
+        console.log("No Firebase user, using anonymous mode");
+    }
+
+    // Initialize network connection WITH Firebase user ID
     Network.initializeNetwork(
         scene,
         playerState,
@@ -263,16 +305,18 @@ function initializeNetworkWithPlayerInfo() {
         islandColliders,
         activeIslands,
         playerName,
-        rgbColor
+        rgbColor,
+        firebaseUserId  // Pass the Firebase UID here
     );
 }
 
 // Replace your existing setTimeout for network initialization with this:
+/*
 setTimeout(() => {
     console.log("Showing player setup screen...");
     showLoginScreen();
 }, 2000);
-
+*/
 
 // Island generation variables
 const visibleDistance = 2000; // Increased to see islands from even further away

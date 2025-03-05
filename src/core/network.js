@@ -1,5 +1,7 @@
-// network.js - Socket.IO integration for the ship game
+
 import * as THREE from 'three';
+import { getAuth } from 'firebase/auth';
+import { showLoginScreen } from './main';
 
 // Network configuration
 //const SERVER_URL = 'http://localhost:5001';
@@ -8,6 +10,7 @@ const SERVER_URL = 'https://boat-game-python.onrender.com';
 // Network state
 let socket;
 let playerId;
+let firebaseDocId = null; // Store Firebase User ID globally in the module
 let otherPlayers = new Map(); // Map to store other players' meshes
 let isConnected = false;
 let playerName = "Sailor_" + Math.floor(Math.random() * 1000);
@@ -19,12 +22,12 @@ let playerStats = {
 };
 
 // Reference to scene and game objects (to be set from script.js)
-let scene;
-let playerState;
-let boat;
+let sceneRef;
+let playerStateRef;
+let boatRef;
 let character;
-let islandColliders;
-let activeIslands;
+let islandCollidersRef;
+let activeIslandsRef;
 
 // Chat system variables
 let chatMessageCallback = null;
@@ -33,41 +36,78 @@ let messageHistory = [];
 const DEFAULT_MESSAGE_LIMIT = 50;
 
 // Initialize the network connection
-export function initializeNetwork(gameScene, gamePlayerState, gameBoat, gameIslandColliders, gameActiveIslands, gamePlayerName, gamePlayerColor) {
+export async function initializeNetwork(
+    scene,
+    playerState,
+    boat,
+    islandColliders,
+    activeIslands,
+    name,
+    color,
+    userId = null // Firebase UID
+) {
+
+    console.log("NETWORK INIT STARTING");
+
     // Store references to game objects
-    scene = gameScene;
-    playerState = gamePlayerState;
-    boat = gameBoat;
-    islandColliders = gameIslandColliders;
-    activeIslands = gameActiveIslands;
-    playerName = gamePlayerName;
-    playerColor = gamePlayerColor;
+    sceneRef = scene;
+    playerStateRef = playerState;
+    boatRef = boat;
+    islandCollidersRef = islandColliders;
+    activeIslandsRef = activeIslands;
+    playerName = name;
+    playerColor = color;
+
+    // Store the Firebase user ID
+    console.log("Initializing network with Firebase UID:", userId);
+
+    console.log(`Initializing network with user ID: ${userId || 'anonymous'}`);
 
     // Apply the player's color to their own boat
     applyColorToBoat(boat, playerColor);
 
-    // Load Socket.IO client if not already loaded
-    if (typeof io === 'undefined') {
-        console.error('Socket.IO client not loaded. Make sure to include the Socket.IO script in your HTML.');
-        return;
+    // Initialize Socket.IO connection
+    socket = io(SERVER_URL);
+
+    // Set up event handlers
+    setupSocketEvents();
+
+    // Get the Firebase auth token if using Firebase
+    let firebaseToken = null;
+    if (userId) {
+        try {
+            const auth = getAuth();
+            firebaseToken = await auth.currentUser.getIdToken();
+            console.log("Firebase token acquired successfully");
+        } catch (error) {
+            console.error("Failed to get Firebase token:", error);
+        }
     }
 
-    // Connect to the server
-    try {
-        socket = io(SERVER_URL, {
-            withCredentials: false,
-            extraHeaders: {
-                "Access-Control-Allow-Origin": "*"
-            }
+    console.log('Connecting to game server...');
+
+    // Once connected, we'll send the player_join event
+    socket.on('connect', () => {
+        console.log('Connected to game server, sending player data');
+        isConnected = true;
+
+        // CRUCIAL FIX: Get the current Firebase UID value at connection time
+        // This ensures we're using the most up-to-date value
+        console.log(`Current Firebase UID at connection time: ${firebaseDocId}`);
+
+        // Send player data with the token to authenticate
+        socket.emit('player_join', {
+            name: playerName,
+            color: playerColor,
+            position: boatRef.position,
+            rotation: boatRef.rotation.y,
+            mode: playerStateRef.mode,
+            player_id: userId,      // Use module-scoped variable
+            firebaseToken: firebaseToken   // Use module-scoped variable
         });
+    });
 
-        // Set up event handlers
-        setupSocketEvents();
-
-        console.log('Connecting to game server...');
-    } catch (error) {
-        console.error('Failed to connect to game server:', error);
-    }
+    firebaseDocId = "firebase_" + userId;
 }
 
 // Helper function to apply color to a boat
@@ -187,22 +227,7 @@ function createBoatTextures() {
 
 // Set up Socket.IO event handlers
 function setupSocketEvents() {
-    // Connection events
-    socket.on('connect', () => {
-        socket.emit('player_join', {
-            name: playerName,
-            color: playerColor,
-            position: {
-                x: boat.position.x,
-                y: boat.position.y,
-                z: boat.position.z
-            },
-            rotation: boat.rotation.y,
-            mode: playerState.mode
-        });
-        console.log('Connected to game server');
-        isConnected = true;
-    });
+    // Skip connect handler as we'll handle it in initializeNetwork
 
     socket.on('disconnect', () => {
         console.log('Disconnected from game server');
@@ -216,7 +241,12 @@ function setupSocketEvents() {
 
     socket.on('connection_response', (data) => {
         console.log('Connection established, player ID:', data.id);
+
+        // Important: The server will now send back the Firebase UID as the player ID
+        // if authentication was successful
         playerId = data.id;
+
+        // This may be different from the socket ID now - it could be the Firebase UID
 
         // Set player name
         setPlayerName(playerName);
@@ -230,8 +260,10 @@ function setupSocketEvents() {
         // Request all current players (as a backup in case the automatic all_players event wasn't received)
         socket.emit('get_all_players');
 
+        showLoginScreen();
+
         // Request initial chat messages
-        requestInitialMessages();
+        // requestInitialMessages();
     });
 
     // Handle receiving all current players
@@ -346,14 +378,15 @@ export function updatePlayerPosition() {
     if (!isConnected || !socket || !playerId) return;
 
     // Get the active object (boat or character)
-    const activeObject = playerState.mode === 'boat' ? boat : character;
+    const activeObject = playerStateRef.mode === 'boat' ? boatRef : character;
 
     socket.emit('update_position', {
         x: activeObject.position.x,
         y: activeObject.position.y,
         z: activeObject.position.z,
         rotation: activeObject.rotation.y,
-        mode: playerState.mode
+        mode: playerStateRef.mode,
+        player_id: firebaseDocId
     });
 }
 
@@ -362,7 +395,15 @@ export function setPlayerName(name) {
     playerName = name;
 
     if (isConnected && socket) {
-        socket.emit('update_player_name', { name: playerName });
+        socket.emit('update_player_name', { name: playerName, player_id: firebaseDocId });
+    }
+}
+
+export function setPlayerColor(color) {
+    playerColor = color;
+
+    if (isConnected && socket) {
+        socket.emit('update_player_color', { color: playerColor, player_id: firebaseDocId });
     }
 }
 
@@ -371,14 +412,15 @@ function registerIslands() {
     if (!isConnected || !socket) return;
 
     // Register each island with the server
-    islandColliders.forEach(collider => {
+    islandCollidersRef.forEach(collider => {
         socket.emit('register_island', {
             id: collider.id,
             x: collider.center.x,
             y: collider.center.y,
             z: collider.center.z,
             radius: collider.radius,
-            type: activeIslands.get(collider.id)?.type || 'default'
+            type: activeIslandsRef.get(collider.id)?.type || 'default',
+            player_id: firebaseDocId
         });
     });
 }
@@ -475,7 +517,7 @@ function addOtherPlayerToScene(playerData) {
     playerMesh.rotation.y = playerData.rotation;
 
     // Add to scene
-    scene.add(playerMesh);
+    sceneRef.add(playerMesh);
 
     // Store in otherPlayers map
     otherPlayers.set(playerData.id, {
@@ -566,7 +608,7 @@ function removeOtherPlayerFromScene(playerId) {
     if (!player) return;
 
     // Remove from scene
-    scene.remove(player.mesh);
+    sceneRef.remove(player.mesh);
 
     // Remove from map
     otherPlayers.delete(playerId);
@@ -594,7 +636,7 @@ export function requestLeaderboard() {
     if (!isConnected || !socket) return;
 
     console.log('Requesting leaderboard data...');
-    socket.emit('get_leaderboard');
+    socket.emit('get_leaderboard', { player_id: firebaseDocId });
 }
 
 // Update player stats
@@ -614,7 +656,11 @@ export function updatePlayerStats(stats) {
 
     // Send update to server
     console.log('Updating player stats:', stats);
-    socket.emit('update_stats', stats);
+    socket.emit('player_action', {
+        action: 'update_stats',
+        stats: stats,
+        player_id: firebaseDocId
+    });
 
     // Update UI if gameUI exists
     if (window.gameUI && typeof window.gameUI.updatePlayerStats === 'function') {
@@ -641,7 +687,11 @@ export function incrementPlayerStats(stats) {
 
     // Send the complete updated stats to server
     console.log('Incrementing player stats:', stats);
-    socket.emit('update_stats', playerStats);
+    socket.emit('player_action', {
+        action: 'update_stats',
+        stats: playerStats,
+        player_id: firebaseDocId
+    });
 
     // Update UI if gameUI exists
     if (window.gameUI && typeof window.gameUI.updatePlayerStats === 'function') {
@@ -656,17 +706,68 @@ export function getPlayerStats() {
 
 // Call this when a player catches a fish
 export function onFishCaught(value = 1) {
-    incrementPlayerStats({ fishCount: value });
+    if (!isConnected || !socket) return;
+
+    // Update local stats
+    playerStats.fishCount += value;
+
+    console.log(`Fish caught! New count: ${playerStats.fishCount}`);
+
+    // Send the fish caught action to server
+    socket.emit('player_action', {
+        action: 'fish_caught',
+        value: value,
+        player_id: firebaseDocId
+    });
+
+    // Update UI
+    if (window.gameUI && typeof window.gameUI.updatePlayerStats === 'function') {
+        window.gameUI.updatePlayerStats();
+    }
 }
 
 // Call this when a player kills a monster
 export function onMonsterKilled(value = 1) {
-    incrementPlayerStats({ monsterKills: value });
+    if (!isConnected || !socket) return;
+
+    // Update local stats
+    playerStats.monsterKills += value;
+
+    console.log(`Monster killed! New count: ${playerStats.monsterKills}`);
+
+    // Send the monster killed action to server
+    socket.emit('player_action', {
+        action: 'monster_killed',
+        value: value,
+        player_id: firebaseDocId
+    });
+
+    // Update UI
+    if (window.gameUI && typeof window.gameUI.updatePlayerStats === 'function') {
+        window.gameUI.updatePlayerStats();
+    }
 }
 
 // Call this when a player earns money
 export function onMoneyEarned(value) {
-    incrementPlayerStats({ money: value });
+    if (!isConnected || !socket) return;
+
+    // Update local stats
+    playerStats.money += value;
+
+    console.log(`Money earned! New amount: ${playerStats.money}`);
+
+    // Send the money earned action to server
+    socket.emit('player_action', {
+        action: 'money_earned',
+        value: value,
+        player_id: firebaseDocId
+    });
+
+    // Update UI
+    if (window.gameUI && typeof window.gameUI.updatePlayerStats === 'function') {
+        window.gameUI.updatePlayerStats();
+    }
 }
 
 // Add this new function to initialize player stats
@@ -676,7 +777,7 @@ function initializePlayerStats() {
     console.log('Initializing player stats from server...');
 
     // Request player stats from server
-    socket.emit('get_player_stats', { id: playerId });
+    socket.emit('get_player_stats', { id: playerId, player_id: firebaseDocId });
 }
 
 // Send a chat message
@@ -687,7 +788,8 @@ export function sendChatMessage(content, messageType = 'global') {
 
     socket.emit('send_message', {
         content: content,
-        type: messageType
+        type: messageType,
+        player_id: firebaseDocId
     });
 
     return true;
@@ -701,7 +803,8 @@ export function getRecentMessages(messageType = 'global', limit = DEFAULT_MESSAG
 
     socket.emit('get_recent_messages', {
         type: messageType,
-        limit: limit
+        limit: limit,
+        player_id: firebaseDocId
     });
 
     return true;
@@ -725,4 +828,9 @@ export function getChatHistory() {
 // Request initial messages when connecting
 function requestInitialMessages() {
     getRecentMessages('global', DEFAULT_MESSAGE_LIMIT);
+}
+
+// Add a getter for other modules that might need the ID
+export function getFirebaseUserId() {
+    return firebaseDocId;
 } 

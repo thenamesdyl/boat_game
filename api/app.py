@@ -7,7 +7,7 @@ import logging
 import time
 from datetime import datetime
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth as firebase_auth
 import firestore_models  # Import our new Firestore models
 from collections import defaultdict
 import mimetypes
@@ -16,11 +16,22 @@ import mimetypes
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()  # Ensure logs go to console/terminal
+    ]
+)
 logger = logging.getLogger(__name__)
 
+# Change Werkzeug logger level to INFO for development
 werkzeug_logger = logging.getLogger('werkzeug')
-werkzeug_logger.setLevel(logging.ERROR) 
+werkzeug_logger.setLevel(logging.INFO)  # Changed from ERROR to INFO
+
+# Also add more verbose logging for Firebase auth
+firebase_logger = logging.getLogger('firebase_admin')
+firebase_logger.setLevel(logging.DEBUG)  # Set Firebase logging to DEBUG level
 
 # Initialize Flask app and Socket.IO
 app = Flask(__name__)
@@ -45,6 +56,9 @@ islands = {}
 # Add this near your other global variables
 last_db_update = defaultdict(float)  # Track last database update time for each player
 DB_UPDATE_INTERVAL = 5.0  # seconds between database updates
+
+# Add this near your other global variables (at the top of the file)
+socket_to_user_map = {}
 
 # Add these MIME type registrations after your existing imports
 # Register GLB and GLTF MIME types
@@ -76,6 +90,28 @@ def load_data_from_firestore():
 # Call the function during app startup
 load_data_from_firestore()
 
+# Add this new function for token verification
+def verify_firebase_token(token):
+    """Verify Firebase token and return the UID if valid"""
+    try:
+        if not token:
+            logger.warning("No token provided for verification")
+            return None
+            
+        logger.info("Attempting to verify Firebase token")
+        
+        # Verify the token
+        decoded_token = firebase_auth.verify_id_token(token)
+        
+        # Get user UID from the token
+        uid = decoded_token['uid']
+        logger.info(f"Successfully verified Firebase token for user: {uid}")
+        return uid
+    except Exception as e:
+        logger.error(f"Error verifying Firebase token: {e}")
+        logger.exception("Token verification exception details:")  # This logs the full stack trace
+        return None
+
 # Socket.IO event handlers
 @socketio.on('connect')
 def handle_connect():
@@ -85,9 +121,14 @@ def handle_connect():
 def handle_disconnect():
     logger.info(f"Client disconnected: {request.sid}")
     
+    # Look up the player ID from our mapping
+    player_id = socket_to_user_map.pop(request.sid, None)
+
+    logger.info(f"Player ID: {player_id}")
+    logger.info(f"Players: {players}")
+    
     # If this was a player, mark them as inactive
-    player_id = request.sid
-    if player_id in players:
+    if player_id and player_id in players:
         # Update player in Firestore and cache
         firestore_models.Player.update(player_id, active=False, last_update=time.time())
         if player_id in players:
@@ -95,35 +136,84 @@ def handle_disconnect():
             
             # Broadcast that the player disconnected
             emit('player_disconnected', {'id': player_id}, broadcast=True)
+            logger.info(f"Player {player_id} marked as inactive after disconnect")
 
 @socketio.on('player_join')
 def handle_player_join(data):
-    player_id = request.sid
-    logger.info(f"New player joined: {player_id}")
-    logger.info(f"Name: {data.get('name', 'Unknown')}")
-    logger.info(f"Color: {data.get('color')}")
+    # Get the Firebase token and UID from the request
+    firebase_token = data.get('firebaseToken')
+    claimed_firebase_uid = data.get('player_id')
+
+    logger.info(f"Firebase token: {firebase_token}")
+    logger.info(f"Claimed Firebase UID: {claimed_firebase_uid}")
     
-    # Create new player entry with stats
-    player_data = {
-        'name': data.get('name', f'Sailor {player_id[:4]}'),
-        'color': data.get('color', {'r': 0.3, 'g': 0.6, 'b': 0.8}),
-        'position': data.get('position', {'x': 0, 'y': 0, 'z': 0}),
-        'rotation': data.get('rotation', 0),
-        'mode': data.get('mode', 'boat'),
-        'last_update': time.time(),
-        'fishCount': 0,
-        'monsterKills': 0,
-        'money': 0,
-        'active': True  # Mark as active when they join
-    }
+    # ONLY proceed with database storage if Firebase authentication is provided and valid
+    if firebase_token and claimed_firebase_uid:
+        verified_uid = verify_firebase_token(firebase_token)
+        
+        if verified_uid and verified_uid == claimed_firebase_uid:
+            logger.info(f"Authentication successful for Firebase user: {verified_uid}")
+            # Use the Firebase UID directly without the prefix
+            player_id = verified_uid
+            
+            # Store player_id directly on request for simplicity
+            request.player_id = player_id
+            
+            # Store in our socket-to-user mapping
+            logger.info(f"Mapped socket {request.sid} to user {player_id}")
+            
+            # Send connection_response with the assigned player ID
+            emit('connection_response', {'id': player_id})
+            
+            # Now proceed with database operations
+            existing_player = firestore_models.Player.get("firebase_" + player_id)
+            docid = "firebase_" + player_id
+            socket_to_user_map[request.sid] = docid
+            
+            if existing_player:
+                # Update the existing player in database
+                player_data = {
+                    'active': True,
+                    'last_update': time.time(),
+                }
+                
+                # Update in Firestore
+                firestore_models.Player.update(docid, **player_data)
+                
+                # Update cache
+                players[docid] = {**existing_player, **player_data}
+            else:
+                # Create new player entry with stats
+                player_data = {
+                    'name': data.get('name', f'Sailor {player_id[:4]}'),
+                    'color': data.get('color', {'r': 0.3, 'g': 0.6, 'b': 0.8}),
+                    'position': data.get('position', {'x': 0, 'y': 0, 'z': 0}),
+                    'rotation': data.get('rotation', 0),
+                    'mode': data.get('mode', 'boat'),
+                    'last_update': time.time(),
+                    'fishCount': 0,
+                    'monsterKills': 0,
+                    'money': 0,
+                    'active': True,  # Mark as active when they join
+                    'firebase_uid': verified_uid
+                }
+                
+                # Create player in Firestore and cache the result
+                player = firestore_models.Player.create(docid, **player_data)
+                players[docid] = player
+            
+            # Broadcast to all clients that a new player joined
+            emit('player_joined', players[docid], broadcast=True)
+        else:
+            logger.warning(f"Firebase token verification failed. No data will be stored.")
+            emit('auth_error', {'message': 'Authentication failed'})
+            return
+    else:
+        logger.warning(f"No Firebase authentication provided. No data will be stored.")
+        emit('auth_required', {'message': 'Firebase authentication required'})
+        return
     
-    # Create player in Firestore and cache the result
-    player = firestore_models.Player.create(player_id, **player_data)
-    players[player_id] = player
-    
-    # Broadcast to all clients that a new player joined
-    emit('player_joined', player, broadcast=True)
-    
+    # Send game data regardless of auth status (read-only operations)
     # Send existing ACTIVE players to the new player
     active_players = [p for p in players.values() if p.get('active', False)]
     emit('all_players', active_players)
@@ -138,52 +228,103 @@ def handle_player_join(data):
     # Send leaderboard data to the new player
     emit('leaderboard_update', firestore_models.Player.get_combined_leaderboard())
 
-@socketio.on('player_update')
-def handle_player_update(data):
-    player_id = request.sid
+@socketio.on('update_position')
+def handle_position_update(data):
+    """
+    Handle frequent position updates from client.
+    Expects: { x, y, z, rotation, mode, player_id }
+    """
+    player_id = data.get('player_id')
+    if not player_id:
+        # Also check request if not explicitly provided
+        player_id = data.get('player_id', None)
+        if not player_id:
+            logger.warning("Missing player ID in position update. Ignoring.")
+            return
     
-    # Ensure player exists
+
+    # Extract individual position components
+    x = data.get('x')
+    y = data.get('y')
+    z = data.get('z')
+    rotation = data.get('rotation')
+    mode = data.get('mode')
+    
+    # Validate required fields
+    if x is None or z is None:  # y can be 0, so check None specifically
+        logger.warning("Missing position data in update. Ignoring.")
+        return
+    
+    # Ensure player exists in cache
     if player_id not in players:
+        logger.warning(f"Player ID {player_id} not found in cache. Ignoring position update.")
         return
     
     current_time = time.time()
     
-    # Update in-memory cache immediately
-    for key, value in data.items():
-        if key in ['position', 'rotation', 'mode']:
-            players[player_id][key] = value
+    # Construct position object for storage
+    position = {
+        'x': x,
+        'y': y,
+        'z': z
+    }
     
+    # Always update in-memory cache immediately for responsive gameplay
+    players[player_id]['position'] = position
+    if rotation is not None:
+        players[player_id]['rotation'] = rotation
+    if mode is not None:
+        players[player_id]['mode'] = mode
     players[player_id]['last_update'] = current_time
     
-    # Throttle database updates (only update every DB_UPDATE_INTERVAL seconds)
-    if current_time - last_db_update[player_id] > DB_UPDATE_INTERVAL:
+    # Throttle database updates to reduce Firestore writes
+    if current_time - last_db_update.get(player_id, 0) > DB_UPDATE_INTERVAL:
         last_db_update[player_id] = current_time
         
-        # Only update necessary fields in Firestore
+        # Build update data with only necessary fields
         update_data = {
-            'position': players[player_id]['position'],
-            'rotation': players[player_id]['rotation'],
-            'mode': players[player_id]['mode'],
+            'position': position,
             'last_update': current_time
         }
+        if rotation is not None:
+            update_data['rotation'] = rotation
+        if mode is not None:
+            update_data['mode'] = mode
         
+        # Update in Firestore
         firestore_models.Player.update(player_id, **update_data)
+        logger.debug(f"Updated player {player_id} position in Firestore")
     
-    # Broadcast update to all other clients
-    emit('player_moved', {
+    # Broadcast to all other clients (not back to sender)
+    emit_data = {
         'id': player_id,
-        'position': players[player_id]['position'],
-        'rotation': players[player_id]['rotation'],
-        'mode': players[player_id]['mode']
-    }, broadcast=True, include_self=False)
+        'position': position
+    }
+    if rotation is not None:
+        emit_data['rotation'] = rotation
+    if mode is not None:
+        emit_data['mode'] = mode
+        
+    emit('player_moved', emit_data, broadcast=True, include_self=False)
 
 @socketio.on('player_action')
 def handle_player_action(data):
-    player_id = request.sid
-    action_type = data.get('type')
+    # Get both action and type fields (to handle client inconsistencies)
+    action_type = data.get('action') or data.get('type')
+    
+    # Simplified: Just use the player_id from the current request
+    player_id = data.get('player_id')
+
+    logger.info(f"Player action data: {data}, player_id: {player_id}")
+    
+    # Check if player_id is available and valid
+    if not player_id or not player_id.startswith('firebase_'):
+        logger.warning(f"Missing or invalid player ID. Ignoring action.")
+        return
     
     # Ensure player exists
     if player_id not in players:
+        logger.warning(f"Player ID {player_id} not found in cache. Ignoring action.")
         return
     
     if action_type == 'fish_caught':
@@ -259,11 +400,18 @@ def handle_player_action(data):
 
 @socketio.on('chat_message')
 def handle_chat_message(data):
-    player_id = request.sid
     content = data.get('content', '').strip()
     
     # Validate message
     if not content or len(content) > 500:
+        return
+    
+    # Simplified: Just use the player_id from the current request
+    player_id = data.get('player_id', None)
+    
+    # Check if player_id is available and valid
+    if not player_id or not player_id.startswith('firebase_'):
+        logger.warning(f"Missing or invalid player ID. Ignoring chat message.")
         return
     
     # Create message in Firestore
@@ -276,6 +424,74 @@ def handle_chat_message(data):
     if message:
         # Broadcast message to all clients
         emit('chat_message', message, broadcast=True)
+
+@socketio.on('update_player_color')
+def handle_update_player_color(data):
+    """
+    Update a player's color
+    Expects: { player_id, color: {r, g, b} }
+    """
+    player_id = data.get('player_id')
+    if not player_id:
+        logger.warning("Missing player ID in color update. Ignoring.")
+        return
+    
+    color = data.get('color')
+    if not color:
+        logger.warning("Missing color data in update. Ignoring.")
+        return
+    
+    # Ensure player exists in cache
+    if player_id not in players:
+        logger.warning(f"Player ID {player_id} not found in cache. Ignoring color update.")
+        return
+    
+    # Update in-memory cache
+    players[player_id]['color'] = color
+    
+    # Update in Firestore directly with the data
+    firestore_models.Player.update(player_id, color=color)
+    logger.info(f"Updated player {player_id} color to {color}")
+    
+    # Broadcast to all other clients
+    emit('player_updated', {
+        'id': player_id,
+        'color': color
+    }, broadcast=True)
+
+@socketio.on('update_player_name')
+def handle_update_player_name(data):
+    """
+    Update a player's name
+    Expects: { player_id, name }
+    """
+    player_id = data.get('player_id')
+    if not player_id:
+        logger.warning("Missing player ID in name update. Ignoring.")
+        return
+    
+    name = data.get('name')
+    if not name or not isinstance(name, str) or len(name) > 50:
+        logger.warning("Invalid name in update. Ignoring.")
+        return
+    
+    # Ensure player exists in cache
+    if player_id not in players:
+        logger.warning(f"Player ID {player_id} not found in cache. Ignoring name update.")
+        return
+    
+    # Update in-memory cache
+    players[player_id]['name'] = name
+    
+    # Update in Firestore directly
+    firestore_models.Player.update(player_id, name=name)
+    logger.info(f"Updated player {player_id} name to {name}")
+    
+    # Broadcast to all other clients
+    emit('player_updated', {
+        'id': player_id,
+        'name': name
+    }, broadcast=True)
 
 # API endpoints
 @app.route('/api/players', methods=['GET'])
@@ -390,5 +606,5 @@ def file_system_info():
 
 if __name__ == '__main__':
     # Run the Socket.IO server with debug and reloader enabled
-    socketio.run(app, host='0.0.0.0') 
+    socketio.run(app, host='0.0.0.0', port=5001) 
     # socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=True) 
