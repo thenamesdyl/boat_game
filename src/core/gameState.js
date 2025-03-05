@@ -6,6 +6,7 @@ export const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window
 export const renderer = new THREE.WebGLRenderer({ antialias: true });
 export const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
 export const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+export let playerData = null;
 
 export const boatVelocity = new THREE.Vector3(0, 0, 0);
 export const boatSpeed = 0.2; // Much slower speed (was 0.03)
@@ -29,4 +30,12 @@ export function getWindData() {
         speed: 5 + Math.sin(getTime() * 0.05) * 3 // Wind speed between 2-8 knots
     };
 
+}
+
+export function getPlayerStateFromDb() {
+    return playerData;
+}
+
+export function setPlayerStateFromDb(data) {
+    playerData = data;
 }

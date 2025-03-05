@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { getAuth } from 'firebase/auth';
 import { showLoginScreen } from './main';
+import { setPlayerStateFromDb } from './gameState';
 
 // Network configuration
 //const SERVER_URL = 'http://localhost:5001';
@@ -251,6 +252,9 @@ function setupSocketEvents() {
         if (!data.name) {
             showLoginScreen();
         }
+
+        console.log("setting player data ", data);
+        setPlayerStateFromDb(data);
 
         // Set player name
         setPlayerName(playerName);

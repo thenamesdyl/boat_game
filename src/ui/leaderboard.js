@@ -1,3 +1,4 @@
+import { getPlayerStateFromDb } from '../core/gameState.js';
 import { getPlayerStats, requestLeaderboard } from '../core/network.js';
 import { gameUI } from './ui.js';
 import { registerOpenUI, unregisterOpenUI } from './ui.js';
@@ -89,7 +90,10 @@ export function updatePlayerStatsInLeaderboard() {
     if (!gameUI.elements.leaderboard || !gameUI.elements.leaderboard.playerStatsContent) return;
 
     // Get player stats
-    const playerStats = getPlayerStats();
+    const playerStats = getPlayerStateFromDb();
+    if (!playerStats) {
+        playerStats = getPlayerStats();
+    }
 
     // Clear existing content
     const container = gameUI.elements.leaderboard.playerStatsContent;
