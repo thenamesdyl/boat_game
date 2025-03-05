@@ -7,7 +7,8 @@ class InventoryUI {
             chest: null,
             panel: null,
             fishContent: null,
-            treasureContent: null
+            treasureContent: null,
+            cargoContent: null
         };
 
         // Track if the inventory is currently open
@@ -191,7 +192,7 @@ class InventoryUI {
             });
         });
 
-        // Create inventory panel (hidden by default)
+        // Create inventory panel (hidden by default, now with chest design)
         const inventoryPanel = document.createElement('div');
         inventoryPanel.style.position = 'absolute';
         inventoryPanel.style.top = '50%';
@@ -199,8 +200,8 @@ class InventoryUI {
         inventoryPanel.style.transform = 'translate(-50%, -50%)';
         inventoryPanel.style.width = '600px';
         inventoryPanel.style.height = '400px';
-        inventoryPanel.style.backgroundColor = 'rgba(20, 40, 80, 0.9)';
-        inventoryPanel.style.border = '3px solid rgba(100, 150, 200, 0.9)';
+        inventoryPanel.style.backgroundColor = '#8B4513'; // Wood brown color
+        inventoryPanel.style.border = '8px solid #A0522D'; // Lighter wood border
         inventoryPanel.style.borderRadius = '10px';
         inventoryPanel.style.padding = '20px';
         inventoryPanel.style.display = 'none';
@@ -209,82 +210,179 @@ class InventoryUI {
         inventoryPanel.style.pointerEvents = 'auto';
         inventoryPanel.style.color = 'white';
         inventoryPanel.style.fontFamily = 'Arial, sans-serif';
-        inventoryPanel.style.boxShadow = '0 0 20px rgba(0, 0, 0, 0.5)';
+        inventoryPanel.style.boxShadow = '0 0 20px rgba(0, 0, 0, 0.8), inset 0 0 30px rgba(0, 0, 0, 0.4)';
         document.body.appendChild(inventoryPanel);
 
-        // Inventory header
+        // Add decorative metal corners to the panel
+        const corners = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+        corners.forEach(position => {
+            const corner = document.createElement('div');
+            corner.style.position = 'absolute';
+            corner.style.width = '30px';
+            corner.style.height = '30px';
+            corner.style.backgroundColor = '#DAA520'; // Gold color
+            corner.style.boxShadow = 'inset 0 0 5px rgba(0, 0, 0, 0.5)';
+
+            if (position === 'top-left') {
+                corner.style.top = '0';
+                corner.style.left = '0';
+                corner.style.borderTopLeftRadius = '5px';
+                corner.style.borderRight = '1px solid #8B4513';
+                corner.style.borderBottom = '1px solid #8B4513';
+            } else if (position === 'top-right') {
+                corner.style.top = '0';
+                corner.style.right = '0';
+                corner.style.borderTopRightRadius = '5px';
+                corner.style.borderLeft = '1px solid #8B4513';
+                corner.style.borderBottom = '1px solid #8B4513';
+            } else if (position === 'bottom-left') {
+                corner.style.bottom = '0';
+                corner.style.left = '0';
+                corner.style.borderBottomLeftRadius = '5px';
+                corner.style.borderRight = '1px solid #8B4513';
+                corner.style.borderTop = '1px solid #8B4513';
+            } else {
+                corner.style.bottom = '0';
+                corner.style.right = '0';
+                corner.style.borderBottomRightRadius = '5px';
+                corner.style.borderLeft = '1px solid #8B4513';
+                corner.style.borderTop = '1px solid #8B4513';
+            }
+
+            inventoryPanel.appendChild(corner);
+        });
+
+        // Add wood grain texture effect
+        for (let i = 0; i < 8; i++) {
+            const grain = document.createElement('div');
+            grain.style.position = 'absolute';
+            grain.style.left = '0';
+            grain.style.right = '0';
+            grain.style.height = '1px';
+            grain.style.top = `${50 + (i * 40)}px`;
+            grain.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+            grain.style.zIndex = '1';
+            inventoryPanel.appendChild(grain);
+        }
+
+        // Inventory header with chest-like design
         const inventoryHeader = document.createElement('div');
         inventoryHeader.style.display = 'flex';
         inventoryHeader.style.justifyContent = 'space-between';
         inventoryHeader.style.alignItems = 'center';
         inventoryHeader.style.marginBottom = '20px';
+        inventoryHeader.style.padding = '5px 10px';
+        inventoryHeader.style.backgroundColor = '#654321'; // Darker wood for header
+        inventoryHeader.style.borderRadius = '5px';
+        inventoryHeader.style.border = '2px solid #DAA520'; // Gold border
+        inventoryHeader.style.boxShadow = 'inset 0 0 10px rgba(0, 0, 0, 0.3)';
+        inventoryHeader.style.position = 'relative';
+        inventoryHeader.style.zIndex = '2';
         inventoryPanel.appendChild(inventoryHeader);
 
-        // Inventory title
+        // Inventory title - styled as metal plate
         const inventoryTitle = document.createElement('h2');
         inventoryTitle.textContent = 'Inventory';
         inventoryTitle.style.margin = '0';
-        inventoryTitle.style.color = 'rgba(150, 200, 255, 1)';
+        inventoryTitle.style.color = '#FFD700'; // Gold text
+        inventoryTitle.style.textShadow = '0 1px 2px rgba(0, 0, 0, 0.6)';
+        inventoryTitle.style.fontFamily = "'Times New Roman', serif";
+        inventoryTitle.style.fontWeight = 'bold';
         inventoryHeader.appendChild(inventoryTitle);
 
-        // Close button
+        // Close button styled as a metal clasp
         const closeButton = document.createElement('button');
         closeButton.textContent = '✕';
-        closeButton.style.backgroundColor = 'transparent';
-        closeButton.style.border = 'none';
-        closeButton.style.color = 'white';
-        closeButton.style.fontSize = '20px';
+        closeButton.style.backgroundColor = '#DAA520'; // Gold color
+        closeButton.style.border = '2px solid #B8860B'; // Darker gold border
+        closeButton.style.color = '#654321'; // Dark wood color
+        closeButton.style.fontSize = '16px';
+        closeButton.style.fontWeight = 'bold';
         closeButton.style.cursor = 'pointer';
-        closeButton.style.padding = '5px 10px';
+        closeButton.style.padding = '2px 8px';
         closeButton.style.borderRadius = '5px';
-        closeButton.style.transition = 'background-color 0.2s';
+        closeButton.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.5)';
+        closeButton.style.transition = 'all 0.2s';
+
+        // Add click event to close the inventory
+        closeButton.addEventListener('click', () => {
+            this.toggleInventory(false); // Close the inventory
+        });
+
         closeButton.addEventListener('mouseover', () => {
-            closeButton.style.backgroundColor = 'rgba(255, 100, 100, 0.3)';
+            closeButton.style.backgroundColor = '#FFD700';
+            closeButton.style.transform = 'scale(1.05)';
         });
         closeButton.addEventListener('mouseout', () => {
-            closeButton.style.backgroundColor = 'transparent';
+            closeButton.style.backgroundColor = '#DAA520';
+            closeButton.style.transform = 'scale(1)';
         });
         inventoryHeader.appendChild(closeButton);
 
-        // Tabs for different inventory categories
+        // Tabs styled as metal plates or labels on a chest
         const tabsContainer = document.createElement('div');
         tabsContainer.style.display = 'flex';
         tabsContainer.style.marginBottom = '15px';
-        tabsContainer.style.borderBottom = '1px solid rgba(100, 150, 200, 0.5)';
+        tabsContainer.style.position = 'relative';
+        tabsContainer.style.zIndex = '2';
         inventoryPanel.appendChild(tabsContainer);
 
-        // Fish tab (active by default)
-        const fishTab = document.createElement('div');
-        fishTab.textContent = 'Fish';
-        fishTab.style.padding = '8px 15px';
-        fishTab.style.marginRight = '10px';
-        fishTab.style.cursor = 'pointer';
-        fishTab.style.backgroundColor = 'rgba(100, 150, 200, 0.5)';
-        fishTab.style.borderTopLeftRadius = '5px';
-        fishTab.style.borderTopRightRadius = '5px';
-        fishTab.dataset.active = 'true';
+        // Function to create styled tabs
+        const createTab = (text, isActive = false) => {
+            const tab = document.createElement('div');
+            tab.textContent = text;
+            tab.style.padding = '8px 15px';
+            tab.style.marginRight = '10px';
+            tab.style.cursor = 'pointer';
+            tab.style.backgroundColor = isActive ? '#DAA520' : '#B8860B'; // Gold for active, darker for inactive
+            tab.style.color = '#FFF8DC'; // Cream color
+            tab.style.borderTopLeftRadius = '5px';
+            tab.style.borderTopRightRadius = '5px';
+            tab.style.boxShadow = isActive ? '0 -1px 5px rgba(0, 0, 0, 0.3)' : '0 -1px 3px rgba(0, 0, 0, 0.2)';
+            tab.style.transition = 'all 0.2s';
+            tab.style.border = '1px solid #654321'; // Dark wood color
+            tab.style.borderBottom = isActive ? '1px solid #DAA520' : '1px solid #B8860B';
+            tab.style.textShadow = '0 1px 1px rgba(0, 0, 0, 0.5)';
+            tab.style.fontWeight = isActive ? 'bold' : 'normal';
+            tab.style.transform = isActive ? 'translateY(-2px)' : 'translateY(0)';
+            tab.dataset.active = isActive ? 'true' : 'false';
+            return tab;
+        };
+
+        // Create tabs with new styling
+        const fishTab = createTab('Fish', true);
+        const treasureTab = createTab('Treasures');
+        const cargoTab = createTab('Cargo');
+
         tabsContainer.appendChild(fishTab);
-
-        // Treasure tab
-        const treasureTab = document.createElement('div');
-        treasureTab.textContent = 'Treasures';
-        treasureTab.style.padding = '8px 15px';
-        treasureTab.style.marginRight = '10px';
-        treasureTab.style.cursor = 'pointer';
-        treasureTab.style.opacity = '0.7';
-        treasureTab.style.borderTopLeftRadius = '5px';
-        treasureTab.style.borderTopRightRadius = '5px';
-        treasureTab.dataset.active = 'false';
         tabsContainer.appendChild(treasureTab);
+        tabsContainer.appendChild(cargoTab);
 
-        // Content area
+        // Content area styled as the inside of a chest
         const contentArea = document.createElement('div');
         contentArea.style.flex = '1';
         contentArea.style.overflowY = 'auto';
-        contentArea.style.padding = '10px';
-        contentArea.style.backgroundColor = 'rgba(30, 50, 90, 0.5)';
+        contentArea.style.padding = '15px';
+        contentArea.style.backgroundColor = '#654321'; // Dark wood interior
         contentArea.style.borderRadius = '5px';
+        contentArea.style.border = '3px solid #B8860B'; // Dark gold border
+        contentArea.style.boxShadow = 'inset 0 0 15px rgba(0, 0, 0, 0.5)';
+        contentArea.style.position = 'relative';
+        contentArea.style.zIndex = '2';
         inventoryPanel.appendChild(contentArea);
+
+        // Add a subtle fabric texture to the interior
+        const fabricTexture = document.createElement('div');
+        fabricTexture.style.position = 'absolute';
+        fabricTexture.style.top = '0';
+        fabricTexture.style.left = '0';
+        fabricTexture.style.right = '0';
+        fabricTexture.style.bottom = '0';
+        fabricTexture.style.opacity = '0.1';
+        fabricTexture.style.backgroundImage = 'linear-gradient(45deg, #000 25%, transparent 25%, transparent 75%, #000 75%), linear-gradient(45deg, #000 25%, transparent 25%, transparent 75%, #000 75%)';
+        fabricTexture.style.backgroundSize = '4px 4px';
+        fabricTexture.style.pointerEvents = 'none';
+        contentArea.appendChild(fabricTexture);
 
         // Fish inventory content (visible by default)
         const fishContent = document.createElement('div');
@@ -292,6 +390,8 @@ class InventoryUI {
         fishContent.style.display = 'flex';
         fishContent.style.flexDirection = 'column';
         fishContent.style.gap = '15px';
+        fishContent.style.position = 'relative';
+        fishContent.style.zIndex = '3';
         contentArea.appendChild(fishContent);
 
         // Treasure inventory content (hidden by default)
@@ -301,8 +401,178 @@ class InventoryUI {
         treasureContent.textContent = 'No treasures found yet. Explore more islands!';
         treasureContent.style.textAlign = 'center';
         treasureContent.style.padding = '20px';
-        treasureContent.style.color = 'rgba(200, 200, 200, 0.7)';
+        treasureContent.style.color = '#FFD700'; // Gold color
+        treasureContent.style.fontStyle = 'italic';
+        treasureContent.style.position = 'relative';
+        treasureContent.style.zIndex = '3';
         contentArea.appendChild(treasureContent);
+
+        // Cargo inventory content (hidden by default)
+        const cargoContent = document.createElement('div');
+        cargoContent.id = 'cargo-inventory';
+        cargoContent.style.display = 'none';
+        cargoContent.style.position = 'relative';
+        cargoContent.style.zIndex = '3';
+        cargoContent.style.padding = '10px';
+
+        // Add a sample cannon item 
+        const cannonItem = document.createElement('div');
+        cannonItem.style.display = 'flex';
+        cannonItem.style.alignItems = 'center';
+        cannonItem.style.backgroundColor = 'rgba(50, 40, 30, 0.7)';
+        cannonItem.style.borderRadius = '8px';
+        cannonItem.style.padding = '10px 15px';
+        cannonItem.style.marginBottom = '10px';
+        cannonItem.style.border = '2px solid #B8860B'; // Gold border
+        cannonItem.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.3)';
+
+        // Cannon icon/image placeholder
+        const cannonIcon = document.createElement('div');
+        cannonIcon.style.width = '40px';
+        cannonIcon.style.height = '40px';
+        cannonIcon.style.backgroundColor = '#333';
+        cannonIcon.style.borderRadius = '5px';
+        cannonIcon.style.marginRight = '15px';
+        cannonIcon.style.position = 'relative';
+        cannonIcon.style.boxShadow = 'inset 0 0 5px rgba(0, 0, 0, 0.5)';
+
+        // Add a simple cannon shape inside the icon
+        const cannonBarrel = document.createElement('div');
+        cannonBarrel.style.position = 'absolute';
+        cannonBarrel.style.width = '25px';
+        cannonBarrel.style.height = '12px';
+        cannonBarrel.style.backgroundColor = '#666';
+        cannonBarrel.style.top = '14px';
+        cannonBarrel.style.left = '10px';
+        cannonBarrel.style.borderRadius = '3px';
+        cannonIcon.appendChild(cannonBarrel);
+
+        const cannonBase = document.createElement('div');
+        cannonBase.style.position = 'absolute';
+        cannonBase.style.width = '20px';
+        cannonBase.style.height = '20px';
+        cannonBase.style.backgroundColor = '#555';
+        cannonBase.style.borderRadius = '50%';
+        cannonBase.style.bottom = '5px';
+        cannonBase.style.left = '10px';
+        cannonIcon.appendChild(cannonBase);
+
+        // Cannon details
+        const cannonDetails = document.createElement('div');
+        cannonDetails.style.flex = '1';
+
+        const cannonName = document.createElement('div');
+        cannonName.textContent = 'Cannons';
+        cannonName.style.fontWeight = 'bold';
+        cannonName.style.fontSize = '16px';
+        cannonName.style.color = '#FFD700'; // Gold text
+        cannonName.style.marginBottom = '4px';
+
+        const cannonCount = document.createElement('div');
+        cannonCount.textContent = 'Quantity: 200';
+        cannonCount.style.color = '#FFF';
+        cannonCount.style.fontSize = '14px';
+
+        cannonDetails.appendChild(cannonName);
+        cannonDetails.appendChild(cannonCount);
+
+        // Assemble the cannon item
+        cannonItem.appendChild(cannonIcon);
+        cannonItem.appendChild(cannonDetails);
+        cargoContent.appendChild(cannonItem);
+
+        // Add a message for other cargo items
+        const otherCargoMsg = document.createElement('div');
+        otherCargoMsg.textContent = 'Find more equipment for your ship!';
+        otherCargoMsg.style.textAlign = 'center';
+        otherCargoMsg.style.padding = '15px';
+        otherCargoMsg.style.color = '#FFD700'; // Gold color
+        otherCargoMsg.style.fontStyle = 'italic';
+        cargoContent.appendChild(otherCargoMsg);
+
+        contentArea.appendChild(cargoContent);
+
+        // Update tab click events for new styling
+        fishTab.addEventListener('click', () => {
+            fishTab.style.backgroundColor = '#DAA520';
+            fishTab.style.fontWeight = 'bold';
+            fishTab.style.transform = 'translateY(-2px)';
+            fishTab.style.boxShadow = '0 -1px 5px rgba(0, 0, 0, 0.3)';
+            fishTab.style.borderBottom = '1px solid #DAA520';
+            fishTab.dataset.active = 'true';
+
+            treasureTab.style.backgroundColor = '#B8860B';
+            treasureTab.style.fontWeight = 'normal';
+            treasureTab.style.transform = 'translateY(0)';
+            treasureTab.style.boxShadow = '0 -1px 3px rgba(0, 0, 0, 0.2)';
+            treasureTab.style.borderBottom = '1px solid #B8860B';
+            treasureTab.dataset.active = 'false';
+
+            cargoTab.style.backgroundColor = '#B8860B';
+            cargoTab.style.fontWeight = 'normal';
+            cargoTab.style.transform = 'translateY(0)';
+            cargoTab.style.boxShadow = '0 -1px 3px rgba(0, 0, 0, 0.2)';
+            cargoTab.style.borderBottom = '1px solid #B8860B';
+            cargoTab.dataset.active = 'false';
+
+            fishContent.style.display = 'flex';
+            treasureContent.style.display = 'none';
+            cargoContent.style.display = 'none';
+        });
+
+        treasureTab.addEventListener('click', () => {
+            treasureTab.style.backgroundColor = '#DAA520';
+            treasureTab.style.fontWeight = 'bold';
+            treasureTab.style.transform = 'translateY(-2px)';
+            treasureTab.style.boxShadow = '0 -1px 5px rgba(0, 0, 0, 0.3)';
+            treasureTab.style.borderBottom = '1px solid #DAA520';
+            treasureTab.dataset.active = 'true';
+
+            fishTab.style.backgroundColor = '#B8860B';
+            fishTab.style.fontWeight = 'normal';
+            fishTab.style.transform = 'translateY(0)';
+            fishTab.style.boxShadow = '0 -1px 3px rgba(0, 0, 0, 0.2)';
+            fishTab.style.borderBottom = '1px solid #B8860B';
+            fishTab.dataset.active = 'false';
+
+            cargoTab.style.backgroundColor = '#B8860B';
+            cargoTab.style.fontWeight = 'normal';
+            cargoTab.style.transform = 'translateY(0)';
+            cargoTab.style.boxShadow = '0 -1px 3px rgba(0, 0, 0, 0.2)';
+            cargoTab.style.borderBottom = '1px solid #B8860B';
+            cargoTab.dataset.active = 'false';
+
+            treasureContent.style.display = 'block';
+            fishContent.style.display = 'none';
+            cargoContent.style.display = 'none';
+        });
+
+        cargoTab.addEventListener('click', () => {
+            cargoTab.style.backgroundColor = '#DAA520';
+            cargoTab.style.fontWeight = 'bold';
+            cargoTab.style.transform = 'translateY(-2px)';
+            cargoTab.style.boxShadow = '0 -1px 5px rgba(0, 0, 0, 0.3)';
+            cargoTab.style.borderBottom = '1px solid #DAA520';
+            cargoTab.dataset.active = 'true';
+
+            fishTab.style.backgroundColor = '#B8860B';
+            fishTab.style.fontWeight = 'normal';
+            fishTab.style.transform = 'translateY(0)';
+            fishTab.style.boxShadow = '0 -1px 3px rgba(0, 0, 0, 0.2)';
+            fishTab.style.borderBottom = '1px solid #B8860B';
+            fishTab.dataset.active = 'false';
+
+            treasureTab.style.backgroundColor = '#B8860B';
+            treasureTab.style.fontWeight = 'normal';
+            treasureTab.style.transform = 'translateY(0)';
+            treasureTab.style.boxShadow = '0 -1px 3px rgba(0, 0, 0, 0.2)';
+            treasureTab.style.borderBottom = '1px solid #B8860B';
+            treasureTab.dataset.active = 'false';
+
+            cargoContent.style.display = 'block';
+            fishContent.style.display = 'none';
+            treasureContent.style.display = 'none';
+        });
 
         // Toggle inventory when chest is clicked
         inventoryChest.addEventListener('click', () => {
@@ -329,48 +599,12 @@ class InventoryUI {
             }
         });
 
-        // Add click events for tabs
-        fishTab.addEventListener('click', () => {
-            fishTab.style.backgroundColor = 'rgba(100, 150, 200, 0.5)';
-            fishTab.style.opacity = '1';
-            fishTab.dataset.active = 'true';
-
-            treasureTab.style.backgroundColor = 'transparent';
-            treasureTab.style.opacity = '0.7';
-            treasureTab.dataset.active = 'false';
-
-            fishContent.style.display = 'flex';
-            treasureContent.style.display = 'none';
-        });
-
-        treasureTab.addEventListener('click', () => {
-            treasureTab.style.backgroundColor = 'rgba(100, 150, 200, 0.5)';
-            treasureTab.style.opacity = '1';
-            treasureTab.dataset.active = 'true';
-
-            fishTab.style.backgroundColor = 'transparent';
-            fishTab.style.opacity = '0.7';
-            fishTab.dataset.active = 'false';
-
-            treasureContent.style.display = 'block';
-            fishContent.style.display = 'none';
-        });
-
-        // Close inventory when close button is clicked
-        closeButton.addEventListener('click', () => {
-            inventoryPanel.style.display = 'none';
-            this.isOpen = false;
-            // Unregister this as an open UI if available
-            if (typeof this.unregisterOpenUI === 'function') {
-                this.unregisterOpenUI('inventory');
-            }
-        });
-
         // Store references to important elements
         this.elements.chest = inventoryChest;
         this.elements.panel = inventoryPanel;
         this.elements.fishContent = fishContent;
         this.elements.treasureContent = treasureContent;
+        this.elements.cargoContent = cargoContent;
 
         return inventoryChest;
     }
@@ -649,6 +883,34 @@ class InventoryUI {
         // Start and stop - very brief sound
         osc.start(currentTime);
         osc.stop(currentTime + 0.06);
+    }
+
+    // Toggle inventory
+    toggleInventory(open) {
+        const inventoryPanel = this.elements.panel;
+        if (!inventoryPanel) return;
+
+        if (open) {
+            // Play chest opening sound
+            this.playChestOpenSound();
+
+            inventoryPanel.style.display = 'flex';
+            this.isOpen = true;
+            // Register this as an open UI with the main game UI if available
+            if (typeof this.registerOpenUI === 'function') {
+                this.registerOpenUI('inventory');
+            }
+        } else {
+            // Play chest closing sound (slightly different)
+            this.playChestCloseSound();
+
+            inventoryPanel.style.display = 'none';
+            this.isOpen = false;
+            // Unregister this as an open UI if available
+            if (typeof this.unregisterOpenUI === 'function') {
+                this.unregisterOpenUI('inventory');
+            }
+        }
     }
 }
 
