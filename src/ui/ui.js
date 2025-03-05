@@ -4,6 +4,7 @@ import { initChat, initMiniMap } from './chat.js';
 import { initShop, updateShopAvailability } from '../gameplay/shop.js';
 import InventoryUI from './inventoryUI.js';
 import { getDiagnosticsData, ENABLE_DIAGNOSTICS, isBraveBrowser } from './diagnostics.js';
+import { fireCannons } from '../gameplay/cannons.js';
 
 // Create a UI class to manage all interface elements
 class GameUI {
@@ -84,6 +85,9 @@ class GameUI {
 
         // Initialize the shop UI
         this.elements.shop = initShop(this);
+
+        // Connect the fire button to the fireCannons function
+        this.elements.cannon.fireButton.addEventListener('click', fireCannons);
     }
 
     createUIElement(text) {

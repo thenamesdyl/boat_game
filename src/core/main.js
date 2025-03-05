@@ -937,6 +937,13 @@ document.addEventListener('keydown', (event) => {
         case 'd': case 'ArrowRight': keys.right = true; break;
         // Toggle mouse camera control with 'c' key
         case 'c': mouseControl.isEnabled = !mouseControl.isEnabled; break;
+        // Add hotkey for firing cannons (space bar)
+        case ' ': // Space bar
+            // Import and call fireCannons if needed
+            if (window.fireCannons) {
+                window.fireCannons();
+            }
+            break;
     }
 });
 document.addEventListener('keyup', (event) => {

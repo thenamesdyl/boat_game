@@ -41,6 +41,9 @@ export function initCannons(playerBoat, seaMonsters) {
 
     // Set up event listeners for cannon UI
     gameUI.elements.cannon.fireButton.addEventListener('click', fireCannons);
+
+    // Expose fireCannons function globally for hotkey usage
+    window.fireCannons = fireCannons;
 }
 
 // Update cannon system
@@ -102,7 +105,7 @@ function checkForMonstersInRange() {
 }
 
 // Fire cannons
-function fireCannons() {
+export function fireCannons() {
     if (cannonCooldown > 0) return;
 
     // Set cooldown
