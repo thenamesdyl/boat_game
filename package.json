@@ -4,7 +4,7 @@
     "description": "A multiplayer 3D boat game with procedurally generated islands",
     "scripts": {
         "start": "parcel index.html --open",
-        "build": "parcel build index.html --public-url /",
+        "build": "parcel build index.html --public-url ./ && cp -r public/* dist/",
         "dev": "parcel index.html"
     },
     "dependencies": {
