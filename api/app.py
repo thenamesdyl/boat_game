@@ -25,13 +25,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Change Werkzeug logger level to INFO for development
+# Change Werkzeug logger level to ERROR to hide HTTP request logs
 werkzeug_logger = logging.getLogger('werkzeug')
-werkzeug_logger.setLevel(logging.INFO)  # Changed from ERROR to INFO
+werkzeug_logger.setLevel(logging.ERROR)  # Changed from INFO to ERROR to hide polling requests
 
-# Also add more verbose logging for Firebase auth
+# Set Firebase logging to a higher level to reduce token logging
 firebase_logger = logging.getLogger('firebase_admin')
-firebase_logger.setLevel(logging.DEBUG)  # Set Firebase logging to DEBUG level
+firebase_logger.setLevel(logging.WARNING)  # Changed from DEBUG to WARNING
 
 # Initialize Flask app and Socket.IO
 app = Flask(__name__)
@@ -57,7 +57,7 @@ islands = {}
 last_db_update = defaultdict(float)  # Track last database update time for each player
 DB_UPDATE_INTERVAL = 0.2  # seconds between database updates
 # Add new distance threshold constant and tracking dictionary
-MIN_POSITION_UPDATE_DISTANCE = 1.5  # minimum distance in units to trigger a database update
+MIN_POSITION_UPDATE_DISTANCE = 1000  # minimum distance in units to trigger a database update
 last_db_positions = {}  # Track last database position for each player
 
 # Add this near your other global variables (at the top of the file)
@@ -122,13 +122,15 @@ def handle_connect():
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    logger.info(f"Client disconnected: {request.sid}")
+    logger.error(f"Client disconnected: {request.sid}")
     
     # Look up the player ID from our mapping
     player_id = socket_to_user_map.pop(request.sid, None)
+    logger.error(f'request.sid: {request.sid}')
+    logger.error(f"Socket to user map: {socket_to_user_map}")
 
-    logger.info(f"Player ID: {player_id}")
-    logger.info(f"Players: {players}")
+    logger.error(f"Player ID: {player_id}")
+    logger.error(f"Players: {players}")
     
     # If this was a player, mark them as inactive
     if player_id and player_id in players:
@@ -139,7 +141,7 @@ def handle_disconnect():
             
             # Broadcast that the player disconnected
             emit('player_disconnected', {'id': player_id}, broadcast=True)
-            logger.info(f"Player {player_id} marked as inactive after disconnect")
+            logger.error(f"Player {player_id} marked as inactive after disconnect")
 
 @socketio.on('player_join')
 def handle_player_join(data):
@@ -167,13 +169,15 @@ def handle_player_join(data):
             
             # Now proceed with database operations
             docid = "firebase_" + player_id
+
+            socket_to_user_map[request.sid] = docid
             
             # Get existing player from Firestore before sending connection response
             existing_player = firestore_models.Player.get(docid)
             
             # Send connection_response with the assigned player ID AND name if it exists
             connection_data = {
-                'id': player_id
+                'id': docid
             }
             
             # Add player name if they have one (already registered)
@@ -303,7 +307,7 @@ def handle_position_update(data):
         dz = z - last_pos['z']
         distance = (dx*dx + dy*dy + dz*dz) ** 0.5  # Euclidean distance
 
-        logger.info(f"Distance between current and last stored position: {distance}")
+        # logger.info(f"Distance between current and last stored position: {distance}")
         
         # Update if moved more than threshold distance
         if distance > MIN_POSITION_UPDATE_DISTANCE:
