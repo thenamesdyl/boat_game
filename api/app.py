@@ -446,15 +446,15 @@ def handle_chat_message(data):
         return
     
     # Create message in Firestore
-    #message = firestore_models.Message.create(
-    #    player_id,
-    #    content,
-    #    message_type='global'
-    #)
+    message = firestore_models.Message.create(
+        player_id,
+        content,
+        message_type='global'
+    )
     
-    #if message:
+    if message:
         # Broadcast message to all clients
-    emit('new_message', content, broadcast=True)
+        emit('new_message', message, broadcast=True)
 
 @socketio.on('update_player_color')
 def handle_update_player_color(data):
