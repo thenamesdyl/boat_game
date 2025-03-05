@@ -300,13 +300,13 @@ function createLeaderboardUI() {
     bookIcon.style.zIndex = '100';
     bookIcon.style.pointerEvents = 'auto';
 
-    // Create the book cover
+    // Create the book cover with a more decorative style
     const bookCover = document.createElement('div');
     bookCover.className = 'book-cover';
     bookCover.style.position = 'absolute';
     bookCover.style.width = '100%';
     bookCover.style.height = '100%';
-    bookCover.style.backgroundColor = '#8B4513'; // Brown leather color
+    bookCover.style.backgroundColor = '#6B4226'; // Richer brown leather color
     bookCover.style.borderRadius = '3px 10px 10px 3px'; // Rounded on right side like a book
     bookCover.style.boxShadow = '2px 2px 5px rgba(0, 0, 0, 0.5), 0 0 5px rgba(139, 69, 19, 0.8) inset';
     bookCover.style.border = '1px solid #654321';
@@ -314,18 +314,31 @@ function createLeaderboardUI() {
     bookCover.style.transformOrigin = 'left center';
     bookCover.style.transition = 'transform 0.3s ease';
 
-    // Create book spine
+    // Add decorative embossed pattern on the cover
+    bookCover.style.backgroundImage = 'radial-gradient(circle at 50% 30%, rgba(255, 215, 0, 0.2) 0%, rgba(139, 69, 19, 0.1) 60%)';
+
+    // Create book spine with more detail
     const bookSpine = document.createElement('div');
     bookSpine.className = 'book-spine';
     bookSpine.style.position = 'absolute';
     bookSpine.style.left = '0';
     bookSpine.style.width = '5px';
     bookSpine.style.height = '100%';
-    bookSpine.style.backgroundColor = '#654321'; // Darker brown for spine
+    bookSpine.style.backgroundColor = '#513018'; // Darker brown for spine
     bookSpine.style.borderRadius = '2px 0 0 2px';
     bookSpine.style.boxShadow = 'inset -1px 0 3px rgba(0, 0, 0, 0.5)';
 
-    // Create book pages (white edge visible on the side)
+    // Add decorative lines to the spine
+    const spineLines = document.createElement('div');
+    spineLines.style.position = 'absolute';
+    spineLines.style.top = '10%';
+    spineLines.style.left = '0';
+    spineLines.style.width = '100%';
+    spineLines.style.height = '80%';
+    spineLines.style.backgroundImage = 'linear-gradient(0deg, transparent 85%, rgba(255, 215, 0, 0.3) 87%, transparent 90%, transparent 96%, rgba(255, 215, 0, 0.3) 98%)';
+    bookSpine.appendChild(spineLines);
+
+    // Create book pages with more detail
     const bookPages = document.createElement('div');
     bookPages.className = 'book-pages';
     bookPages.style.position = 'absolute';
@@ -338,51 +351,99 @@ function createLeaderboardUI() {
     bookPages.style.zIndex = '-1'; // Behind the cover
     bookPages.style.transform = 'translateX(-3px)';
 
-    // Create book title label
-    const bookTitle = document.createElement('div');
-    bookTitle.className = 'book-title';
-    bookTitle.textContent = "Diary";
-    bookTitle.style.position = 'absolute';
-    bookTitle.style.top = '50%';
-    bookTitle.style.left = '50%';
-    bookTitle.style.transform = 'translate(-50%, -50%) rotate(-90deg)';
-    bookTitle.style.color = '#F5F1E4'; // Off-white color
-    bookTitle.style.fontSize = '18px';
-    bookTitle.style.fontWeight = 'bold';
-    bookTitle.style.fontFamily = '"Pirata One", cursive, serif';
-    bookTitle.style.whiteSpace = 'nowrap';
-    bookTitle.style.textAlign = 'center';
-    bookTitle.style.textShadow = '0 0 2px rgba(0, 0, 0, 0.7)';
+    // Add paper texture to pages
+    bookPages.style.backgroundImage = 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAMAAAAp4XiDAAAAUVBMVEWFhYWDg4N3d3dtbW17e3t1dXWBgYGHh4d5eXlzc3OLi4ubm5uVlZWPj4+NjY19fX2JiYl/f39ra2uRkZGZmZlpaWmXl5dvb29xcXGTk5NnZ2c4zIykAAAA70lEQVR4nO3VbS+CMBAG4DqGCOxdZobK//+dh3MUpLtidRL7wvN1N5I2d5GmaVS1QCDC6wdJlKZp2rb8DzJNU3uLdJpYHI2faYnyLYxGy6SJakR41ETNisxUibJkPmOEEFI4NcgMESaEzlgQYXv3TIi/qEE2Rp5o8+ZbpO8uFd41nZ9YEbZvbxuOxMPZmbmRgfBIeGSHxxEkaoUQivQgI2LvneeR3aU/Ic9+UgghhJzxO/L5vj6vA92RRw+pC/ejXUzEI2KGxQlZ3CmrB0IikUikbkOMnwwxQAZyGUIGIQdtYFqnakXbf5r8V1SvNvAH4lwRMJEPK/kAAAAASUVORK5CYII=")';
+    bookPages.style.backgroundSize = 'cover';
 
-    // Create a decorative bookmark hanging out of the book
-    const bookmark = document.createElement('div');
-    bookmark.className = 'book-bookmark';
-    bookmark.style.position = 'absolute';
-    bookmark.style.top = '5px';
-    bookmark.style.right = '10px';
-    bookmark.style.width = '5px';
-    bookmark.style.height = '15px';
-    bookmark.style.backgroundColor = '#B22222'; // Red bookmark
-    bookmark.style.borderRadius = '0 0 2px 2px';
-    bookmark.style.zIndex = '2';
+    // Add a decorative compass emblem on the cover
+    const compassEmblem = document.createElement('div');
+    compassEmblem.style.position = 'absolute';
+    compassEmblem.style.width = '30px';
+    compassEmblem.style.height = '30px';
+    compassEmblem.style.top = '50%';
+    compassEmblem.style.left = '50%';
+    compassEmblem.style.transform = 'translate(-50%, -50%)';
+    compassEmblem.style.borderRadius = '50%';
+    compassEmblem.style.backgroundColor = 'rgba(139, 69, 19, 0.2)';
+    compassEmblem.style.border = '2px solid rgba(218, 165, 32, 0.6)';
+    compassEmblem.style.boxShadow = 'inset 0 0 5px rgba(218, 165, 32, 0.4)';
 
-    // Add hover effects
+    // Compass lines
+    const compassLines = document.createElement('div');
+    compassLines.style.position = 'absolute';
+    compassLines.style.width = '100%';
+    compassLines.style.height = '100%';
+    compassLines.style.backgroundImage = `
+        linear-gradient(0deg, transparent 48%, rgba(218, 165, 32, 0.7) 49%, rgba(218, 165, 32, 0.7) 51%, transparent 52%),
+        linear-gradient(90deg, transparent 48%, rgba(218, 165, 32, 0.7) 49%, rgba(218, 165, 32, 0.7) 51%, transparent 52%),
+        linear-gradient(45deg, transparent 48%, rgba(218, 165, 32, 0.4) 49%, rgba(218, 165, 32, 0.4) 51%, transparent 52%),
+        linear-gradient(135deg, transparent 48%, rgba(218, 165, 32, 0.4) 49%, rgba(218, 165, 32, 0.4) 51%, transparent 52%)
+    `;
+    compassLines.style.borderRadius = '50%';
+    compassEmblem.appendChild(compassLines);
+
+    // Compass center dot
+    const compassCenter = document.createElement('div');
+    compassCenter.style.position = 'absolute';
+    compassCenter.style.width = '6px';
+    compassCenter.style.height = '6px';
+    compassCenter.style.top = '50%';
+    compassCenter.style.left = '50%';
+    compassCenter.style.transform = 'translate(-50%, -50%)';
+    compassCenter.style.borderRadius = '50%';
+    compassCenter.style.backgroundColor = 'rgba(218, 165, 32, 0.8)';
+    compassEmblem.appendChild(compassCenter);
+
+    bookCover.appendChild(compassEmblem);
+
+    // Add metal corner protectors
+    const addCornerProtector = (top, right) => {
+        const corner = document.createElement('div');
+        corner.style.position = 'absolute';
+        corner.style.width = '10px';
+        corner.style.height = '10px';
+        corner.style.backgroundColor = 'transparent';
+        corner.style.borderRadius = '0';
+        corner.style.top = top ? '0' : 'auto';
+        corner.style.bottom = !top ? '0' : 'auto';
+        corner.style.right = right ? '0' : 'auto';
+        corner.style.left = !right ? '0' : 'auto';
+
+        // Create the corner with borders
+        corner.style.borderTop = top ? '2px solid rgba(218, 165, 32, 0.8)' : 'none';
+        corner.style.borderBottom = !top ? '2px solid rgba(218, 165, 32, 0.8)' : 'none';
+        corner.style.borderRight = right ? '2px solid rgba(218, 165, 32, 0.8)' : 'none';
+        corner.style.borderLeft = !right ? '2px solid rgba(218, 165, 32, 0.8)' : 'none';
+
+        bookCover.appendChild(corner);
+    };
+
+    // Add all four corners
+    addCornerProtector(true, true);
+    addCornerProtector(true, false);
+    addCornerProtector(false, true);
+    addCornerProtector(false, false);
+
+    // Enhanced hover effects
     bookIcon.addEventListener('mouseover', () => {
-        bookCover.style.transform = 'perspective(300px) rotateY(-20deg)';
-        bookIcon.style.transform = 'scale(1.05)';
+        bookCover.style.transform = 'perspective(300px) rotateY(-25deg)';
+        bookIcon.style.transform = 'scale(1.1)';
+        bookCover.style.boxShadow = '4px 4px 8px rgba(0, 0, 0, 0.6), 0 0 5px rgba(139, 69, 19, 0.8) inset';
+        compassEmblem.style.transform = 'translate(-50%, -50%) rotate(45deg)';
+        compassEmblem.style.transition = 'transform 0.6s ease';
     });
 
     bookIcon.addEventListener('mouseout', () => {
         bookCover.style.transform = 'perspective(300px) rotateY(-10deg)';
         bookIcon.style.transform = 'scale(1)';
+        bookCover.style.boxShadow = '2px 2px 5px rgba(0, 0, 0, 0.5), 0 0 5px rgba(139, 69, 19, 0.8) inset';
+        compassEmblem.style.transform = 'translate(-50%, -50%) rotate(0deg)';
     });
 
     // Assemble the book
-    bookCover.appendChild(bookTitle);
     bookIcon.appendChild(bookPages);
     bookIcon.appendChild(bookCover);
     bookIcon.appendChild(bookSpine);
-    bookIcon.appendChild(bookmark);
     document.body.appendChild(bookIcon);
 
     // Create book panel (hidden by default)

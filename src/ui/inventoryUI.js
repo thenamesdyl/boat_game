@@ -19,20 +19,31 @@ class InventoryUI {
 
     // Create the inventory chest and panel
     createInventory() {
-        // Create inventory chest (the icon)
+        // Create inventory chest container (the icon)
         const inventoryChest = document.createElement('div');
         inventoryChest.style.position = 'absolute';
         inventoryChest.style.top = '15px';
         inventoryChest.style.right = '60px';
         inventoryChest.style.width = '65px';
-        inventoryChest.style.height = '58px';
-        inventoryChest.style.borderRadius = '5px';
+        inventoryChest.style.height = '60px';
         inventoryChest.style.cursor = 'pointer';
-        inventoryChest.style.transition = 'transform 0.2s';
+        inventoryChest.style.transition = 'transform 0.3s';
         inventoryChest.style.zIndex = '100';
         inventoryChest.style.pointerEvents = 'auto';
+        inventoryChest.style.perspective = '300px';
 
-        // Create chest body
+        // Create a back panel for the chest that will be visible during lid animation
+        const chestBackPanel = document.createElement('div');
+        chestBackPanel.style.position = 'absolute';
+        chestBackPanel.style.width = '100%';
+        chestBackPanel.style.height = '90%';
+        chestBackPanel.style.backgroundColor = '#5D2906'; // Darker brown than chest body
+        chestBackPanel.style.borderRadius = '5px'; // Slightly smaller radius to appear behind
+        chestBackPanel.style.zIndex = '-1'; // Position it behind other chest elements
+        chestBackPanel.style.boxShadow = 'inset 0 0 5px rgba(0, 0, 0, 0.5)';
+        inventoryChest.appendChild(chestBackPanel);
+
+        // Create chest body - simplified styling
         const chestBody = document.createElement('div');
         chestBody.className = 'chest-body';
         chestBody.style.position = 'absolute';
@@ -40,38 +51,79 @@ class InventoryUI {
         chestBody.style.height = '60%';
         chestBody.style.bottom = '0';
         chestBody.style.backgroundColor = '#8B4513'; // Brown color
-        chestBody.style.borderRadius = '0 0 5px 5px';
-        chestBody.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.5)';
-        chestBody.style.backgroundImage = 'linear-gradient(90deg, rgba(139, 69, 19, 0.9) 10%, rgba(160, 82, 45, 1) 50%, rgba(139, 69, 19, 0.9) 90%)';
+        chestBody.style.borderRadius = '0 0 8px 8px';
+        chestBody.style.boxShadow = '0 3px 6px rgba(0, 0, 0, 0.3)';
+        chestBody.style.border = '1px solid rgba(0, 0, 0, 0.3)';
 
-        // Create chest lid
+        // Create chest lid with transform capabilities - proper back-hinge opening
         const chestLid = document.createElement('div');
         chestLid.className = 'chest-lid';
         chestLid.style.position = 'absolute';
         chestLid.style.width = '100%';
-        chestLid.style.height = '40%';
+        chestLid.style.height = '45%';
         chestLid.style.top = '0';
-        chestLid.style.backgroundColor = '#A0522D'; // Slightly lighter brown for lid
-        chestLid.style.borderRadius = '5px 5px 0 0';
-        chestLid.style.boxShadow = '0 0 3px rgba(0, 0, 0, 0.5), inset 0 0 2px rgba(0, 0, 0, 0.4)';
-        chestLid.style.backgroundImage = 'linear-gradient(90deg, rgba(160, 82, 45, 0.9) 10%, rgba(178, 95, 57, 1) 50%, rgba(160, 82, 45, 0.9) 90%)';
-        chestLid.style.transition = 'transform 0.3s ease';
-        chestLid.style.transformOrigin = 'bottom center';
+        chestLid.style.backgroundColor = '#A0522D'; // Slightly lighter brown
+        chestLid.style.borderRadius = '8px 8px 0 0';
+        chestLid.style.boxShadow = '0 0 4px rgba(0, 0, 0, 0.4)';
+        // Changed to back-edge opening for traditional chest
+        chestLid.style.transformOrigin = 'center top';
+        chestLid.style.transition = 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1.2)';
+        chestLid.style.border = '1px solid rgba(0, 0, 0, 0.3)';
 
-        // Create chest lock/clasp
+        // Add interior of the lid (visible when open)
+        const lidInterior = document.createElement('div');
+        lidInterior.style.position = 'absolute';
+        lidInterior.style.width = '90%';
+        lidInterior.style.height = '90%';
+        lidInterior.style.top = '10%';
+        lidInterior.style.left = '5%';
+        lidInterior.style.backgroundColor = '#654321';
+        lidInterior.style.borderRadius = '5px 5px 0 0';
+        lidInterior.style.boxShadow = 'inset 0 0 5px rgba(0, 0, 0, 0.5)';
+        lidInterior.style.opacity = '0'; // Hidden initially
+        lidInterior.style.transition = 'opacity 0.3s';
+        chestLid.appendChild(lidInterior);
+
+        // Create simplified lock/clasp at the front edge
         const chestLock = document.createElement('div');
         chestLock.className = 'chest-lock';
         chestLock.style.position = 'absolute';
-        chestLock.style.width = '10px';
-        chestLock.style.height = '10px';
-        chestLock.style.bottom = '0';
+        chestLock.style.width = '12px';
+        chestLock.style.height = '14px';
+        chestLock.style.top = '100%'; // Position it at bottom of lid, extending down
         chestLock.style.left = '50%';
         chestLock.style.transform = 'translateX(-50%)';
         chestLock.style.backgroundColor = '#DAA520'; // Gold color
-        chestLock.style.borderRadius = '2px';
-        chestLock.style.boxShadow = '0 0 2px rgba(0, 0, 0, 0.8)';
+        chestLock.style.borderRadius = '0 0 3px 3px';
+        chestLock.style.boxShadow = '0 2px 3px rgba(0, 0, 0, 0.4)';
+        chestLock.style.transition = 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1.2)';
+        chestLid.appendChild(chestLock);
 
-        // Create horizontal wood grain lines for body
+        // Add keyhole to lock - simple circle
+        const keyhole = document.createElement('div');
+        keyhole.style.position = 'absolute';
+        keyhole.style.width = '5px';
+        keyhole.style.height = '5px';
+        keyhole.style.top = '7px';
+        keyhole.style.left = '50%';
+        keyhole.style.transform = 'translateX(-50%)';
+        keyhole.style.backgroundColor = '#333';
+        keyhole.style.borderRadius = '50%';
+        chestLock.appendChild(keyhole);
+
+        // Add lock plate on the body that the lock closes onto
+        const lockPlate = document.createElement('div');
+        lockPlate.style.position = 'absolute';
+        lockPlate.style.width = '14px';
+        lockPlate.style.height = '5px';
+        lockPlate.style.top = '0';
+        lockPlate.style.left = '50%';
+        lockPlate.style.transform = 'translateX(-50%)';
+        lockPlate.style.backgroundColor = '#DAA520'; // Gold color
+        lockPlate.style.borderRadius = '0 0 3px 3px';
+        chestBody.appendChild(lockPlate);
+
+        // Create wood grain lines - limited to just a few
         const createWoodGrain = (parent, top, width) => {
             const grain = document.createElement('div');
             grain.style.position = 'absolute';
@@ -83,45 +135,61 @@ class InventoryUI {
             parent.appendChild(grain);
         };
 
-        // Add wood grain to chest body
-        createWoodGrain(chestBody, 25, 90);
-        createWoodGrain(chestBody, 50, 80);
-        createWoodGrain(chestBody, 75, 85);
+        // Add just a few wood grain lines
+        createWoodGrain(chestBody, 30, 85);
+        createWoodGrain(chestBody, 70, 90);
+        createWoodGrain(chestLid, 50, 85);
 
-        // Add wood grain to chest lid
-        createWoodGrain(chestLid, 30, 85);
-        createWoodGrain(chestLid, 60, 90);
-
-        // Add metal bands/reinforcements
-        const createMetalBand = (parent, isVertical, position) => {
-            const band = document.createElement('div');
-            band.style.position = 'absolute';
-            band.style.backgroundColor = '#B8860B'; // Dark golden
-
-            if (isVertical) {
-                band.style.width = '4px';
-                band.style.height = '100%';
-                band.style.left = `${position}%`;
-                band.style.top = '0';
-            } else {
-                band.style.height = '4px';
-                band.style.width = '100%';
-                band.style.top = `${position}%`;
-                band.style.left = '0';
-            }
-
-            parent.appendChild(band);
-        };
-
-        // Add vertical metal bands
-        createMetalBand(chestBody, true, 15);
-        createMetalBand(chestBody, true, 85);
+        // Create the interior treasure area
+        const treasureArea = document.createElement('div');
+        treasureArea.style.position = 'absolute';
+        treasureArea.style.width = '90%';
+        treasureArea.style.height = '80%';
+        treasureArea.style.top = '10%';
+        treasureArea.style.left = '5%';
+        treasureArea.style.backgroundColor = '#654321'; // Dark brown interior
+        treasureArea.style.borderRadius = '0 0 5px 5px';
+        treasureArea.style.boxShadow = 'inset 0 0 10px rgba(0, 0, 0, 0.7)';
+        treasureArea.style.overflow = 'hidden';
+        chestBody.appendChild(treasureArea);
 
         // Assemble the chest
         inventoryChest.appendChild(chestBody);
-        inventoryChest.appendChild(chestLock);
         inventoryChest.appendChild(chestLid);
         document.body.appendChild(inventoryChest);
+
+        // Proper chest opening animation with lid opening backward
+        inventoryChest.addEventListener('mouseover', () => {
+            // Open lid backward with proper physics
+            chestLid.style.transform = 'rotateX(-100deg)';
+            inventoryChest.style.transform = 'scale(1.05)';
+
+            // Show interior of lid as it opens
+            lidInterior.style.opacity = '1';
+
+            // Reveal coins with slight delay for effect
+            const coins = treasureArea.querySelectorAll('.treasure-coin');
+            coins.forEach((coin, index) => {
+                setTimeout(() => {
+                    coin.style.opacity = '1';
+                }, 150 + (index * 50));
+            });
+        });
+
+        inventoryChest.addEventListener('mouseout', () => {
+            // Close lid
+            chestLid.style.transform = 'rotateX(0deg)';
+            inventoryChest.style.transform = 'scale(1)';
+
+            // Hide interior of lid
+            lidInterior.style.opacity = '0';
+
+            // Hide coins
+            const coins = treasureArea.querySelectorAll('.treasure-coin');
+            coins.forEach(coin => {
+                coin.style.opacity = '0';
+            });
+        });
 
         // Create inventory panel (hidden by default)
         const inventoryPanel = document.createElement('div');
@@ -197,7 +265,7 @@ class InventoryUI {
         fishTab.dataset.active = 'true';
         tabsContainer.appendChild(fishTab);
 
-        // Other tabs can be added here (for future expansion)
+        // Treasure tab
         const treasureTab = document.createElement('div');
         treasureTab.textContent = 'Treasures';
         treasureTab.style.padding = '8px 15px';
@@ -236,15 +304,29 @@ class InventoryUI {
         treasureContent.style.color = 'rgba(200, 200, 200, 0.7)';
         contentArea.appendChild(treasureContent);
 
-        // Add hover effects
-        inventoryChest.addEventListener('mouseover', () => {
-            chestLid.style.transform = 'perspective(100px) rotateX(-15deg)';
-            inventoryChest.style.transform = 'scale(1.05)';
-        });
+        // Toggle inventory when chest is clicked
+        inventoryChest.addEventListener('click', () => {
+            if (inventoryPanel.style.display === 'none') {
+                // Play chest opening sound
+                this.playChestOpenSound();
 
-        inventoryChest.addEventListener('mouseout', () => {
-            chestLid.style.transform = 'none';
-            inventoryChest.style.transform = 'scale(1)';
+                inventoryPanel.style.display = 'flex';
+                this.isOpen = true;
+                // Register this as an open UI with the main game UI if available
+                if (typeof this.registerOpenUI === 'function') {
+                    this.registerOpenUI('inventory');
+                }
+            } else {
+                // Play chest closing sound (slightly different)
+                this.playChestCloseSound();
+
+                inventoryPanel.style.display = 'none';
+                this.isOpen = false;
+                // Unregister this as an open UI if available
+                if (typeof this.unregisterOpenUI === 'function') {
+                    this.unregisterOpenUI('inventory');
+                }
+            }
         });
 
         // Add click events for tabs
@@ -272,31 +354,6 @@ class InventoryUI {
 
             treasureContent.style.display = 'block';
             fishContent.style.display = 'none';
-        });
-
-        // Toggle inventory when chest is clicked
-        inventoryChest.addEventListener('click', () => {
-            if (inventoryPanel.style.display === 'none') {
-                // Play chest opening sound
-                this.playChestOpenSound();
-
-                inventoryPanel.style.display = 'flex';
-                this.isOpen = true;
-                // Register this as an open UI with the main game UI if available
-                if (typeof this.registerOpenUI === 'function') {
-                    this.registerOpenUI('inventory');
-                }
-            } else {
-                // Play chest closing sound (slightly different)
-                this.playChestCloseSound();
-
-                inventoryPanel.style.display = 'none';
-                this.isOpen = false;
-                // Unregister this as an open UI if available
-                if (typeof this.unregisterOpenUI === 'function') {
-                    this.unregisterOpenUI('inventory');
-                }
-            }
         });
 
         // Close inventory when close button is clicked
