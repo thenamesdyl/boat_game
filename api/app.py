@@ -7,7 +7,7 @@ import logging
 import time
 from datetime import datetime
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth as firebase_auth
 import firestore_models  # Import our new Firestore models
 from collections import defaultdict
 import mimetypes
@@ -16,11 +16,22 @@ import mimetypes
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()  # Ensure logs go to console/terminal
+    ]
+)
 logger = logging.getLogger(__name__)
 
+# Change Werkzeug logger level to INFO for development
 werkzeug_logger = logging.getLogger('werkzeug')
-werkzeug_logger.setLevel(logging.ERROR) 
+werkzeug_logger.setLevel(logging.INFO)  # Changed from ERROR to INFO
+
+# Also add more verbose logging for Firebase auth
+firebase_logger = logging.getLogger('firebase_admin')
+firebase_logger.setLevel(logging.DEBUG)  # Set Firebase logging to DEBUG level
 
 # Initialize Flask app and Socket.IO
 app = Flask(__name__)
@@ -76,6 +87,28 @@ def load_data_from_firestore():
 # Call the function during app startup
 load_data_from_firestore()
 
+# Add this new function for token verification
+def verify_firebase_token(token):
+    """Verify Firebase token and return the UID if valid"""
+    try:
+        if not token:
+            logger.warning("No token provided for verification")
+            return None
+            
+        logger.info("Attempting to verify Firebase token")
+        
+        # Verify the token
+        decoded_token = firebase_auth.verify_id_token(token)
+        
+        # Get user UID from the token
+        uid = decoded_token['uid']
+        logger.info(f"Successfully verified Firebase token for user: {uid}")
+        return uid
+    except Exception as e:
+        logger.error(f"Error verifying Firebase token: {e}")
+        logger.exception("Token verification exception details:")  # This logs the full stack trace
+        return None
+
 # Socket.IO event handlers
 @socketio.on('connect')
 def handle_connect():
@@ -85,44 +118,130 @@ def handle_connect():
 def handle_disconnect():
     logger.info(f"Client disconnected: {request.sid}")
     
-    # If this was a player, mark them as inactive
-    player_id = request.sid
-    if player_id in players:
-        # Update player in Firestore and cache
-        firestore_models.Player.update(player_id, active=False, last_update=time.time())
-        if player_id in players:
-            players[player_id]['active'] = False
+    # Look up the player ID from socket session
+    try:
+        session_ref = db.collection('socket_sessions').document(request.sid)
+        session = session_ref.get()
+        
+        if session.exists:
+            session_data = session.to_dict()
+            player_id = session_data.get('player_id')
             
-            # Broadcast that the player disconnected
-            emit('player_disconnected', {'id': player_id}, broadcast=True)
+            # If this was a player, mark them as inactive
+            if player_id and player_id in players:
+                # Update player in Firestore and cache
+                firestore_models.Player.update(player_id, active=False, last_update=time.time())
+                if player_id in players:
+                    players[player_id]['active'] = False
+                    
+                    # Broadcast that the player disconnected
+                    emit('player_disconnected', {'id': player_id}, broadcast=True)
+            
+            # Delete the session mapping
+            session_ref.delete()
+        else:
+            # Legacy fallback - directly use socket ID as player ID
+            player_id = request.sid
+            if player_id in players:
+                # Update player in Firestore and cache
+                firestore_models.Player.update(player_id, active=False, last_update=time.time())
+                players[player_id]['active'] = False
+                
+                # Broadcast that the player disconnected
+                emit('player_disconnected', {'id': player_id}, broadcast=True)
+    except Exception as e:
+        logger.error(f"Error handling disconnect: {e}")
 
 @socketio.on('player_join')
 def handle_player_join(data):
+    # Get the Firebase token and UID from the request
+    firebase_token = data.get('firebaseToken')
+    claimed_firebase_uid = data.get('firebaseUid')
+    
+    # Use socket ID as default player ID
     player_id = request.sid
+
+    logger.info(f"Player join data: {data}")
+    
+    # Initialize verified_uid to None by default
+    verified_uid = None
+    
+    # If Firebase authentication is being used, verify the token
+    if firebase_token and claimed_firebase_uid:
+        verified_uid = verify_firebase_token(firebase_token)
+        
+        # Only use the Firebase UID if token verification succeeded
+        if verified_uid and verified_uid == claimed_firebase_uid:
+            logger.info(f"Authentication successful for Firebase user: {verified_uid}")
+            # Use the Firebase UID instead of socket ID for persistent identity
+            player_id = f"firebase_{verified_uid}"
+        else:
+            logger.warning(f"Firebase token verification failed. Using socket ID instead.")
+    
     logger.info(f"New player joined: {player_id}")
     logger.info(f"Name: {data.get('name', 'Unknown')}")
-    logger.info(f"Color: {data.get('color')}")
     
-    # Create new player entry with stats
-    player_data = {
-        'name': data.get('name', f'Sailor {player_id[:4]}'),
-        'color': data.get('color', {'r': 0.3, 'g': 0.6, 'b': 0.8}),
-        'position': data.get('position', {'x': 0, 'y': 0, 'z': 0}),
-        'rotation': data.get('rotation', 0),
-        'mode': data.get('mode', 'boat'),
-        'last_update': time.time(),
-        'fishCount': 0,
-        'monsterKills': 0,
-        'money': 0,
-        'active': True  # Mark as active when they join
-    }
+    # Check if this player already exists in the database
+    existing_player = firestore_models.Player.get(player_id)
     
-    # Create player in Firestore and cache the result
-    player = firestore_models.Player.create(player_id, **player_data)
-    players[player_id] = player
+    if existing_player:
+        # Update the existing player's active status and socket ID
+        logger.info(f"Existing player reconnected: {player_id}")
+        
+        # Store the socket ID mapping for this player
+        session_mapping = {
+            'player_id': player_id,
+            'socket_id': request.sid,
+            'last_update': time.time()
+        }
+        
+        # Store mapping in a new collection
+        db.collection('socket_sessions').document(request.sid).set(session_mapping)
+        
+        # Update player data
+        player_data = {
+            'active': True,
+            'last_update': time.time(),
+            'position': data.get('position', existing_player.get('position')),
+            'rotation': data.get('rotation', existing_player.get('rotation')),
+            'mode': data.get('mode', existing_player.get('mode'))
+        }
+        
+        # Update in Firestore
+        firestore_models.Player.update(player_id, **player_data)
+        
+        # Update cache
+        players[player_id] = {**existing_player, **player_data}
+    else:
+        # Create new player entry with stats
+        player_data = {
+            'name': data.get('name', f'Sailor {player_id[:4]}'),
+            'color': data.get('color', {'r': 0.3, 'g': 0.6, 'b': 0.8}),
+            'position': data.get('position', {'x': 0, 'y': 0, 'z': 0}),
+            'rotation': data.get('rotation', 0),
+            'mode': data.get('mode', 'boat'),
+            'last_update': time.time(),
+            'fishCount': 0,
+            'monsterKills': 0,
+            'money': 0,
+            'active': True,  # Mark as active when they join
+            'firebase_uid': claimed_firebase_uid if verified_uid else None
+        }
+        
+        # Create player in Firestore and cache the result
+        player = firestore_models.Player.create(player_id, **player_data)
+        players[player_id] = player
+        
+        # Store the socket ID mapping
+        session_mapping = {
+            'player_id': player_id,
+            'socket_id': request.sid,
+            'last_update': time.time()
+        }
+        db.collection('socket_sessions').document(request.sid).set(session_mapping)
     
     # Broadcast to all clients that a new player joined
-    emit('player_joined', player, broadcast=True)
+    emit('player_joined', players[player_id], broadcast=True)
     
     # Send existing ACTIVE players to the new player
     active_players = [p for p in players.values() if p.get('active', False)]
@@ -140,7 +259,22 @@ def handle_player_join(data):
 
 @socketio.on('player_update')
 def handle_player_update(data):
-    player_id = request.sid
+    logger.info(f"Player update data: {data}")
+    socket_id = request.sid
+    
+    # Find the player ID associated with this socket
+    try:
+        session_ref = db.collection('socket_sessions').document(socket_id)
+        session = session_ref.get()
+        
+        if session.exists:
+            player_id = session.to_dict().get('player_id')
+        else:
+            # Legacy fallback
+            player_id = socket_id
+    except Exception as e:
+        logger.error(f"Error finding player for socket {socket_id}: {e}")
+        return
     
     # Ensure player exists
     if player_id not in players:
@@ -390,4 +524,4 @@ def file_system_info():
 
 if __name__ == '__main__':
     # Run the Socket.IO server with debug and reloader enabled
-    socketio.run(app, host='0.0.0.0') 
+    socketio.run(app, host='0.0.0.0', port=5001) 

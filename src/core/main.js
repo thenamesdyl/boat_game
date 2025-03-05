@@ -30,6 +30,7 @@ import MusicSystem from '../audio/music.js';
 import { initCameraControls, updateCameraPosition } from '../controls/cameraControls.js';
 import { setupWater, updateWater } from '../environment/water.js';
 import { initDiagnostics, updateDiagnosticsDisplay, ENABLE_DIAGNOSTICS } from '../ui/diagnostics.js';
+import * as Firebase from './firebase.js';
 
 const water = setupWater();
 
@@ -61,6 +62,9 @@ scene.environment = environmentMap;*/
 
 // Add these variables to your global scope
 let lastTime = null;
+
+// Add this near the top with other variables
+let firebaseInitialized = false;
 
 // Scene setup
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -161,6 +165,32 @@ const waterMaterial = new THREE.ShaderMaterial({
 // Add this at the beginning of your script.js file
 let playerName = '';
 let playerColor = '#3498db'; // Default blue
+
+// Add this function after your other initialization code
+async function initializeFirebaseAuth() {
+    console.log("Initializing Firebase authentication...");
+
+    // Try to initialize Firebase
+    firebaseInitialized = await Firebase.initializeFirebase();
+
+    if (!firebaseInitialized) {
+        console.warn("Firebase initialization failed");
+        return;
+    }
+
+    // Show Firebase auth popup
+    Firebase.showAuthPopup((user) => {
+        console.log("Firebase authentication successful:", user);
+
+        // Firebase auth will proceed in parallel with existing login
+        // User profile will be available through Firebase.getUserProfile()
+        initializeNetworkWithPlayerInfo();
+    });
+}
+
+// Add this call early in your initialization sequence 
+// (can be placed right before or after other initialization code)
+initializeFirebaseAuth();
 
 // Create a simple login UI
 function showLoginScreen() {
@@ -268,11 +298,12 @@ function initializeNetworkWithPlayerInfo() {
 }
 
 // Replace your existing setTimeout for network initialization with this:
+/*
 setTimeout(() => {
     console.log("Showing player setup screen...");
     showLoginScreen();
 }, 2000);
-
+*/
 
 // Island generation variables
 const visibleDistance = 2000; // Increased to see islands from even further away
