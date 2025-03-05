@@ -16,83 +16,88 @@ export class ChatSystem {
     }
 
     createChatUI() {
-        // Create the integrated control panel container
+        // Create the integrated control panel container (styled as a wooden navigation desk)
         this.controlPanel = document.createElement('div');
         this.controlPanel.className = 'ship-control-panel';
         this.controlPanel.style.position = 'absolute';
         this.controlPanel.style.bottom = '20px';
         this.controlPanel.style.right = '20px';
         this.controlPanel.style.width = '200px';
-        this.controlPanel.style.backgroundColor = 'rgba(20, 40, 60, 0.85)';
-        this.controlPanel.style.borderRadius = '10px';
-        this.controlPanel.style.boxShadow = '0 0 15px rgba(0, 0, 0, 0.7), inset 0 0 10px rgba(100, 200, 255, 0.2)';
-        this.controlPanel.style.border = '2px solid #2a5a8a';
+        this.controlPanel.style.backgroundColor = '#8B5A2B'; // Medium cedar wood
+        this.controlPanel.style.borderRadius = '8px';
+        this.controlPanel.style.boxShadow = '0 0 15px rgba(0, 0, 0, 0.7), inset 0 0 10px rgba(0, 0, 0, 0.3)'; // Worn wood look
+        this.controlPanel.style.border = '4px solid #A67C52'; // Lighter wood border
+        this.controlPanel.style.borderBottom = '6px solid #A67C52'; // Thicker bottom border for desk-like appearance
         this.controlPanel.style.overflow = 'hidden';
         this.controlPanel.style.zIndex = '900';
         document.body.appendChild(this.controlPanel);
 
-        // Panel header with ship control look
+        // Panel header with navigation station look
         const panelHeader = document.createElement('div');
         panelHeader.className = 'control-panel-header';
         panelHeader.style.height = '30px';
-        panelHeader.style.backgroundColor = '#1a3a5a';
-        panelHeader.style.borderBottom = '2px solid #2a5a8a';
+        panelHeader.style.backgroundColor = '#654321'; // Darker wood
+        panelHeader.style.borderBottom = '2px solid #D2B48C'; // Tan border like worn leather
         panelHeader.style.display = 'flex';
         panelHeader.style.justifyContent = 'space-between';
         panelHeader.style.alignItems = 'center';
         panelHeader.style.padding = '0 10px';
         this.controlPanel.appendChild(panelHeader);
 
-        // Ship systems label
+        // Ship systems label (now NAVIGATION STATION)
         const systemsLabel = document.createElement('div');
-        systemsLabel.textContent = 'SHIP SYSTEMS';
-        systemsLabel.style.color = '#8ab7e0';
-        systemsLabel.style.fontFamily = 'monospace, sans-serif';
+        systemsLabel.textContent = 'HELM';
+        systemsLabel.style.color = '#DAA520'; // Golden text
+        systemsLabel.style.fontFamily = 'serif';
         systemsLabel.style.fontWeight = 'bold';
         systemsLabel.style.fontSize = '14px';
+        systemsLabel.style.letterSpacing = '1px';
         panelHeader.appendChild(systemsLabel);
 
-        // Status indicator light
+        // Brass status light
         const statusLight = document.createElement('div');
         statusLight.style.width = '10px';
         statusLight.style.height = '10px';
         statusLight.style.borderRadius = '50%';
-        statusLight.style.backgroundColor = '#00ff66';
-        statusLight.style.boxShadow = '0 0 5px #00ff66';
+        statusLight.style.backgroundColor = '#B8860B'; // Darker gold/brass
+        statusLight.style.boxShadow = '0 0 5px #B8860B';
+        statusLight.style.border = '1px solid #FFD700'; // Gold border
         panelHeader.appendChild(statusLight);
 
-        // Create tabbed interface
+        // Create tabbed interface (styled as weathered book tabs)
         const tabsContainer = document.createElement('div');
         tabsContainer.style.display = 'flex';
-        tabsContainer.style.borderBottom = '1px solid #2a5a8a';
+        tabsContainer.style.borderBottom = '1px solid #D2B48C'; // Tan border
         this.controlPanel.appendChild(tabsContainer);
 
-        // Radar tab (Mini-map)
+        // Navigator's Map tab (renamed from Radar)
         this.radarTab = document.createElement('div');
-        this.radarTab.textContent = 'RADAR';
+        this.radarTab.textContent = 'CHART';
         this.radarTab.style.padding = '6px 10px';
-        this.radarTab.style.backgroundColor = '#1a3a5a';
-        this.radarTab.style.color = '#8ab7e0';
-        this.radarTab.style.fontFamily = 'monospace, sans-serif';
+        this.radarTab.style.backgroundColor = '#654321'; // Darker wood
+        this.radarTab.style.color = '#DAA520'; // Golden text
+        this.radarTab.style.fontFamily = 'serif';
         this.radarTab.style.fontSize = '12px';
         this.radarTab.style.cursor = 'pointer';
         this.radarTab.style.flex = '1';
         this.radarTab.style.textAlign = 'center';
-        this.radarTab.style.borderRight = '1px solid #2a5a8a';
+        this.radarTab.style.borderRight = '1px solid #D2B48C'; // Tan border
+        this.radarTab.style.borderTop = '2px solid #DAA520'; // Gold top accent
         this.radarTab.dataset.active = 'true';
         tabsContainer.appendChild(this.radarTab);
 
-        // Comms tab (Chat)
+        // Comms tab (styled as a logbook tab)
         this.commsTab = document.createElement('div');
-        this.commsTab.textContent = 'COMMS';
+        this.commsTab.textContent = 'LOGBOOK';
         this.commsTab.style.padding = '6px 10px';
         this.commsTab.style.backgroundColor = 'transparent';
-        this.commsTab.style.color = '#5a87b0';
-        this.commsTab.style.fontFamily = 'monospace, sans-serif';
+        this.commsTab.style.color = '#B8860B'; // Darker gold/brass
+        this.commsTab.style.fontFamily = 'serif';
         this.commsTab.style.fontSize = '12px';
         this.commsTab.style.cursor = 'pointer';
         this.commsTab.style.flex = '1';
         this.commsTab.style.textAlign = 'center';
+        this.commsTab.style.borderTop = '1px solid transparent'; // For alignment
         this.commsTab.dataset.active = 'false';
         tabsContainer.appendChild(this.commsTab);
 
@@ -102,21 +107,22 @@ export class ChatSystem {
         contentArea.style.height = '200px';
         this.controlPanel.appendChild(contentArea);
 
-        // Mini-map container (initially visible)
+        // Navigator's Map container (previously mini-map)
         this.miniMapContainer = document.createElement('div');
-        this.miniMapContainer.id = 'mini-map';
+        this.miniMapContainer.id = 'navigators-map';
         this.miniMapContainer.style.position = 'absolute';
         this.miniMapContainer.style.top = '0';
         this.miniMapContainer.style.left = '0';
         this.miniMapContainer.style.width = '100%';
         this.miniMapContainer.style.height = '100%';
-        this.miniMapContainer.style.backgroundColor = 'rgba(0, 30, 60, 0.5)';
+        this.miniMapContainer.style.backgroundColor = '#D2B48C'; // Tan color like parchment
+        this.miniMapContainer.style.backgroundImage = 'url("data:image/svg+xml,%3Csvg width=\'100%25\' height=\'100%25\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cdefs%3E%3Cpattern id=\'smallGrid\' width=\'8\' height=\'8\' patternUnits=\'userSpaceOnUse\'%3E%3Cpath d=\'M 8 0 L 0 0 0 8\' fill=\'none\' stroke=\'%23C19A6B\' stroke-width=\'0.5\'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width=\'100%25\' height=\'100%25\' fill=\'%23D2B48C\'/%3E%3Crect width=\'100%25\' height=\'100%25\' fill=\'url(%23smallGrid)\'/%3E%3C/svg%3E")'; // Grid pattern for map
         this.miniMapContainer.style.display = 'flex';
         this.miniMapContainer.style.justifyContent = 'center';
         this.miniMapContainer.style.alignItems = 'center';
         contentArea.appendChild(this.miniMapContainer);
 
-        // Radar screen overlay effect
+        // Map overlay (circular chart with directional compass)
         const radarScreen = document.createElement('div');
         radarScreen.style.position = 'absolute';
         radarScreen.style.top = '50%';
@@ -125,57 +131,85 @@ export class ChatSystem {
         radarScreen.style.width = '150px';
         radarScreen.style.height = '150px';
         radarScreen.style.borderRadius = '50%';
-        radarScreen.style.border = '2px solid rgba(100, 180, 255, 0.7)';
-        radarScreen.style.boxShadow = 'inset 0 0 20px rgba(0, 150, 200, 0.3)';
-        radarScreen.style.background = 'radial-gradient(circle, rgba(0,50,100,0.6) 0%, rgba(0,20,40,0.9) 100%)';
+        radarScreen.style.border = '2px solid #B8860B'; // Brass border
+        radarScreen.style.boxShadow = 'inset 0 0 10px rgba(184, 134, 11, 0.4)'; // Darker gold inner glow
+        radarScreen.style.background = 'radial-gradient(circle, #D2B48C 0%, #C19A6B 100%)'; // Parchment gradient
         radarScreen.style.overflow = 'hidden';
+
+        // Add compass rose elements
+        const directions = ['N', 'E', 'S', 'W'];
+        directions.forEach((dir, i) => {
+            const dirMarker = document.createElement('div');
+            dirMarker.textContent = dir;
+            dirMarker.style.position = 'absolute';
+            dirMarker.style.color = '#8B4513'; // Dark brown text
+            dirMarker.style.fontSize = '10px';
+            dirMarker.style.fontFamily = 'serif';
+            dirMarker.style.fontWeight = 'bold';
+
+            // Position based on direction
+            if (dir === 'N') {
+                dirMarker.style.top = '5px';
+                dirMarker.style.left = '50%';
+                dirMarker.style.transform = 'translateX(-50%)';
+            } else if (dir === 'E') {
+                dirMarker.style.right = '5px';
+                dirMarker.style.top = '50%';
+                dirMarker.style.transform = 'translateY(-50%)';
+            } else if (dir === 'S') {
+                dirMarker.style.bottom = '5px';
+                dirMarker.style.left = '50%';
+                dirMarker.style.transform = 'translateX(-50%)';
+            } else {
+                dirMarker.style.left = '5px';
+                dirMarker.style.top = '50%';
+                dirMarker.style.transform = 'translateY(-50%)';
+            }
+
+            radarScreen.appendChild(dirMarker);
+        });
+
+        // Add distance rings
+        for (let i = 1; i <= 2; i++) {
+            const ring = document.createElement('div');
+            ring.style.position = 'absolute';
+            ring.style.top = `${50 - i * 25}%`;
+            ring.style.left = `${50 - i * 25}%`;
+            ring.style.width = `${i * 50}%`;
+            ring.style.height = `${i * 50}%`;
+            ring.style.border = '1px dashed #8B4513'; // Dark brown dashed line
+            ring.style.borderRadius = '50%';
+            radarScreen.appendChild(ring);
+        }
+
         this.miniMapContainer.appendChild(radarScreen);
 
-        // Radar sweep effect
+        // Spyglass sweep effect instead of radar sweep
         const radarSweep = document.createElement('div');
         radarSweep.style.position = 'absolute';
         radarSweep.style.top = '0';
         radarSweep.style.left = '50%';
         radarSweep.style.width = '50%';
         radarSweep.style.height = '100%';
-        radarSweep.style.background = 'linear-gradient(90deg, rgba(0,150,220,0) 0%, rgba(0,200,255,0.3) 100%)';
+        radarSweep.style.background = 'linear-gradient(90deg, rgba(184, 134, 11, 0) 0%, rgba(184, 134, 11, 0.2) 100%)'; // Brass gradient
         radarSweep.style.transformOrigin = '0 50%';
         radarSweep.style.animation = 'radarSweep 4s infinite linear';
         radarScreen.appendChild(radarSweep);
 
-        // Add animation for radar sweep
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes radarSweep {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
-            }
-            
-            .active-tab {
-                background-color: #1a3a5a !important;
-                color: #8ab7e0 !important;
-            }
-            
-            .inactive-tab {
-                background-color: transparent !important;
-                color: #5a87b0 !important;
-            }
-        `;
-        document.head.appendChild(style);
-
-        // Self marker (player's ship)
+        // Self marker (styled as a brass ship pin)
         this.selfMarker = document.createElement('div');
         this.selfMarker.style.position = 'absolute';
         this.selfMarker.style.width = '8px';
         this.selfMarker.style.height = '8px';
-        this.selfMarker.style.backgroundColor = '#ff3333';
-        this.selfMarker.style.borderRadius = '50%';
-        this.selfMarker.style.transform = 'translate(-50%, -50%)';
-        this.selfMarker.style.boxShadow = '0 0 5px #ff3333';
+        this.selfMarker.style.backgroundColor = '#DAA520'; // Gold
+        this.selfMarker.style.borderRadius = '0'; // Square for ship marker
+        this.selfMarker.style.transform = 'translate(-50%, -50%) rotate(45deg)'; // Diamond shape
+        this.selfMarker.style.boxShadow = '0 0 3px #DAA520'; // Gold glow
         this.selfMarker.style.zIndex = '5';
+        this.selfMarker.style.border = '1px solid #8B4513'; // Dark brown border
         radarScreen.appendChild(this.selfMarker);
 
-        // Chat container (initially hidden)
+        // Chat container (styled as a ship's logbook)
         this.chatContainer = document.createElement('div');
         this.chatContainer.className = 'chat-container';
         this.chatContainer.style.position = 'absolute';
@@ -185,59 +219,65 @@ export class ChatSystem {
         this.chatContainer.style.height = '100%';
         this.chatContainer.style.display = 'none';
         this.chatContainer.style.flexDirection = 'column';
+        this.chatContainer.style.backgroundColor = '#D2B48C'; // Tan parchment
+        this.chatContainer.style.backgroundImage = 'linear-gradient(to bottom, transparent 24px, #B8860B66 25px)'; // Lined paper
+        this.chatContainer.style.backgroundSize = '100% 25px';
         contentArea.appendChild(this.chatContainer);
 
-        // Messages area
+        // Messages area (logbook pages)
         this.messagesArea = document.createElement('div');
         this.messagesArea.className = 'chat-messages';
         this.messagesArea.style.flex = '1';
         this.messagesArea.style.padding = '5px 8px';
         this.messagesArea.style.overflowY = 'auto';
-        this.messagesArea.style.color = '#8ab7e0';
+        this.messagesArea.style.color = '#8B4513'; // Dark brown text
         this.messagesArea.style.fontSize = '12px';
-        this.messagesArea.style.fontFamily = 'monospace, sans-serif';
-        this.messagesArea.style.backgroundColor = 'rgba(0, 20, 40, 0.7)';
-        this.messagesArea.style.borderTop = '1px solid #2a5a8a';
+        this.messagesArea.style.fontFamily = 'serif';
         this.messagesArea.style.height = '140px';
         this.chatContainer.appendChild(this.messagesArea);
 
-        // Input area
+        // Input area (quill and ink design)
         const inputArea = document.createElement('div');
         inputArea.className = 'chat-input-area';
         inputArea.style.display = 'flex';
         inputArea.style.padding = '5px';
-        inputArea.style.borderTop = '1px solid #2a5a8a';
-        inputArea.style.backgroundColor = 'rgba(20, 40, 60, 0.7)';
+        inputArea.style.borderTop = '1px solid #8B4513'; // Dark brown separator
+        inputArea.style.backgroundColor = '#C19A6B'; // Slightly darker parchment
         this.chatContainer.appendChild(inputArea);
 
-        // Message input
+        // Message input (styled as a quill writing area)
         this.messageInput = document.createElement('input');
         this.messageInput.type = 'text';
-        this.messageInput.placeholder = 'Send message...';
+        this.messageInput.placeholder = 'Write in logbook...';
         this.messageInput.style.flex = '1';
         this.messageInput.style.padding = '5px';
-        this.messageInput.style.border = '1px solid #2a5a8a';
+        this.messageInput.style.border = '1px solid #8B4513'; // Dark brown border
         this.messageInput.style.borderRadius = '3px';
-        this.messageInput.style.backgroundColor = 'rgba(10, 30, 50, 0.8)';
-        this.messageInput.style.color = '#8ab7e0';
-        this.messageInput.style.fontFamily = 'monospace, sans-serif';
+        this.messageInput.style.backgroundColor = '#E6D2B5'; // Lighter parchment
+        this.messageInput.style.color = '#3D1C00'; // Very dark brown
+        this.messageInput.style.fontFamily = 'serif';
+        this.messageInput.style.fontStyle = 'italic';
         inputArea.appendChild(this.messageInput);
 
-        // Send button
+        // Send button (styled as a wax seal)
         this.sendButton = document.createElement('button');
-        this.sendButton.textContent = 'SEND';
+        this.sendButton.textContent = 'SEAL';
         this.sendButton.style.marginLeft = '5px';
         this.sendButton.style.padding = '5px';
-        this.sendButton.style.border = '1px solid #2a5a8a';
-        this.sendButton.style.borderRadius = '3px';
-        this.sendButton.style.backgroundColor = '#1a3a5a';
-        this.sendButton.style.color = '#8ab7e0';
+        this.sendButton.style.border = '1px solid #8B4513'; // Dark brown border
+        this.sendButton.style.borderRadius = '50%';
+        this.sendButton.style.width = '40px';
+        this.sendButton.style.height = '40px';
+        this.sendButton.style.backgroundColor = '#B22222'; // Firebrick red for wax seal
+        this.sendButton.style.color = '#FFD700'; // Gold text
         this.sendButton.style.cursor = 'pointer';
-        this.sendButton.style.fontFamily = 'monospace, sans-serif';
-        this.sendButton.style.fontSize = '12px';
+        this.sendButton.style.fontFamily = 'serif';
+        this.sendButton.style.fontSize = '10px';
+        this.sendButton.style.fontWeight = 'bold';
+        this.sendButton.style.boxShadow = 'inset 0 0 5px rgba(0, 0, 0, 0.3)';
         inputArea.appendChild(this.sendButton);
 
-        // Unread indicator
+        // Unread indicator (styled as a small ink blot)
         this.unreadIndicator = document.createElement('div');
         this.unreadIndicator.className = 'unread-indicator';
         this.unreadIndicator.style.position = 'absolute';
@@ -245,14 +285,15 @@ export class ChatSystem {
         this.unreadIndicator.style.right = '3px';
         this.unreadIndicator.style.width = '16px';
         this.unreadIndicator.style.height = '16px';
-        this.unreadIndicator.style.backgroundColor = '#ff3333';
+        this.unreadIndicator.style.backgroundColor = '#B22222'; // Firebrick red
         this.unreadIndicator.style.borderRadius = '50%';
         this.unreadIndicator.style.display = 'none';
         this.unreadIndicator.style.justifyContent = 'center';
         this.unreadIndicator.style.alignItems = 'center';
         this.unreadIndicator.style.fontSize = '10px';
-        this.unreadIndicator.style.color = 'white';
+        this.unreadIndicator.style.color = '#FFD700'; // Gold text
         this.unreadIndicator.style.fontWeight = 'bold';
+        this.unreadIndicator.style.boxShadow = '0 0 3px #B22222';
         this.commsTab.appendChild(this.unreadIndicator);
 
         // Set up tab switching
@@ -262,10 +303,10 @@ export class ChatSystem {
             this.radarTab.dataset.active = 'true';
             this.commsTab.dataset.active = 'false';
 
-            this.radarTab.style.backgroundColor = '#1a3a5a';
-            this.radarTab.style.color = '#8ab7e0';
+            this.radarTab.style.backgroundColor = '#654321'; // Darker wood
+            this.radarTab.style.color = '#DAA520'; // Golden text
             this.commsTab.style.backgroundColor = 'transparent';
-            this.commsTab.style.color = '#5a87b0';
+            this.commsTab.style.color = '#B8860B'; // Darker gold/brass
 
             this.miniMapContainer.style.display = 'flex';
             this.chatContainer.style.display = 'none';
@@ -277,10 +318,10 @@ export class ChatSystem {
             this.commsTab.dataset.active = 'true';
             this.radarTab.dataset.active = 'false';
 
-            this.commsTab.style.backgroundColor = '#1a3a5a';
-            this.commsTab.style.color = '#8ab7e0';
+            this.commsTab.style.backgroundColor = '#654321'; // Darker wood
+            this.commsTab.style.color = '#DAA520'; // Golden text
             this.radarTab.style.backgroundColor = 'transparent';
-            this.radarTab.style.color = '#5a87b0';
+            this.radarTab.style.color = '#B8860B'; // Darker gold/brass
 
             this.chatContainer.style.display = 'flex';
             this.miniMapContainer.style.display = 'none';
@@ -359,20 +400,21 @@ export class ChatSystem {
     }
 
     addMessage(message, shouldScroll = true) {
-        // Create message element
+        // Create message element with quill-written appearance
         const messageEl = document.createElement('div');
-        console.log("message sent", message);
         messageEl.className = 'chat-message';
         messageEl.style.marginBottom = '5px';
         messageEl.style.wordBreak = 'break-word';
-        messageEl.style.fontFamily = 'monospace, sans-serif';
+        messageEl.style.fontFamily = 'serif';
+        messageEl.style.fontSize = '12px';
+        messageEl.style.lineHeight = '20px';
 
         // Format timestamp
         const date = new Date(message.timestamp * 1000);
         const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         // Format message color based on sender color
-        let colorStyle = '#8ab7e0';
+        let colorStyle = '#8B4513'; // Default dark brown ink
         if (message.sender_color) {
             const r = Math.floor(message.sender_color.r * 255);
             const g = Math.floor(message.sender_color.g * 255);
@@ -380,11 +422,11 @@ export class ChatSystem {
             colorStyle = `rgb(${r}, ${g}, ${b})`;
         }
 
-        // Create message HTML
+        // Create message HTML with quill writing style
         messageEl.innerHTML = `
-            <span style="color: #4d7da8; font-size: 10px;">[${timeStr}]</span>
+            <span style="color: #8B4513; font-size: 10px; font-style: italic;">${timeStr}</span>
             <span style="color: ${colorStyle}; font-weight: bold;"> ${message.sender_name}: </span>
-            <span>${message.content}</span>
+            <span style="color: #3D1C00;">${message.content}</span>
         `;
 
         // Add to messages area
@@ -409,11 +451,12 @@ export class ChatSystem {
         const messageEl = document.createElement('div');
         messageEl.className = 'system-message';
         messageEl.style.marginBottom = '5px';
-        messageEl.style.color = '#ffcc00';
+        messageEl.style.color = '#B22222'; // Red ink for system messages
         messageEl.style.fontStyle = 'italic';
         messageEl.style.fontSize = '11px';
-        messageEl.style.fontFamily = 'monospace, sans-serif';
-        messageEl.textContent = `:: ${text} ::`;
+        messageEl.style.fontFamily = 'serif';
+        messageEl.style.textAlign = 'center';
+        messageEl.textContent = `~ ${text} ~`;
 
         this.messagesArea.appendChild(messageEl);
         this.scrollToBottom();

@@ -94,9 +94,12 @@ class GameUI {
         const element = document.createElement('div');
         element.textContent = text;
         element.style.marginBottom = '8px';
-        element.style.backgroundColor = 'rgba(0, 30, 60, 0.5)';
+        element.style.backgroundColor = 'rgba(60, 30, 0, 0.7)';
         element.style.padding = '5px 10px';
         element.style.borderRadius = '5px';
+        element.style.border = '1px solid rgba(120, 80, 40, 0.8)';
+        element.style.color = '#E6C68A';
+        element.style.fontFamily = 'serif';
         this.container.appendChild(element);
         return element;
     }
@@ -106,24 +109,26 @@ class GameUI {
         compassContainer.style.width = '80px';
         compassContainer.style.height = '80px';
         compassContainer.style.borderRadius = '50%';
-        compassContainer.style.border = '2px solid rgba(100, 200, 255, 0.7)';
+        compassContainer.style.border = '3px solid #B8860B';
         compassContainer.style.position = 'relative';
         compassContainer.style.marginTop = '10px';
         compassContainer.style.marginBottom = '15px';
-        compassContainer.style.backgroundColor = 'rgba(0, 30, 60, 0.5)';
+        compassContainer.style.backgroundColor = '#D2B48C';
+        compassContainer.style.backgroundImage = 'radial-gradient(circle, #D2B48C 0%, #C19A6B 100%)';
         compassContainer.style.display = 'flex';
         compassContainer.style.justifyContent = 'center';
         compassContainer.style.alignItems = 'center';
+        compassContainer.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.5)';
 
-        // Add cardinal directions
         const directions = ['N', 'E', 'S', 'W'];
         directions.forEach((dir, i) => {
             const dirElement = document.createElement('div');
             dirElement.textContent = dir;
             dirElement.style.position = 'absolute';
             dirElement.style.fontWeight = 'bold';
+            dirElement.style.color = '#8B4513';
+            dirElement.style.fontFamily = 'serif';
 
-            // Position based on direction
             switch (dir) {
                 case 'N':
                     dirElement.style.top = '5px';
@@ -151,16 +156,29 @@ class GameUI {
         });
 
         const needle = document.createElement('div');
-        needle.style.width = '2px';
+        needle.style.width = '3px';
         needle.style.height = '35px';
-        needle.style.backgroundColor = 'red';
+        needle.style.backgroundColor = '#B22222';
         needle.style.position = 'absolute';
         needle.style.top = '50%';
         needle.style.left = '50%';
         needle.style.transformOrigin = 'bottom center';
         needle.style.transform = 'translateX(-50%) translateY(-100%) rotate(0deg)';
+        needle.style.borderRadius = '50% 50% 0 0';
+
+        const needleBase = document.createElement('div');
+        needleBase.style.width = '10px';
+        needleBase.style.height = '10px';
+        needleBase.style.backgroundColor = '#B8860B';
+        needleBase.style.borderRadius = '50%';
+        needleBase.style.position = 'absolute';
+        needleBase.style.top = '50%';
+        needleBase.style.left = '50%';
+        needleBase.style.transform = 'translate(-50%, -50%)';
+        needleBase.style.boxShadow = 'inset 0 0 3px rgba(0, 0, 0, 0.5)';
 
         compassContainer.appendChild(needle);
+        compassContainer.appendChild(needleBase);
         this.container.appendChild(compassContainer);
 
         return { container: compassContainer, needle: needle };
@@ -170,15 +188,17 @@ class GameUI {
         const speedContainer = document.createElement('div');
         speedContainer.style.width = '100px';
         speedContainer.style.height = '15px';
-        speedContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        speedContainer.style.backgroundColor = 'rgba(50, 25, 0, 0.7)';
         speedContainer.style.borderRadius = '10px';
         speedContainer.style.overflow = 'hidden';
         speedContainer.style.marginBottom = '15px';
+        speedContainer.style.border = '1px solid #B8860B';
 
         const speedBar = document.createElement('div');
         speedBar.style.width = '0%';
         speedBar.style.height = '100%';
-        speedBar.style.backgroundColor = 'rgba(0, 255, 128, 0.7)';
+        speedBar.style.backgroundColor = '#B8860B';
+        speedBar.style.backgroundImage = 'linear-gradient(to right, #B8860B, #DAA520)';
         speedBar.style.transition = 'width 0.3s ease-out';
 
         speedContainer.appendChild(speedBar);
@@ -188,46 +208,124 @@ class GameUI {
     }
 
     createFishingUI() {
-        // Create fishing container
+        // Create fishing container with ornate ship control styling
         const fishingContainer = document.createElement('div');
         fishingContainer.id = 'fishing-ui';
         fishingContainer.style.position = 'absolute';
         fishingContainer.style.bottom = '20px';
         fishingContainer.style.left = '20px';
-        fishingContainer.style.backgroundColor = 'rgba(0, 30, 60, 0.7)';
-        fishingContainer.style.padding = '10px';
-        fishingContainer.style.borderRadius = '5px';
-        fishingContainer.style.display = 'flex';
-        fishingContainer.style.flexDirection = 'column';
-        fishingContainer.style.alignItems = 'center';
-        fishingContainer.style.pointerEvents = 'auto'; // Allow interaction
+        fishingContainer.style.width = '180px';
+        fishingContainer.style.backgroundColor = '#3A2616'; // Rich dark wood
+        fishingContainer.style.padding = '0'; // No padding, will add internal container
+        fishingContainer.style.borderRadius = '8px';
+        fishingContainer.style.border = '2px solid #DAA520'; // Gold border
+        fishingContainer.style.boxShadow = '0 0 15px rgba(0, 0, 0, 0.7), inset 0 0 5px rgba(0, 0, 0, 0.3)';
+        fishingContainer.style.overflow = 'hidden';
+        fishingContainer.style.pointerEvents = 'auto';
         document.body.appendChild(fishingContainer);
 
-        // Cast button
+        // Create header bar with ornate styling
+        const headerBar = document.createElement('div');
+        headerBar.style.backgroundColor = '#4A2D17'; // Slightly lighter wood for header
+        headerBar.style.padding = '6px 10px';
+        headerBar.style.borderBottom = '2px solid #DAA520'; // Gold border
+        headerBar.style.textAlign = 'center';
+        headerBar.style.position = 'relative';
+        headerBar.style.backgroundImage = 'linear-gradient(to bottom, #5A3D27, #4A2D17)'; // Wood grain effect
+        fishingContainer.appendChild(headerBar);
+
+        // Brass corner accents for header
+        const corners = ['top-left', 'top-right'];
+        corners.forEach(corner => {
+            const accent = document.createElement('div');
+            accent.style.position = 'absolute';
+            accent.style.width = '10px';
+            accent.style.height = '10px';
+            accent.style.backgroundColor = '#DAA520';
+            accent.style.borderRadius = corner.includes('top') ?
+                (corner.includes('left') ? '5px 0 0 0' : '0 5px 0 0') :
+                (corner.includes('left') ? '0 0 0 5px' : '0 0 5px 0');
+
+            if (corner.includes('top')) accent.style.top = '0';
+            if (corner.includes('bottom')) accent.style.bottom = '0';
+            if (corner.includes('left')) accent.style.left = '0';
+            if (corner.includes('right')) accent.style.right = '0';
+
+            headerBar.appendChild(accent);
+        });
+
+        // Fishing label with ship manifest styling
+        const fishingLabel = document.createElement('div');
+        fishingLabel.textContent = 'FISHING STATION';
+        fishingLabel.style.color = '#FFD700'; // Brighter gold for header
+        fishingLabel.style.fontFamily = 'serif';
+        fishingLabel.style.fontWeight = 'bold';
+        fishingLabel.style.fontSize = '16px';
+        fishingLabel.style.letterSpacing = '1px';
+        fishingLabel.style.textShadow = '0 1px 2px rgba(0,0,0,0.8)';
+        headerBar.appendChild(fishingLabel);
+
+        // Content container with internal padding
+        const contentContainer = document.createElement('div');
+        contentContainer.style.padding = '12px';
+        contentContainer.style.backgroundColor = '#3A2616';
+        contentContainer.style.backgroundImage = 'radial-gradient(circle at center, #3A2616 0%, #2A1606 100%)'; // Vignette effect
+        fishingContainer.appendChild(contentContainer);
+
+        // Cast button with ornate styling
         const castButton = document.createElement('button');
         castButton.textContent = 'Cast Line';
-        castButton.style.padding = '8px 15px';
+        castButton.style.width = '100%';
+        castButton.style.padding = '8px 0';
         castButton.style.marginBottom = '10px';
-        castButton.style.backgroundColor = 'rgba(100, 200, 255, 0.7)';
-        castButton.style.border = 'none';
+        castButton.style.backgroundColor = '#5A3D27'; // Medium brown wood
+        castButton.style.backgroundImage = 'linear-gradient(to bottom, #6A4D37, #5A3D27)'; // Wood grain effect
+        castButton.style.border = '1px solid #DAA520'; // Gold border
         castButton.style.borderRadius = '5px';
-        castButton.style.color = 'white';
+        castButton.style.color = '#FFD700'; // Gold text
         castButton.style.fontWeight = 'bold';
         castButton.style.cursor = 'pointer';
-        fishingContainer.appendChild(castButton);
+        castButton.style.fontFamily = 'serif';
+        castButton.style.fontSize = '15px';
+        castButton.style.textShadow = '0 1px 2px rgba(0,0,0,0.8)';
+        castButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)';
+        contentContainer.appendChild(castButton);
 
-        // Fishing status
+        // Add hover effect
+        castButton.onmouseover = () => {
+            castButton.style.backgroundImage = 'linear-gradient(to bottom, #7A5D47, #6A4D37)';
+        };
+        castButton.onmouseout = () => {
+            castButton.style.backgroundImage = 'linear-gradient(to bottom, #6A4D37, #5A3D27)';
+        };
+
+        // Fishing status with parchment styling
         const fishingStatus = document.createElement('div');
         fishingStatus.textContent = 'Ready to fish';
-        fishingStatus.style.color = 'white';
-        fishingStatus.style.marginBottom = '10px';
-        fishingContainer.appendChild(fishingStatus);
+        fishingStatus.style.color = '#FFD700'; // Gold
+        fishingStatus.style.margin = '8px 0';
+        fishingStatus.style.fontFamily = 'serif';
+        fishingStatus.style.fontStyle = 'italic';
+        fishingStatus.style.fontSize = '14px';
+        fishingStatus.style.textAlign = 'center';
+        fishingStatus.style.width = '100%';
+        contentContainer.appendChild(fishingStatus);
 
-        // Fish caught counter
+        // Fish counter with brass instrument styling
         const fishCounter = document.createElement('div');
         fishCounter.textContent = 'Fish: 0';
-        fishCounter.style.color = 'white';
-        fishingContainer.appendChild(fishCounter);
+        fishCounter.style.textAlign = 'center';
+        fishCounter.style.width = '100%';
+        fishCounter.style.padding = '6px 0';
+        fishCounter.style.backgroundColor = '#28180A'; // Very dark wood
+        fishCounter.style.backgroundImage = 'linear-gradient(to bottom, #28180A, #1A0D02)'; // Gradient
+        fishCounter.style.border = '1px solid #DAA520'; // Gold border
+        fishCounter.style.borderRadius = '5px';
+        fishCounter.style.color = '#FFD700'; // Gold
+        fishCounter.style.fontFamily = 'serif';
+        fishCounter.style.fontWeight = 'bold';
+        fishCounter.style.boxShadow = 'inset 0 0 5px rgba(0,0,0,0.5)';
+        contentContainer.appendChild(fishCounter);
 
         // Create minigame container (hidden by default)
         const minigameContainer = document.createElement('div');
@@ -236,23 +334,27 @@ class GameUI {
         minigameContainer.style.top = '50%';
         minigameContainer.style.left = '50%';
         minigameContainer.style.transform = 'translate(-50%, -50%)';
-        minigameContainer.style.backgroundColor = 'rgba(0, 30, 60, 0.9)';
+        minigameContainer.style.backgroundColor = 'rgba(60, 30, 0, 0.9)'; // Dark wood
         minigameContainer.style.padding = '20px';
         minigameContainer.style.borderRadius = '10px';
+        minigameContainer.style.border = '3px solid #B8860B'; // Brass border
         minigameContainer.style.display = 'none';
         minigameContainer.style.flexDirection = 'column';
         minigameContainer.style.alignItems = 'center';
         minigameContainer.style.pointerEvents = 'auto';
         minigameContainer.style.zIndex = '100';
         minigameContainer.style.width = '300px';
+        minigameContainer.style.boxShadow = '0 0 20px rgba(0, 0, 0, 0.8)';
         document.body.appendChild(minigameContainer);
 
         // Minigame title
         const minigameTitle = document.createElement('div');
         minigameTitle.textContent = 'Fish On!';
-        minigameTitle.style.color = 'white';
+        minigameTitle.style.color = '#E6C68A'; // Muted gold
         minigameTitle.style.fontSize = '24px';
         minigameTitle.style.marginBottom = '20px';
+        minigameTitle.style.fontFamily = 'serif';
+        minigameTitle.style.fontWeight = 'bold';
         minigameContainer.appendChild(minigameTitle);
 
         // Minigame instructions
@@ -320,59 +422,144 @@ class GameUI {
     }
 
     createCannonUI() {
-        // Create cannon control container
+        // Create cannon control container with ornate styling
         const cannonContainer = document.createElement('div');
         cannonContainer.id = 'cannon-ui';
         cannonContainer.style.position = 'absolute';
         cannonContainer.style.bottom = '20px';
-        cannonContainer.style.left = '200px'; // Position next to fishing UI
-        cannonContainer.style.backgroundColor = 'rgba(60, 30, 0, 0.7)';
-        cannonContainer.style.padding = '10px';
-        cannonContainer.style.borderRadius = '5px';
-        cannonContainer.style.display = 'flex';
-        cannonContainer.style.flexDirection = 'column';
-        cannonContainer.style.alignItems = 'center';
-        cannonContainer.style.pointerEvents = 'auto'; // Allow interaction
+        cannonContainer.style.left = '210px'; // Position next to fishing UI
+        cannonContainer.style.width = '180px';
+        cannonContainer.style.backgroundColor = '#3A2616'; // Rich dark wood
+        cannonContainer.style.padding = '0'; // No padding, will add internal container
+        cannonContainer.style.borderRadius = '8px';
+        cannonContainer.style.border = '2px solid #DAA520'; // Gold border
+        cannonContainer.style.boxShadow = '0 0 15px rgba(0, 0, 0, 0.7), inset 0 0 5px rgba(0, 0, 0, 0.3)';
+        cannonContainer.style.overflow = 'hidden';
+        cannonContainer.style.pointerEvents = 'auto';
         document.body.appendChild(cannonContainer);
 
-        // Fire button
+        // Create header bar with ornate styling matching fishing
+        const headerBar = document.createElement('div');
+        headerBar.style.backgroundColor = '#4A2D17'; // Slightly lighter wood for header
+        headerBar.style.padding = '6px 10px';
+        headerBar.style.borderBottom = '2px solid #DAA520'; // Gold border
+        headerBar.style.textAlign = 'center';
+        headerBar.style.position = 'relative';
+        headerBar.style.backgroundImage = 'linear-gradient(to bottom, #5A3D27, #4A2D17)'; // Wood grain effect
+        cannonContainer.appendChild(headerBar);
+
+        // Brass corner accents for header
+        const corners = ['top-left', 'top-right'];
+        corners.forEach(corner => {
+            const accent = document.createElement('div');
+            accent.style.position = 'absolute';
+            accent.style.width = '10px';
+            accent.style.height = '10px';
+            accent.style.backgroundColor = '#DAA520';
+            accent.style.borderRadius = corner.includes('top') ?
+                (corner.includes('left') ? '5px 0 0 0' : '0 5px 0 0') :
+                (corner.includes('left') ? '0 0 0 5px' : '0 0 5px 0');
+
+            if (corner.includes('top')) accent.style.top = '0';
+            if (corner.includes('bottom')) accent.style.bottom = '0';
+            if (corner.includes('left')) accent.style.left = '0';
+            if (corner.includes('right')) accent.style.right = '0';
+
+            headerBar.appendChild(accent);
+        });
+
+        // Cannon label
+        const cannonLabel = document.createElement('div');
+        cannonLabel.textContent = 'CANNON DECK';
+        cannonLabel.style.color = '#FFD700'; // Brighter gold for header
+        cannonLabel.style.fontFamily = 'serif';
+        cannonLabel.style.fontWeight = 'bold';
+        cannonLabel.style.fontSize = '16px';
+        cannonLabel.style.letterSpacing = '1px';
+        cannonLabel.style.textShadow = '0 1px 2px rgba(0,0,0,0.8)';
+        headerBar.appendChild(cannonLabel);
+
+        // Content container with internal padding
+        const contentContainer = document.createElement('div');
+        contentContainer.style.padding = '12px';
+        contentContainer.style.backgroundColor = '#3A2616';
+        contentContainer.style.backgroundImage = 'radial-gradient(circle at center, #3A2616 0%, #2A1606 100%)'; // Vignette effect
+        cannonContainer.appendChild(contentContainer);
+
+        // Fire button with ornate styling
         const fireButton = document.createElement('button');
         fireButton.textContent = 'FIRE CANNONS';
-        fireButton.style.padding = '10px 20px';
-        fireButton.style.marginBottom = '10px';
-        fireButton.style.backgroundColor = 'rgba(255, 50, 0, 0.9)';
-        fireButton.style.border = '3px solid rgba(255, 200, 0, 0.9)';
+        fireButton.style.width = '100%';
+        fireButton.style.padding = '8px 0';
+        fireButton.style.marginBottom = '5px';
+        fireButton.style.backgroundColor = '#5A3D27'; // Medium brown wood
+        fireButton.style.backgroundImage = 'linear-gradient(to bottom, #6A4D37, #5A3D27)'; // Wood grain effect
+        fireButton.style.border = '1px solid #DAA520'; // Gold border
         fireButton.style.borderRadius = '5px';
-        fireButton.style.color = 'white';
+        fireButton.style.color = '#FFD700'; // Gold text
         fireButton.style.fontWeight = 'bold';
         fireButton.style.cursor = 'pointer';
-        fireButton.style.fontSize = '18px';
-        fireButton.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
-        fireButton.style.boxShadow = '0 0 10px rgba(255, 100, 0, 0.5)';
+        fireButton.style.fontFamily = 'serif';
+        fireButton.style.fontSize = '15px';
+        fireButton.style.textShadow = '0 1px 2px rgba(0,0,0,0.8)';
+        fireButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)';
         fireButton.disabled = true; // Disabled by default
-        cannonContainer.appendChild(fireButton);
+        contentContainer.appendChild(fireButton);
 
-        // Cannon status
+        // Add hover effect (only when enabled)
+        fireButton.onmouseover = () => {
+            if (!fireButton.disabled) {
+                fireButton.style.backgroundImage = 'linear-gradient(to bottom, #7A5D47, #6A4D37)';
+            }
+        };
+        fireButton.onmouseout = () => {
+            if (!fireButton.disabled) {
+                fireButton.style.backgroundImage = 'linear-gradient(to bottom, #6A4D37, #5A3D27)';
+            }
+        };
+
+        // Spacebar hint with brass style
+        const spaceHint = document.createElement('div');
+        spaceHint.textContent = '(SPACE)';
+        spaceHint.style.color = '#B8860B'; // Darker gold
+        spaceHint.style.fontSize = '10px';
+        spaceHint.style.fontFamily = 'serif';
+        spaceHint.style.fontStyle = 'italic';
+        spaceHint.style.textAlign = 'center';
+        spaceHint.style.marginBottom = '8px';
+        contentContainer.appendChild(spaceHint);
+
+        // Cannon status with parchment styling
         const cannonStatus = document.createElement('div');
         cannonStatus.textContent = 'No targets in range';
-        cannonStatus.style.color = 'white';
-        cannonStatus.style.marginBottom = '5px';
-        cannonContainer.appendChild(cannonStatus);
+        cannonStatus.style.color = '#FFD700'; // Gold
+        cannonStatus.style.margin = '8px 0';
+        cannonStatus.style.fontFamily = 'serif';
+        cannonStatus.style.fontStyle = 'italic';
+        cannonStatus.style.fontSize = '14px';
+        cannonStatus.style.textAlign = 'center';
+        cannonStatus.style.width = '100%';
+        contentContainer.appendChild(cannonStatus);
 
-        // Cooldown indicator
+        // Cooldown indicator with brass styling
         const cooldownIndicator = document.createElement('div');
         cooldownIndicator.style.width = '100%';
-        cooldownIndicator.style.height = '5px';
-        cooldownIndicator.style.backgroundColor = 'rgba(100, 100, 100, 0.5)';
-        cooldownIndicator.style.borderRadius = '2px';
+        cooldownIndicator.style.height = '10px';
+        cooldownIndicator.style.backgroundColor = '#28180A'; // Very dark wood
+        cooldownIndicator.style.backgroundImage = 'linear-gradient(to bottom, #28180A, #1A0D02)'; // Gradient
+        cooldownIndicator.style.borderRadius = '5px';
         cooldownIndicator.style.overflow = 'hidden';
-        cannonContainer.appendChild(cooldownIndicator);
+        cooldownIndicator.style.border = '1px solid #DAA520'; // Gold border
+        cooldownIndicator.style.boxShadow = 'inset 0 0 5px rgba(0,0,0,0.5)';
+        contentContainer.appendChild(cooldownIndicator);
 
-        // Cooldown progress
+        // Cooldown progress styled as glowing cannon fuse
         const cooldownProgress = document.createElement('div');
         cooldownProgress.style.width = '0%';
         cooldownProgress.style.height = '100%';
-        cooldownProgress.style.backgroundColor = 'rgba(255, 200, 50, 0.8)';
+        cooldownProgress.style.backgroundColor = '#FFD700'; // Gold
+        cooldownProgress.style.backgroundImage = 'linear-gradient(to right, #DAA520, #FFD700, #FFF8DC)'; // Glowing effect
+        cooldownProgress.style.boxShadow = '0 0 10px #FFD700'; // Glow
         cooldownProgress.style.transition = 'width 0.1s linear';
         cooldownIndicator.appendChild(cooldownProgress);
 
@@ -408,47 +595,25 @@ class GameUI {
     }
 
     createPlayerStatsPanel() {
-        // Create stats container
-        const statsContainer = document.createElement('div');
-        statsContainer.id = 'player-stats';
-        statsContainer.style.position = 'absolute';
-        statsContainer.style.top = '10px';
-        statsContainer.style.right = '10px';
-        statsContainer.style.backgroundColor = 'rgba(0, 30, 60, 0.7)';
-        statsContainer.style.padding = '10px';
-        statsContainer.style.borderRadius = '5px';
-        statsContainer.style.display = 'flex';
-        statsContainer.style.flexDirection = 'column';
-        statsContainer.style.gap = '8px';
-        statsContainer.style.visibility = 'hidden';
-        document.body.appendChild(statsContainer);
+        // Create a nautical-styled player stats panel
+        const panel = document.createElement('div');
+        panel.style.position = 'absolute';
+        panel.style.top = '10px';
+        panel.style.right = '10px';
+        panel.style.backgroundColor = 'rgba(60, 30, 0, 0.8)';
+        panel.style.padding = '10px';
+        panel.style.borderRadius = '5px';
+        panel.style.border = '2px solid rgba(120, 80, 40, 0.8)';
+        panel.style.color = '#E6C68A';
+        panel.style.fontFamily = 'serif';
+        panel.style.zIndex = '10';
+        panel.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.4)';
 
-        // Fish count
-        const fishCount = document.createElement('div');
-        fishCount.textContent = `Fish: 0`;
-        fishCount.style.color = 'white';
 
-        statsContainer.appendChild(fishCount);
+        // Add placeholders for various stats
+        this.elements.playerStats = {};
 
-        // Monster kills
-        const monsterCount = document.createElement('div');
-        monsterCount.textContent = `Monsters: 0`;
-        monsterCount.style.color = 'white';
-        statsContainer.appendChild(monsterCount);
-
-        // Money/gold
-        const moneyCount = document.createElement('div');
-        moneyCount.textContent = `Gold: 0`;
-        moneyCount.style.color = 'white';
-        statsContainer.appendChild(moneyCount);
-
-        // Store references for easy updates
-        this.elements.playerStats = {
-            panel: statsContainer,
-            fishCount: fishCount,
-            monsterCount: monsterCount,
-            moneyCount: moneyCount
-        };
+        this.elements.playerStatsPanel = panel;
     }
 
     // Method to update player stats - can be called directly from fishing.js
@@ -643,27 +808,26 @@ class GameUI {
     }
 
     createFPSCounter() {
-        const fpsContainer = document.createElement('div');
-        fpsContainer.id = 'fps-counter';
-        fpsContainer.style.position = 'absolute';
-        fpsContainer.style.top = '5px';
-        fpsContainer.style.left = '5px';
-        fpsContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-        fpsContainer.style.color = 'lime';
-        fpsContainer.style.fontFamily = 'monospace';
-        fpsContainer.style.fontSize = '14px';
-        fpsContainer.style.padding = '3px 6px';
-        fpsContainer.style.borderRadius = '3px';
-        fpsContainer.style.zIndex = '9999'; // Ensure it's above everything
-        fpsContainer.textContent = 'FPS: 0';
-        document.body.appendChild(fpsContainer);
+        const fpsElement = document.createElement('div');
+        fpsElement.textContent = 'FPS: 0';
+        fpsElement.style.position = 'absolute';
+        fpsElement.style.top = '5px';
+        fpsElement.style.left = '5px';
+        fpsElement.style.fontSize = '12px';
+        fpsElement.style.padding = '3px 6px';
+        fpsElement.style.backgroundColor = 'rgba(50, 25, 0, 0.8)';
+        fpsElement.style.color = '#E6C68A';
+        fpsElement.style.fontFamily = 'serif';
+        fpsElement.style.borderRadius = '3px';
+        fpsElement.style.border = '1px solid #B8860B';
+        fpsElement.style.opacity = ENABLE_DIAGNOSTICS ? '1' : '0';
+        document.body.appendChild(fpsElement);
 
-        // Initialize FPS tracking variables
         this.frameCount = 0;
         this.lastFpsUpdate = performance.now();
         this.currentFps = 0;
 
-        return fpsContainer;
+        return fpsElement;
     }
 
     // New method to update FPS counter
