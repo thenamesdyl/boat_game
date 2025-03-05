@@ -56,6 +56,9 @@ islands = {}
 # Add this near your other global variables
 last_db_update = defaultdict(float)  # Track last database update time for each player
 DB_UPDATE_INTERVAL = 0.2  # seconds between database updates
+# Add new distance threshold constant and tracking dictionary
+MIN_POSITION_UPDATE_DISTANCE = 1.5  # minimum distance in units to trigger a database update
+last_db_positions = {}  # Track last database position for each player
 
 # Add this near your other global variables (at the top of the file)
 socket_to_user_map = {}
@@ -287,9 +290,29 @@ def handle_position_update(data):
         players[player_id]['mode'] = mode
     players[player_id]['last_update'] = current_time
     
+    # Calculate distance from last stored database position (if available)
+    should_update_db = False
+    if player_id not in last_db_positions:
+        # First time seeing this player, always update
+        should_update_db = True
+    else:
+        # Calculate distance between current and last stored position
+        last_pos = last_db_positions[player_id]
+        dx = x - last_pos['x']
+        dy = y - last_pos['y']
+        dz = z - last_pos['z']
+        distance = (dx*dx + dy*dy + dz*dz) ** 0.5  # Euclidean distance
+
+        logger.info(f"Distance between current and last stored position: {distance}")
+        
+        # Update if moved more than threshold distance
+        if distance > MIN_POSITION_UPDATE_DISTANCE:
+            should_update_db = True
+    
     # Throttle database updates to reduce Firestore writes
-    if current_time - last_db_update.get(player_id, 0) > DB_UPDATE_INTERVAL:
+    if current_time - last_db_update.get(player_id, 0) > DB_UPDATE_INTERVAL and should_update_db:
         last_db_update[player_id] = current_time
+        last_db_positions[player_id] = position  # Update the last known DB position
         
         # Build update data with only necessary fields
         update_data = {
@@ -303,7 +326,7 @@ def handle_position_update(data):
         
         # Update in Firestore
         firestore_models.Player.update(player_id, **update_data)
-        logger.debug(f"Updated player {player_id} position in Firestore")
+        logger.debug(f"Updated player {player_id} position in Firestore (distance threshold)")
     
     # Broadcast to all other clients (not back to sender)
     emit_data = {
@@ -562,5 +585,5 @@ def create_island():
 
 if __name__ == '__main__':
     # Run the Socket.IO server with debug and reloader enabled
-    # socketio.run(app, host='0.0.0.0') 
-    socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=True) 
+    socketio.run(app, host='0.0.0.0') 
+    # socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=True) 
