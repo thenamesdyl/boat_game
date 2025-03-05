@@ -64,5 +64,5 @@ build/
 
 
 .env
-.parcel-cache/data.mdb
+api/firebasekey.json
 .parcel-cache
