@@ -809,99 +809,230 @@ function stopEnhancedMinigame(success) {
     // Hide minigame UI
     gameUI.elements.fishing.minigame.container.style.display = 'none';
 
-    // Process outcome
-    if (success) {
-        catchFish(currentHookedFish);
-    } else {
-        gameUI.elements.fishing.status.textContent = 'The fish got away!';
-        gameUI.elements.fishing.status.style.color = 'rgba(255, 100, 100, 1)';
-
-        // Reset after a moment
-        setTimeout(() => {
-            if (isFishing) {
-                resetFishingState();
-            }
-        }, 2000);
-    }
+    // Show results screen
+    showFishingResultsScreen(success, currentHookedFish);
 }
 
-// Modified catchFish to accept the specific fish being caught
-function catchFish(caughtFish = null) {
-    // If no specific fish provided, determine randomly (fallback to original behavior)
-    if (!caughtFish) {
-        const rand = Math.random();
-        let cumulativeRarity = 0;
-        caughtFish = FISH_TYPES[0]; // Default to most common fish
+// Show fishing results screen after minigame
+function showFishingResultsScreen(success, fish = null) {
+    // Create results container
+    const resultsContainer = document.createElement('div');
+    resultsContainer.style.position = 'absolute';
+    resultsContainer.style.top = '50%';
+    resultsContainer.style.left = '50%';
+    resultsContainer.style.transform = 'translate(-50%, -50%)';
+    resultsContainer.style.width = '350px';
+    resultsContainer.style.backgroundColor = '#3A2616';
+    resultsContainer.style.border = '2px solid #DAA520';
+    resultsContainer.style.borderRadius = '8px';
+    resultsContainer.style.padding = '20px';
+    resultsContainer.style.boxShadow = '0 0 25px rgba(0, 0, 0, 0.7)';
+    resultsContainer.style.color = '#E6C68A';
+    resultsContainer.style.fontFamily = 'serif';
+    resultsContainer.style.zIndex = '1001'; // Higher than minigame
+    resultsContainer.style.display = 'flex';
+    resultsContainer.style.flexDirection = 'column';
+    resultsContainer.style.alignItems = 'center';
+    document.body.appendChild(resultsContainer);
 
-        for (const fish of FISH_TYPES) {
-            cumulativeRarity += fish.rarity;
-            if (rand <= cumulativeRarity) {
-                caughtFish = fish;
-                break;
-            }
-        }
-    }
+    // Create header
+    const header = document.createElement('div');
+    header.style.width = '100%';
+    header.style.textAlign = 'center';
+    header.style.marginBottom = '15px';
+    header.style.paddingBottom = '10px';
+    header.style.borderBottom = '1px solid #DAA520';
+    header.style.fontSize = '22px';
+    header.style.fontWeight = 'bold';
+    resultsContainer.appendChild(header);
 
-    // The rest of the original catchFish function...
-    // Update fish inventory
-    if (!fishInventory[caughtFish.name]) {
-        fishInventory[caughtFish.name] = {
-            count: 1,
-            value: caughtFish.value,
-            color: caughtFish.color
-        };
+    if (success && fish) {
+        // Success content
+        header.textContent = 'Fish Caught!';
+        header.style.color = '#4CAF50';
+
+        // Fish image/icon
+        const fishIcon = document.createElement('div');
+        fishIcon.style.width = '80px';
+        fishIcon.style.height = '80px';
+        fishIcon.style.borderRadius = '50%';
+        fishIcon.style.backgroundColor = '#' + fish.color.toString(16).padStart(6, '0');
+        fishIcon.style.border = '3px solid #DAA520';
+        fishIcon.style.display = 'flex';
+        fishIcon.style.alignItems = 'center';
+        fishIcon.style.justifyContent = 'center';
+        fishIcon.style.marginBottom = '15px';
+        fishIcon.style.boxShadow = '0 0 15px rgba(0, 0, 0, 0.3)';
+
+        // Fish icon text
+        const fishIconText = document.createElement('div');
+        fishIconText.textContent = '🐟';
+        fishIconText.style.fontSize = '40px';
+        fishIcon.appendChild(fishIconText);
+        resultsContainer.appendChild(fishIcon);
+
+        // Fish name
+        const fishName = document.createElement('div');
+        fishName.textContent = fish.name;
+        fishName.style.fontSize = '24px';
+        fishName.style.fontWeight = 'bold';
+        fishName.style.marginBottom = '5px';
+        fishName.style.color = '#FFD700';
+        resultsContainer.appendChild(fishName);
+
+        // Fish value
+        const fishValue = document.createElement('div');
+        fishValue.textContent = `Value: ${fish.value} gold`;
+        fishValue.style.fontSize = '18px';
+        fishValue.style.marginBottom = '20px';
+        resultsContainer.appendChild(fishValue);
+
+        // Fish stats table
+        const statsTable = document.createElement('table');
+        statsTable.style.width = '100%';
+        statsTable.style.marginBottom = '20px';
+        statsTable.style.borderCollapse = 'collapse';
+
+        // Add rows for different stats
+        const stats = [
+            { label: 'Rarity', value: getRarityText(fish.rarity) },
+            { label: 'Difficulty', value: getDifficultyText(fish.difficulty) },
+            { label: 'Total Caught', value: (fishInventory[fish.name]?.count || 1) + ' fish' }
+        ];
+
+        stats.forEach(stat => {
+            const row = document.createElement('tr');
+
+            const labelCell = document.createElement('td');
+            labelCell.textContent = stat.label + ':';
+            labelCell.style.padding = '5px 10px';
+            labelCell.style.borderBottom = '1px dotted #8B4513';
+            labelCell.style.textAlign = 'left';
+            labelCell.style.fontWeight = 'bold';
+            row.appendChild(labelCell);
+
+            const valueCell = document.createElement('td');
+            valueCell.textContent = stat.value;
+            valueCell.style.padding = '5px 10px';
+            valueCell.style.borderBottom = '1px dotted #8B4513';
+            valueCell.style.textAlign = 'right';
+            row.appendChild(valueCell);
+
+            statsTable.appendChild(row);
+        });
+
+        resultsContainer.appendChild(statsTable);
+
+        // Congrats message
+        const congrats = document.createElement('div');
+        congrats.textContent = 'Added to your inventory!';
+        congrats.style.fontSize = '16px';
+        congrats.style.fontStyle = 'italic';
+        congrats.style.marginBottom = '20px';
+        congrats.style.color = '#4CAF50';
+        resultsContainer.appendChild(congrats);
     } else {
-        fishInventory[caughtFish.name].count++;
+        // Failure content
+        header.textContent = 'Fish Escaped!';
+        header.style.color = '#F44336';
+
+        // Failed fish icon
+        const failedIcon = document.createElement('div');
+        failedIcon.style.fontSize = '50px';
+        failedIcon.style.marginBottom = '15px';
+        failedIcon.textContent = '🎣';
+        resultsContainer.appendChild(failedIcon);
+
+        // Failure message
+        const failureMsg = document.createElement('div');
+        failureMsg.textContent = 'The fish got away this time!';
+        failureMsg.style.fontSize = '18px';
+        failureMsg.style.marginBottom = '20px';
+        resultsContainer.appendChild(failureMsg);
+
+        // Instructions header
+        const instructionsHeader = document.createElement('div');
+        instructionsHeader.textContent = 'Fishing Tips:';
+        instructionsHeader.style.fontSize = '18px';
+        instructionsHeader.style.fontWeight = 'bold';
+        instructionsHeader.style.width = '100%';
+        instructionsHeader.style.textAlign = 'left';
+        instructionsHeader.style.marginBottom = '10px';
+        resultsContainer.appendChild(instructionsHeader);
+
+        // Instructions list
+        const tipsList = document.createElement('ul');
+        tipsList.style.width = '100%';
+        tipsList.style.textAlign = 'left';
+        tipsList.style.paddingLeft = '20px';
+        tipsList.style.margin = '0 0 20px 0';
+
+        const tips = [
+            'Keep the marker in the green target zone',
+            'Maintain proper line tension (40-60% is ideal)',
+            'Press Z or SPACE to reel in the fish',
+            'Use X to increase tension, C to decrease',
+            'Don\'t let the tension get too high or the line will break',
+            'Don\'t let the tension get too low or the fish will escape',
+            'Harder fish move more erratically - be patient!'
+        ];
+
+        tips.forEach(tip => {
+            const tipItem = document.createElement('li');
+            tipItem.textContent = tip;
+            tipItem.style.margin = '5px 0';
+            tipsList.appendChild(tipItem);
+        });
+
+        resultsContainer.appendChild(tipsList);
     }
 
-    // Increment fish counter
-    fishCaught += caughtFish.value;
-    updateFishCounter();
+    // Continue button
+    const continueBtn = document.createElement('button');
+    continueBtn.textContent = 'Continue Fishing';
+    continueBtn.style.padding = '10px 20px';
+    continueBtn.style.backgroundColor = '#4A2D17';
+    continueBtn.style.color = '#FFD700';
+    continueBtn.style.border = '2px solid #DAA520';
+    continueBtn.style.borderRadius = '5px';
+    continueBtn.style.fontSize = '16px';
+    continueBtn.style.cursor = 'pointer';
+    continueBtn.style.transition = 'all 0.2s';
 
-    // Update inventory UI
-    gameUI.updateInventory(fishInventory);
+    continueBtn.onmouseover = () => {
+        continueBtn.style.backgroundColor = '#5A3D27';
+        continueBtn.style.boxShadow = '0 0 10px rgba(218, 165, 32, 0.5)';
+    };
 
-    // Add fish to server inventory system
-    addToInventory({
-        item_type: 'fish',
-        item_name: caughtFish.name,
-        item_data: {
-            value: caughtFish.value,
-            color: caughtFish.color
-        }
-    });
+    continueBtn.onmouseout = () => {
+        continueBtn.style.backgroundColor = '#4A2D17';
+        continueBtn.style.boxShadow = 'none';
+    };
 
-    // Show success message
-    gameUI.elements.fishing.status.textContent = `Caught a ${caughtFish.name}! (+${caughtFish.value})`;
-    gameUI.elements.fishing.status.style.color = 'rgba(100, 255, 100, 1)';
+    continueBtn.onclick = () => {
+        // Remove results screen
+        document.body.removeChild(resultsContainer);
 
-    // Create a 3D fish model that jumps out of the water
-    createCaughtFishEffect(caughtFish);
+        // Continue fishing
+        resetFishingState();
+    };
 
-    // Update player stats in network
-    onFishCaught(1);
-    onMoneyEarned(caughtFish.value);
+    resultsContainer.appendChild(continueBtn);
 
-    // IMPORTANT: Directly update the UI stats panel
-    gameUI.updatePlayerStats({
-        fishCount: fishCaught,
-    });
+    // Helper functions
+    function getRarityText(rarity) {
+        if (rarity <= 0.01) return 'Legendary';
+        if (rarity <= 0.05) return 'Rare';
+        if (rarity <= 0.15) return 'Uncommon';
+        return 'Common';
+    }
 
-    // Reset after a moment
-    setTimeout(() => {
-        if (isFishing) {
-            gameUI.elements.fishing.status.textContent = 'Waiting for a bite...';
-            gameUI.elements.fishing.status.style.color = 'white';
-
-            // Set timeout for next fish bite
-            const biteTime = FISH_BITE_MIN_TIME + Math.random() * (FISH_BITE_MAX_TIME - FISH_BITE_MIN_TIME);
-            fishingTimeout = setTimeout(() => {
-                if (isFishing) {
-                    fishBite();
-                }
-            }, biteTime * 1000);
-        }
-    }, 3000);
+    function getDifficultyText(difficulty) {
+        if (difficulty >= 4) return 'Master';
+        if (difficulty >= 3) return 'Hard';
+        if (difficulty >= 2) return 'Medium';
+        return 'Easy';
+    }
 }
 
 // Update the existing game with the new functions
