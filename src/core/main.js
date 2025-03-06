@@ -1006,11 +1006,31 @@ function animate() {
     // water.geometry.attributes.position.needsUpdate = true;
     //water.geometry.computeVertexNormals(); // For lighting in shader
 
-    // Boat movement
+    // Boat movement - realistic turning that causes forward motion
     if (keys.forward) boatVelocity.z -= boatSpeed;
-    if (keys.backward) boatVelocity.z += boatSpeed;
-    if (keys.left) boat.rotation.y += rotationSpeed;
-    if (keys.right) boat.rotation.y -= rotationSpeed;
+    if (keys.backward) boatVelocity.z += boatSpeed * 0.5; // Slower in reverse
+
+    // Initialize turn-induced forward motion
+    let turnInducedMotion = 0;
+
+    // When turning, add forward momentum
+    if (keys.left || keys.right) {
+        // Turning automatically applies some forward momentum
+        turnInducedMotion = -boatSpeed * 0.4; // Forward motion from turning
+
+        // Apply turn (more effective with existing forward speed)
+        const forwardMotion = Math.abs(boatVelocity.z);
+        const turnEffectiveness = 0.3 + (forwardMotion * 0.7); // Min 30% effectiveness
+
+        if (keys.left) boat.rotation.y += rotationSpeed * turnEffectiveness;
+        if (keys.right) boat.rotation.y -= rotationSpeed * turnEffectiveness;
+    } else {
+        // Not turning, no turn-induced motion
+        turnInducedMotion = 0;
+    }
+
+    // Combine regular forward momentum with turn-induced momentum
+    boatVelocity.z += turnInducedMotion;
 
     // Apply velocity and friction
     boatVelocity.multiplyScalar(0.5);
