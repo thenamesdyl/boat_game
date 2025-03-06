@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createShoreEffect, updateShores, setShoreVisibility, removeShore, clearAllShores } from './shores.js';
 
 // Island generation variables
 let islandColliders = [];
@@ -11,6 +12,28 @@ const maxViewDistance = 5; // How far to render islands
 const generatedChunks = new Set();
 const activeIslands = new Map(); // Maps island ID to island object
 const activeWaterChunks = new Map(); // Maps water chunk ID to water mesh
+
+// Default shore effects setting - will be overridden by window.gameSettings if available
+let enableShoreEffects = true;
+
+// Initialize gameSettings if not already done
+if (typeof window !== 'undefined') {
+    window.gameSettings = window.gameSettings || {};
+    // Use stored setting or default to true
+    window.gameSettings.enableShoreEffects =
+        window.gameSettings.enableShoreEffects !== undefined ?
+            window.gameSettings.enableShoreEffects : true;
+}
+
+// Function to check if shore effects are enabled
+function areShoreEffectsEnabled() {
+    // First check window.gameSettings if available
+    if (typeof window !== 'undefined' && window.gameSettings) {
+        return window.gameSettings.enableShoreEffects;
+    }
+    // Fall back to local variable
+    return enableShoreEffects;
+}
 
 // Cache for structure textures to improve performance
 const structureTextureCache = {};
@@ -349,13 +372,22 @@ function createIsland(x, z, seed, scene) {
     }
 
 
-    // Store the island with its ID
-    activeIslands.set(islandId, {
+    // Store the island with its ID and collider reference
+    const islandEntry = {
         mesh: island,
-        collider: collider
-    });
+        collider: collider,
+        visible: true
+    };
 
-    return island;
+    activeIslands.set(islandId, islandEntry);
+
+    // Add shore effect if enabled
+    if (areShoreEffectsEnabled() && scene) {
+        const shore = createShoreEffect(island, collider, scene);
+        islandEntry.shore = shore;
+    }
+
+    return islandEntry;
 }
 
 // Function to create and cache a stone texture with imperfections
@@ -848,48 +880,50 @@ function updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition) 
         }
     });
 
-    // Remove marked islands
+    // Remove islands marked for removal
     islandsToRemove.forEach(id => {
         const island = activeIslands.get(id);
         if (island) {
-            // Remove from scene
             scene.remove(island.mesh);
 
-            // Remove collider
-            const colliderIndex = islandColliders.findIndex(c => c.id === id);
-            if (colliderIndex !== -1) {
-                islandColliders.splice(colliderIndex, 1);
+            // Remove the island's shore if it exists
+            if (areShoreEffectsEnabled() && island.shore) {
+                removeShore(id, scene);
             }
 
-            // Remove from active islands
+            // Remove collider
+            islandColliders = islandColliders.filter(c => c.id !== id);
             activeIslands.delete(id);
         }
     });
 
-    // Remove water chunks that are too far away
-    const waterChunksToRemove = [];
-    activeWaterChunks.forEach((waterChunk, chunkKey) => {
-        if (!waterChunksToKeep.has(chunkKey)) {
-            waterChunksToRemove.push(chunkKey);
+    // Remove water chunks that are too far
+    const waterToRemove = [];
+    activeWaterChunks.forEach((water, id) => {
+        if (!waterChunksToKeep.has(id)) {
+            waterToRemove.push(id);
         }
     });
 
-    // Remove marked water chunks
-    waterChunksToRemove.forEach(chunkKey => {
-        const waterChunk = activeWaterChunks.get(chunkKey);
-        if (waterChunk) {
-            // Remove from scene
-            scene.remove(waterChunk);
-
-            // Remove from active water chunks
-            activeWaterChunks.delete(chunkKey);
+    waterToRemove.forEach(id => {
+        const water = activeWaterChunks.get(id);
+        if (water) {
+            scene.remove(water);
+            activeWaterChunks.delete(id);
         }
     });
+
+    // Update shore visibilities to match islands
+    if (areShoreEffectsEnabled()) {
+        activeIslands.forEach((island, id) => {
+            setShoreVisibility(id, island.visible);
+        });
+    }
 
     // Update the last chunk update position
     lastChunkUpdatePosition.copy(boat.position);
 
-    return { islandsRemoved: islandsToRemove.length, waterChunksRemoved: waterChunksToRemove.length };
+    return { islandsRemoved: islandsToRemove.length, waterChunksRemoved: waterToRemove.length };
 }
 
 // Find nearest island function
@@ -920,7 +954,14 @@ function checkIslandCollision(position, extraRadius = 2) {
     return false;
 }
 
-// Export everything needed
+// Add a function to update shores in the animation loop
+function updateIslandEffects(deltaTime) {
+    if (areShoreEffectsEnabled()) {
+        updateShores(deltaTime);
+    }
+}
+
+// Export the functions and variables needed in other files
 export {
     islandColliders,
     activeIslands,
@@ -930,5 +971,7 @@ export {
     createIsland,
     updateVisibleChunks,
     findNearestIsland,
-    checkIslandCollision
+    checkIslandCollision,
+    updateIslandEffects,
+    areShoreEffectsEnabled
 }; 

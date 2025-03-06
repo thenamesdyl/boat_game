@@ -24,7 +24,9 @@ import {
     activeWaterChunks,
     updateVisibleChunks,
     findNearestIsland,
-    checkIslandCollision
+    checkIslandCollision,
+    updateIslandEffects,
+    areShoreEffectsEnabled
 } from '../world/islands.js';
 import MusicSystem from '../audio/music.js';
 import { initCameraControls, updateCameraPosition } from '../controls/cameraControls.js';
@@ -33,7 +35,9 @@ import { initDiagnostics, updateDiagnosticsDisplay, ENABLE_DIAGNOSTICS } from '.
 import * as Firebase from './firebase.js';
 
 
-const water = setupWater();
+// Initialize water with explicit realistic style as default
+console.log("Initializing water in main.js");
+const water = setupWater('realistic');
 
 /*
 const cubeTextureLoader = new THREE.CubeTextureLoader();
@@ -981,6 +985,12 @@ function animate() {
     // Update time of day
     updateTimeOfDay(deltaTime);
 
+    // Update water with delta time
+    updateWater(deltaTime);
+
+    // Update island shore effects
+    updateIslandEffects(deltaTime);
+
     // Update water shader time uniform
     waterShader.uniforms.time.value = getTime();
 
@@ -1154,9 +1164,6 @@ function animate() {
     animateSail(deltaTime);
 
     applyWindInfluence();
-
-    // Update water
-    //updateWater(deltaTime);
 
     //water2.update(deltaTime);
 

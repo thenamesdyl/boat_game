@@ -5,6 +5,8 @@ import { initShop, updateShopAvailability } from '../gameplay/shop.js';
 import InventoryUI from './inventoryUI.js';
 import { getDiagnosticsData, ENABLE_DIAGNOSTICS, isBraveBrowser } from './diagnostics.js';
 import { fireCannons } from '../gameplay/cannons.js';
+import { setWaterStyle } from '../environment/water.js';
+import { areShoreEffectsEnabled } from '../world/islands.js';
 
 // Create a UI class to manage all interface elements
 class GameUI {
@@ -24,6 +26,9 @@ class GameUI {
         this.container.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
         this.container.style.pointerEvents = 'none'; // Don't block mouse events
         document.body.appendChild(this.container);
+
+        // Create settings button
+        this.createSettingsPanel();
 
         // Create mini-map container
         this.miniMapContainer = document.createElement('div');
@@ -917,6 +922,286 @@ class GameUI {
                 this.elements.browserWarning = null;
             }
         }
+    }
+
+    // Create a settings panel for game options
+    createSettingsPanel() {
+        // Create settings button (gear icon)
+        const settingsButton = document.createElement('div');
+        settingsButton.id = 'settings-button';
+        settingsButton.innerHTML = '⚙️';
+        settingsButton.style.position = 'absolute';
+        settingsButton.style.top = '10px';
+        settingsButton.style.right = '10px';
+        settingsButton.style.fontSize = '24px';
+        settingsButton.style.cursor = 'pointer';
+        settingsButton.style.pointerEvents = 'auto';
+        settingsButton.style.zIndex = '1000';
+        settingsButton.title = "Game Settings";
+        document.body.appendChild(settingsButton);
+
+        // Create settings panel (initially hidden)
+        const settingsPanel = document.createElement('div');
+        settingsPanel.id = 'settings-panel';
+        settingsPanel.style.position = 'absolute';
+        settingsPanel.style.top = '40px';
+        settingsPanel.style.right = '10px';
+        settingsPanel.style.backgroundColor = 'rgba(50, 50, 70, 0.9)';
+        settingsPanel.style.padding = '15px';
+        settingsPanel.style.borderRadius = '8px';
+        settingsPanel.style.border = '2px solid #4477aa';
+        settingsPanel.style.width = '250px';
+        settingsPanel.style.display = 'none';
+        settingsPanel.style.pointerEvents = 'auto';
+        settingsPanel.style.zIndex = '999';
+        settingsPanel.style.maxHeight = '80vh';
+        settingsPanel.style.overflowY = 'auto';
+        document.body.appendChild(settingsPanel);
+
+        // Add panel header
+        const panelHeader = document.createElement('div');
+        panelHeader.textContent = 'Game Settings';
+        panelHeader.style.fontSize = '18px';
+        panelHeader.style.fontWeight = 'bold';
+        panelHeader.style.marginBottom = '15px';
+        panelHeader.style.color = '#aaccff';
+        panelHeader.style.borderBottom = '1px solid #4477aa';
+        panelHeader.style.paddingBottom = '5px';
+        settingsPanel.appendChild(panelHeader);
+
+        // Add water style toggle section
+        const waterStyleSection = document.createElement('div');
+        waterStyleSection.style.marginBottom = '15px';
+        settingsPanel.appendChild(waterStyleSection);
+
+        // Add section header with description
+        const waterHeader = document.createElement('div');
+        waterHeader.innerHTML = '<span style="font-weight: bold;">Water Style</span>' +
+            '<span style="font-size: 11px; opacity: 0.8; display: block; margin-top: 2px;">' +
+            'Choose the visual style of the water</span>';
+        waterHeader.style.marginBottom = '8px';
+        waterHeader.style.color = '#ffffff';
+        waterStyleSection.appendChild(waterHeader);
+
+        // Create container for water style buttons
+        const waterStyleButtons = document.createElement('div');
+        waterStyleButtons.style.display = 'flex';
+        waterStyleButtons.style.gap = '5px'; // Reduced gap for more buttons
+        waterStyleButtons.style.flexWrap = 'wrap'; // Allow wrapping if needed
+        waterStyleSection.appendChild(waterStyleButtons);
+
+        // Create realistic button
+        const realisticButton = this.createStyleButton('Realistic', 'realistic');
+        realisticButton.classList.add('active'); // Default active
+        waterStyleButtons.appendChild(realisticButton);
+
+        // Create cartoony button
+        const cartoonyButton = this.createStyleButton('Cartoony', 'cartoony');
+        waterStyleButtons.appendChild(cartoonyButton);
+
+        // Create toon button (cell-shaded)
+        const toonButton = this.createStyleButton('Cell-Shaded', 'toon');
+        waterStyleButtons.appendChild(toonButton);
+
+        // Add status message area
+        const statusMessage = document.createElement('div');
+        statusMessage.id = 'water-style-status';
+        statusMessage.style.marginTop = '8px';
+        statusMessage.style.fontSize = '12px';
+        statusMessage.style.color = '#aaffaa';
+        statusMessage.style.opacity = '0';
+        statusMessage.style.transition = 'opacity 0.5s ease';
+        statusMessage.style.textAlign = 'center';
+        waterStyleSection.appendChild(statusMessage);
+
+        // Water style buttons functionality
+        const waterButtons = [realisticButton, cartoonyButton, toonButton];
+        waterButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                try {
+                    // Remove active class from all buttons
+                    waterButtons.forEach(btn => btn.classList.remove('active'));
+                    // Add active class to clicked button
+                    button.classList.add('active');
+
+                    // Show "changing" status
+                    statusMessage.textContent = `Changing to ${button.textContent} water...`;
+                    statusMessage.style.opacity = '1';
+                    statusMessage.style.color = '#aaffaa';
+
+                    // Set water style
+                    setWaterStyle(button.dataset.style);
+
+                    // Show success message
+                    setTimeout(() => {
+                        statusMessage.textContent = `Water style changed to ${button.textContent}!`;
+
+                        // Fade out message after a delay
+                        setTimeout(() => {
+                            statusMessage.style.opacity = '0';
+                        }, 2000);
+                    }, 500);
+                } catch (error) {
+                    // Show error message
+                    statusMessage.textContent = `Error: ${error.message || 'Could not change water style'}`;
+                    statusMessage.style.color = '#ffaaaa';
+                    statusMessage.style.opacity = '1';
+                    console.error('Error changing water style:', error);
+
+                    // Reset active button to match current style
+                    waterButtons.forEach(btn => {
+                        btn.classList.remove('active');
+                        if (btn.dataset.style === 'realistic') {
+                            btn.classList.add('active');
+                        }
+                    });
+                }
+            });
+        });
+
+        // After water style section, add shore effects toggle
+
+        // Add shore effects toggle section
+        const shoreEffectsSection = document.createElement('div');
+        shoreEffectsSection.style.marginBottom = '15px';
+        settingsPanel.appendChild(shoreEffectsSection);
+
+        // Add section header
+        const shoreHeader = document.createElement('div');
+        shoreHeader.textContent = 'Shore Effects';
+        shoreHeader.style.fontWeight = 'bold';
+        shoreHeader.style.marginBottom = '8px';
+        shoreHeader.style.color = '#ffffff';
+        shoreEffectsSection.appendChild(shoreHeader);
+
+        // Create toggle switch
+        const toggleContainer = document.createElement('div');
+        toggleContainer.style.display = 'flex';
+        toggleContainer.style.alignItems = 'center';
+        toggleContainer.style.justifyContent = 'space-between';
+        shoreEffectsSection.appendChild(toggleContainer);
+
+        // Label
+        const toggleLabel = document.createElement('div');
+        toggleLabel.textContent = 'Show Foam at Shorelines';
+        toggleLabel.style.flex = '1';
+        toggleContainer.appendChild(toggleLabel);
+
+        // Create toggle switch
+        const toggleSwitch = document.createElement('div');
+        toggleSwitch.style.width = '36px';
+        toggleSwitch.style.height = '20px';
+        toggleSwitch.style.backgroundColor = areShoreEffectsEnabled() ? 'rgba(80, 180, 120, 0.8)' : 'rgba(80, 80, 100, 0.5)';
+        toggleSwitch.style.borderRadius = '10px';
+        toggleSwitch.style.position = 'relative';
+        toggleSwitch.style.cursor = 'pointer';
+        toggleSwitch.style.transition = 'background-color 0.3s ease';
+        toggleContainer.appendChild(toggleSwitch);
+
+        // Create toggle button
+        const toggleButton = document.createElement('div');
+        toggleButton.style.width = '16px';
+        toggleButton.style.height = '16px';
+        toggleButton.style.backgroundColor = '#ffffff';
+        toggleButton.style.borderRadius = '50%';
+        toggleButton.style.position = 'absolute';
+        toggleButton.style.top = '2px';
+        toggleButton.style.left = areShoreEffectsEnabled() ? '18px' : '2px';
+        toggleButton.style.transition = 'left 0.3s ease';
+        toggleSwitch.appendChild(toggleButton);
+
+        // Add click event
+        toggleSwitch.addEventListener('click', () => {
+            // Initialize gameSettings if needed
+            window.gameSettings = window.gameSettings || {};
+
+            // Toggle the shore effects setting
+            window.gameSettings.enableShoreEffects = !areShoreEffectsEnabled();
+
+            // Update UI
+            toggleButton.style.left = window.gameSettings.enableShoreEffects ? '18px' : '2px';
+            toggleSwitch.style.backgroundColor = window.gameSettings.enableShoreEffects ?
+                'rgba(80, 180, 120, 0.8)' : 'rgba(80, 80, 100, 0.5)';
+
+            // Show status message
+            statusMessage.textContent = `Shore effects ${window.gameSettings.enableShoreEffects ? 'enabled' : 'disabled'}`;
+            statusMessage.style.opacity = '1';
+            statusMessage.style.color = '#aaffaa';
+
+            // Fade out message after a delay
+            setTimeout(() => {
+                statusMessage.style.opacity = '0';
+            }, 2000);
+        });
+
+        // Toggle settings panel when clicking the button
+        settingsButton.addEventListener('click', () => {
+            if (settingsPanel.style.display === 'none') {
+                settingsPanel.style.display = 'block';
+                try {
+                    // Register this as an open UI if available
+                    if (typeof registerOpenUI === 'function') {
+                        registerOpenUI(settingsPanel);
+                    }
+                } catch (e) {
+                    console.warn('Could not register settings panel as open UI:', e);
+                }
+            } else {
+                settingsPanel.style.display = 'none';
+                try {
+                    // Unregister this as an open UI if available
+                    if (typeof unregisterOpenUI === 'function') {
+                        unregisterOpenUI(settingsPanel);
+                    }
+                } catch (e) {
+                    console.warn('Could not unregister settings panel as open UI:', e);
+                }
+            }
+        });
+
+        // Store references
+        this.settingsButton = settingsButton;
+        this.settingsPanel = settingsPanel;
+        this.waterStyleStatus = statusMessage;
+    }
+
+    // Helper method to create a styled button for settings
+    createStyleButton(text, styleValue) {
+        const button = document.createElement('div');
+        button.textContent = text;
+        button.dataset.style = styleValue;
+        button.style.padding = '6px 10px';
+        button.style.backgroundColor = 'rgba(60, 80, 120, 0.5)';
+        button.style.borderRadius = '4px';
+        button.style.cursor = 'pointer';
+        button.style.textAlign = 'center';
+        button.style.flexGrow = '1';
+        button.style.transition = 'all 0.2s ease';
+        button.style.fontSize = '12px'; // Reduced font size for more buttons
+        button.title = `Switch to ${text} water style`;
+
+        // Add hover effects
+        button.addEventListener('mouseover', () => {
+            button.style.backgroundColor = 'rgba(80, 100, 140, 0.7)';
+        });
+        button.addEventListener('mouseout', () => {
+            if (!button.classList.contains('active')) {
+                button.style.backgroundColor = 'rgba(60, 80, 120, 0.5)';
+            }
+        });
+
+        // Add active style with CSS
+        const style = document.createElement('style');
+        style.textContent = `
+            #settings-panel div.active {
+                background-color: rgba(100, 150, 200, 0.8) !important;
+                box-shadow: 0 0 5px rgba(150, 200, 255, 0.8);
+                transform: scale(1.05);
+            }
+        `;
+        document.head.appendChild(style);
+
+        return button;
     }
 }
 
