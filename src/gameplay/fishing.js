@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { scene, camera } from '../core/gameState.js';
 import { gameUI } from '../ui/ui.js';
-import { onFishCaught, onMoneyEarned } from '../core/network.js';
+import { onFishCaught, onMoneyEarned, addToInventory } from '../core/network.js';
 
 // Fishing system configuration
 const FISHING_CAST_DISTANCE = 15;
@@ -14,13 +14,13 @@ const MINIGAME_SPEED = 150; // pixels per second
 
 // Fish types with their rarity and value
 const FISH_TYPES = [
-    { name: 'Anchovy', rarity: 0.3, value: 1, color: 0xCCCCCC },
-    { name: 'Cod', rarity: 0.25, value: 2, color: 0xBBBB88 },
-    { name: 'Salmon', rarity: 0.2, value: 3, color: 0xFF9977 },
-    { name: 'Tuna', rarity: 0.15, value: 5, color: 0x6688AA },
-    { name: 'Swordfish', rarity: 0.07, value: 10, color: 0x4477AA },
-    { name: 'Shark', rarity: 0.02, value: 20, color: 0x778899 },
-    { name: 'Golden Fish', rarity: 0.01, value: 50, color: 0xFFD700 }
+    { name: 'Anchovy', rarity: 0.3, value: 1, color: 0xCCCCCC, difficulty: 1 },
+    { name: 'Cod', rarity: 0.25, value: 2, color: 0xBBBB88, difficulty: 1.2 },
+    { name: 'Salmon', rarity: 0.2, value: 3, color: 0xFF9977, difficulty: 1.5 },
+    { name: 'Tuna', rarity: 0.15, value: 5, color: 0x6688AA, difficulty: 2 },
+    { name: 'Swordfish', rarity: 0.07, value: 10, color: 0x4477AA, difficulty: 3 },
+    { name: 'Shark', rarity: 0.02, value: 20, color: 0x778899, difficulty: 4 },
+    { name: 'Golden Fish', rarity: 0.01, value: 50, color: 0xFFD700, difficulty: 5 }
 ];
 
 // Fishing state
@@ -40,6 +40,12 @@ let fishInventory = {};
 let bobberAnimationInterval = null;
 let fishEscapeTimeout = null;
 let minigameTimeout = null;
+
+// Additional state variables for enhanced minigame
+let currentHookedFish = null;
+let minigameState = {};
+let reelKeyPressed = false;
+let tensionKeyPressed = false;
 
 // Initialize fishing system
 export function initFishing(playerBoat) {
@@ -245,100 +251,544 @@ function startMinigame() {
 
     minigameActive = true;
 
-    // Show minigame UI
-    gameUI.elements.fishing.minigame.container.style.display = 'flex';
+    // Find which fish was caught based on rarity
+    const rand = Math.random();
+    let cumulativeRarity = 0;
+    let hookedFish = FISH_TYPES[0]; // Default to most common fish
 
-    // Reset marker position
-    minigameMarkerPosition = 0;
-    gameUI.elements.fishing.minigame.marker.style.left = '0px';
+    for (const fish of FISH_TYPES) {
+        cumulativeRarity += fish.rarity;
+        if (rand <= cumulativeRarity) {
+            hookedFish = fish;
+            break;
+        }
+    }
 
-    // Start marker movement
-    minigameDirection = 1;
-    minigameInterval = setInterval(updateMinigame, 16);
+    // Store the current hooked fish
+    currentHookedFish = hookedFish;
 
-    // Set timeout to end minigame if player doesn't catch in time
+    // Show minigame UI with enhanced elements
+    setupEnhancedMinigameUI(hookedFish);
+
+    // Set fish behavior based on type
+    const fishDifficulty = hookedFish.difficulty || 1;
+
+    // Initialize minigame state
+    minigameState = {
+        tension: 50, // Starting tension (0-100)
+        fishStamina: 100 * fishDifficulty, // Fish stamina based on difficulty
+        playerProgress: 0, // Progress toward catching (0-100)
+        fishDirection: Math.random() > 0.5 ? 1 : -1, // Random initial direction
+        fishStrength: fishDifficulty * 2, // How hard the fish pulls
+        fishErratic: Math.min(fishDifficulty * 0.5, 1), // How erratically fish behaves (0-1)
+        stage: 'fighting', // fighting, reeling, escaped, or caught
+        reelSpeed: 0, // Current reeling speed
+        markerPosition: 50, // Starting position for marker (center)
+        targetZonePosition: 50, // Starting position for target zone (center)
+        targetZoneSize: Math.max(30 - (fishDifficulty * 5), 10), // Size of target zone based on difficulty
+        targetZoneMoving: fishDifficulty > 2 // Target zone moves for difficult fish
+    };
+
+    // Start the minigame loop
+    minigameInterval = setInterval(updateEnhancedMinigame, 16);
+
+    // Add keyboard event listeners for fishing controls
+    document.addEventListener('keydown', handleFishingKeydown);
+    document.addEventListener('keyup', handleFishingKeyup);
+
+    // Set timeout for fish to potentially escape if player takes too long
     minigameTimeout = setTimeout(() => {
         if (minigameActive) {
-            stopMinigame(false);
-            gameUI.elements.fishing.status.textContent = 'The fish got away!';
-            gameUI.elements.fishing.status.style.color = 'rgba(255, 100, 100, 1)';
-
-            // Reset after a moment
-            setTimeout(() => {
-                if (isFishing) {
-                    resetFishingState();
-                }
-            }, 2000);
+            minigameState.stage = 'escaped';
+            updateEnhancedMinigame(); // Update one more time to show escaped state
         }
-    }, MINIGAME_DURATION * 1000);
+    }, MINIGAME_DURATION * 3000); // Triple the normal duration for the enhanced game
+
+    // Play initial "fish on" sound
+    playSound('fishBite');
 }
 
-// Update minigame marker position
-function updateMinigame() {
-    const progressBarWidth = 250;
+// Setup the enhanced minigame UI
+function setupEnhancedMinigameUI(fish) {
+    const container = gameUI.elements.fishing.minigame.container;
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.width = '300px';
+    container.style.padding = '15px';
 
-    // Update marker position
-    minigameMarkerPosition += minigameDirection * (MINIGAME_SPEED / 60);
+    // Clear previous content
+    container.innerHTML = '';
 
-    // Bounce at edges
-    if (minigameMarkerPosition >= progressBarWidth - 10) {
-        minigameMarkerPosition = progressBarWidth - 10;
-        minigameDirection = -1;
-    } else if (minigameMarkerPosition <= 0) {
-        minigameMarkerPosition = 0;
-        minigameDirection = 1;
-    }
+    // Create fish info header
+    const fishInfo = document.createElement('div');
+    fishInfo.className = 'fish-info';
+    fishInfo.innerHTML = `<span style="color:#FFD700">Hooked:</span> <span style="color:#E6C68A">${fish.name}</span>`;
+    fishInfo.style.marginBottom = '15px';
+    fishInfo.style.textAlign = 'center';
+    fishInfo.style.fontSize = '18px';
+    fishInfo.style.fontWeight = 'bold';
+    container.appendChild(fishInfo);
 
-    // Update marker position
-    gameUI.elements.fishing.minigame.marker.style.left = `${minigameMarkerPosition}px`;
+    // Create fishing rod tension meter
+    const tensionContainer = document.createElement('div');
+    tensionContainer.className = 'tension-container';
+    tensionContainer.style.marginBottom = '15px';
+
+    const tensionLabel = document.createElement('div');
+    tensionLabel.textContent = 'Line Tension:';
+    tensionLabel.style.marginBottom = '5px';
+    tensionLabel.style.fontSize = '14px';
+    tensionContainer.appendChild(tensionLabel);
+
+    const tensionMeter = document.createElement('div');
+    tensionMeter.className = 'tension-meter';
+    tensionMeter.style.width = '100%';
+    tensionMeter.style.height = '15px';
+    tensionMeter.style.backgroundColor = '#333';
+    tensionMeter.style.borderRadius = '10px';
+    tensionMeter.style.overflow = 'hidden';
+    tensionMeter.style.border = '1px solid #DAA520';
+
+    const tensionBar = document.createElement('div');
+    tensionBar.className = 'tension-bar';
+    tensionBar.style.width = '50%';
+    tensionBar.style.height = '100%';
+    tensionBar.style.backgroundColor = '#DAA520';
+    tensionBar.style.transition = 'width 0.1s, background-color 0.3s';
+    tensionMeter.appendChild(tensionBar);
+    tensionContainer.appendChild(tensionMeter);
+
+    // Add danger zones
+    const dangerZonesContainer = document.createElement('div');
+    dangerZonesContainer.style.display = 'flex';
+    dangerZonesContainer.style.justifyContent = 'space-between';
+    dangerZonesContainer.style.width = '100%';
+    dangerZonesContainer.style.marginTop = '2px';
+    dangerZonesContainer.style.fontSize = '10px';
+
+    const lowDanger = document.createElement('div');
+    lowDanger.textContent = 'Too Loose';
+    lowDanger.style.color = 'red';
+
+    const goodZone = document.createElement('div');
+    goodZone.textContent = 'Perfect';
+    goodZone.style.color = 'green';
+
+    const highDanger = document.createElement('div');
+    highDanger.textContent = 'Too Tight';
+    highDanger.style.color = 'red';
+
+    dangerZonesContainer.appendChild(lowDanger);
+    dangerZonesContainer.appendChild(goodZone);
+    dangerZonesContainer.appendChild(highDanger);
+    tensionContainer.appendChild(dangerZonesContainer);
+
+    container.appendChild(tensionContainer);
+
+    // Create catch progress
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'progress-container';
+    progressContainer.style.marginBottom = '15px';
+
+    const progressLabel = document.createElement('div');
+    progressLabel.textContent = 'Catch Progress:';
+    progressLabel.style.marginBottom = '5px';
+    progressLabel.style.fontSize = '14px';
+    progressContainer.appendChild(progressLabel);
+
+    const progressMeter = document.createElement('div');
+    progressMeter.className = 'progress-meter';
+    progressMeter.style.width = '100%';
+    progressMeter.style.height = '15px';
+    progressMeter.style.backgroundColor = '#333';
+    progressMeter.style.borderRadius = '10px';
+    progressMeter.style.overflow = 'hidden';
+    progressMeter.style.border = '1px solid #4CAF50';
+
+    const progressBar = document.createElement('div');
+    progressBar.className = 'progress-bar';
+    progressBar.style.width = '0%';
+    progressBar.style.height = '100%';
+    progressBar.style.backgroundColor = '#4CAF50';
+    progressBar.style.transition = 'width 0.2s';
+    progressMeter.appendChild(progressBar);
+    progressContainer.appendChild(progressMeter);
+    container.appendChild(progressContainer);
+
+    // Create fish stamina meter
+    const staminaContainer = document.createElement('div');
+    staminaContainer.className = 'stamina-container';
+    staminaContainer.style.marginBottom = '15px';
+
+    const staminaLabel = document.createElement('div');
+    staminaLabel.textContent = 'Fish Stamina:';
+    staminaLabel.style.marginBottom = '5px';
+    staminaLabel.style.fontSize = '14px';
+    staminaContainer.appendChild(staminaLabel);
+
+    const staminaMeter = document.createElement('div');
+    staminaMeter.className = 'stamina-meter';
+    staminaMeter.style.width = '100%';
+    staminaMeter.style.height = '15px';
+    staminaMeter.style.backgroundColor = '#333';
+    staminaMeter.style.borderRadius = '10px';
+    staminaMeter.style.overflow = 'hidden';
+    staminaMeter.style.border = '1px solid #F44336';
+
+    const staminaBar = document.createElement('div');
+    staminaBar.className = 'stamina-bar';
+    staminaBar.style.width = '100%';
+    staminaBar.style.height = '100%';
+    staminaBar.style.backgroundColor = '#F44336';
+    staminaBar.style.transition = 'width 0.3s';
+    staminaMeter.appendChild(staminaBar);
+    staminaContainer.appendChild(staminaMeter);
+    container.appendChild(staminaContainer);
+
+    // Create target zone game
+    const targetGameContainer = document.createElement('div');
+    targetGameContainer.className = 'target-game-container';
+    targetGameContainer.style.marginBottom = '15px';
+
+    const targetGameLabel = document.createElement('div');
+    targetGameLabel.textContent = 'Reel Control:';
+    targetGameLabel.style.marginBottom = '5px';
+    targetGameLabel.style.fontSize = '14px';
+    targetGameContainer.appendChild(targetGameLabel);
+
+    const targetGame = document.createElement('div');
+    targetGame.className = 'target-game';
+    targetGame.style.width = '100%';
+    targetGame.style.height = '40px';
+    targetGame.style.backgroundColor = '#333';
+    targetGame.style.borderRadius = '10px';
+    targetGame.style.position = 'relative';
+    targetGame.style.overflow = 'hidden';
+    targetGame.style.border = '1px solid #DAA520';
+
+    // Target zone (green area)
+    const targetZone = document.createElement('div');
+    targetZone.className = 'target-zone';
+    targetZone.style.position = 'absolute';
+    targetZone.style.height = '100%';
+    targetZone.style.backgroundColor = 'rgba(0, 255, 0, 0.3)';
+    targetZone.style.width = `${minigameState.targetZoneSize}%`;
+    targetZone.style.left = `${minigameState.targetZonePosition - (minigameState.targetZoneSize / 2)}%`;
+    targetZone.style.border = '1px dashed #4CAF50';
+    targetZone.style.boxSizing = 'border-box';
+    targetGame.appendChild(targetZone);
+
+    // Marker (player controlled)
+    const marker = document.createElement('div');
+    marker.className = 'marker';
+    marker.style.position = 'absolute';
+    marker.style.height = '100%';
+    marker.style.width = '5px';
+    marker.style.backgroundColor = 'white';
+    marker.style.left = `${minigameState.markerPosition}%`;
+    marker.style.transform = 'translateX(-50%)';
+    marker.style.boxShadow = '0 0 5px white';
+    targetGame.appendChild(marker);
+
+    targetGameContainer.appendChild(targetGame);
+    container.appendChild(targetGameContainer);
+
+    // Create controls info
+    const controlsInfo = document.createElement('div');
+    controlsInfo.className = 'controls-info';
+    controlsInfo.style.marginBottom = '15px';
+    controlsInfo.style.fontSize = '12px';
+    controlsInfo.style.textAlign = 'center';
+    controlsInfo.innerHTML = `
+        <div style="color: #DAA520; margin-bottom: 5px;">Controls:</div>
+        <div><span style="color: #DAA520;">Z Key:</span> <span style="color: #E6C68A;">Reel In (hold)</span></div>
+        <div><span style="color: #DAA520;">X Key:</span> <span style="color: #E6C68A;">Increase Tension</span></div>
+        <div><span style="color: #DAA520;">C Key:</span> <span style="color: #E6C68A;">Decrease Tension</span></div>
+    `;
+    container.appendChild(controlsInfo);
+
+    // Create status message
+    const statusMessage = document.createElement('div');
+    statusMessage.className = 'status-message';
+    statusMessage.textContent = 'Keep tension balanced while reeling in!';
+    statusMessage.style.textAlign = 'center';
+    statusMessage.style.color = '#FFD700';
+    statusMessage.style.fontStyle = 'italic';
+    statusMessage.style.marginBottom = '10px';
+    container.appendChild(statusMessage);
+
+    // Store these UI elements for later reference
+    gameUI.elements.fishing.minigame.enhanced = {
+        container: container,
+        fishInfo: fishInfo,
+        tensionBar: tensionBar,
+        progressBar: progressBar,
+        staminaBar: staminaBar,
+        targetZone: targetZone,
+        marker: marker,
+        statusMessage: statusMessage
+    };
 }
 
-// Attempt to catch fish
-function attemptCatch() {
+// Handle keydown for fishing controls
+function handleFishingKeydown(event) {
     if (!minigameActive) return;
 
-    // Get target zone position
-    const targetZone = gameUI.elements.fishing.minigame.targetZone;
-    const targetLeft = parseInt(targetZone.style.left);
-    const targetWidth = parseInt(targetZone.style.width);
-    const targetRight = targetLeft + targetWidth;
+    // Z key - Reel in
+    if (event.key === 'z' && !reelKeyPressed) {
+        reelKeyPressed = true;
+        minigameState.reelSpeed = 1.5;
+    }
 
-    // Check if marker is in target zone
-    if (minigameMarkerPosition >= targetLeft && minigameMarkerPosition <= targetRight) {
-        // Success!
-        stopMinigame(true);
-        catchFish();
-    } else {
-        // Failure
-        stopMinigame(false);
-        gameUI.elements.fishing.status.textContent = 'Missed! The fish got away.';
-        gameUI.elements.fishing.status.style.color = 'rgba(255, 100, 100, 1)';
+    // X key - Increase tension
+    if (event.key === 'x') {
+        minigameState.tension += 2;
+        playSound('tensionUp');
+    }
 
-        // Reset after a moment
-        setTimeout(() => {
-            if (isFishing) {
-                gameUI.elements.fishing.status.textContent = 'Waiting for a bite...';
-                gameUI.elements.fishing.status.style.color = 'white';
-
-                // Set timeout for next fish bite
-                const biteTime = FISH_BITE_MIN_TIME + Math.random() * (FISH_BITE_MAX_TIME - FISH_BITE_MIN_TIME);
-                fishingTimeout = setTimeout(() => {
-                    if (isFishing) {
-                        fishBite();
-                    }
-                }, biteTime * 1000);
-            }
-        }, 2000);
+    // C key - Decrease tension
+    if (event.key === 'c') {
+        minigameState.tension -= 2;
+        playSound('tensionDown');
     }
 }
 
-// Stop minigame
-function stopMinigame(success) {
+// Handle keyup for fishing controls
+function handleFishingKeyup(event) {
+    if (!minigameActive) return;
+
+    // Z key released - Stop reeling
+    if (event.key === 'z') {
+        reelKeyPressed = false;
+        minigameState.reelSpeed = 0;
+    }
+}
+
+// Update the enhanced minigame
+function updateEnhancedMinigame() {
+    if (!minigameActive) return;
+
+    const ui = gameUI.elements.fishing.minigame.enhanced;
+
+    // Check if game is over
+    if (minigameState.stage === 'escaped') {
+        stopEnhancedMinigame(false);
+        return;
+    }
+
+    if (minigameState.stage === 'caught') {
+        stopEnhancedMinigame(true);
+        return;
+    }
+
+    // Update fish behavior
+    updateFishBehavior();
+
+    // Update game mechanics
+    updateReelPosition();
+    checkLineTension();
+    updateCatchProgress();
+
+    // Check for outcome
+    checkMinigameOutcome();
+
+    // Update UI elements
+    updateMinigameUI();
+}
+
+// Update fish behavior
+function updateFishBehavior() {
+    // Fish changes direction randomly based on erratic level
+    if (Math.random() < minigameState.fishErratic * 0.02) {
+        minigameState.fishDirection *= -1;
+    }
+
+    // Fish stamina decreases over time
+    minigameState.fishStamina -= 0.05;
+
+    // Fish strength increases as stamina decreases (desperate fighting)
+    if (minigameState.fishStamina < 30) {
+        minigameState.fishStrength = minigameState.fishStrength * 1.002;
+    }
+
+    // Update target zone position if it's a moving target
+    if (minigameState.targetZoneMoving) {
+        // Move target zone based on fish direction and strength
+        minigameState.targetZonePosition += minigameState.fishDirection * (minigameState.fishStrength * 0.1);
+
+        // Bounce off edges
+        if (minigameState.targetZonePosition > 100 - (minigameState.targetZoneSize / 2)) {
+            minigameState.targetZonePosition = 100 - (minigameState.targetZoneSize / 2);
+            minigameState.fishDirection *= -1;
+        } else if (minigameState.targetZonePosition < (minigameState.targetZoneSize / 2)) {
+            minigameState.targetZonePosition = (minigameState.targetZoneSize / 2);
+            minigameState.fishDirection *= -1;
+        }
+    }
+
+    // Tension increases when reeling against fish direction
+    if (reelKeyPressed && minigameState.reelSpeed > 0) {
+        // If fish is pulling away and player is reeling, increase tension
+        if (minigameState.fishDirection < 0) {
+            minigameState.tension += 0.5 * Math.abs(minigameState.fishStrength);
+        } else {
+            // If fish is coming toward player, tension decreases slightly
+            minigameState.tension -= 0.1;
+        }
+    } else {
+        // Tension naturally decreases when not reeling
+        minigameState.tension -= 0.2;
+    }
+}
+
+// Check and handle line tension
+function checkLineTension() {
+    // Clamp tension between 0 and 100
+    minigameState.tension = Math.max(0, Math.min(100, minigameState.tension));
+
+    // Line breaks if tension is too high
+    if (minigameState.tension > 90) {
+        // Increase chance of line breaking as tension increases
+        const breakChance = (minigameState.tension - 90) * 0.01;
+        if (Math.random() < breakChance) {
+            minigameState.stage = 'escaped';
+            gameUI.elements.fishing.status.textContent = 'Line snapped! The fish got away!';
+            gameUI.elements.fishing.status.style.color = 'rgba(255, 100, 100, 1)';
+            playSound('lineBreak');
+        }
+    }
+
+    // Fish escapes if tension is too low
+    if (minigameState.tension < 10) {
+        // Increase chance of fish escaping as tension decreases
+        const escapeChance = (10 - minigameState.tension) * 0.01;
+        if (Math.random() < escapeChance) {
+            minigameState.stage = 'escaped';
+            gameUI.elements.fishing.status.textContent = 'No tension! The fish got away!';
+            gameUI.elements.fishing.status.style.color = 'rgba(255, 100, 100, 1)';
+            playSound('fishEscape');
+        }
+    }
+}
+
+// Update reel position
+function updateReelPosition() {
+    // Marker drifts toward center naturally
+    if (minigameState.markerPosition > 50) {
+        minigameState.markerPosition -= 0.5;
+    } else if (minigameState.markerPosition < 50) {
+        minigameState.markerPosition += 0.5;
+    }
+
+    // Fish pulls on the marker based on direction and strength
+    minigameState.markerPosition += minigameState.fishDirection * (minigameState.fishStrength * 0.1);
+
+    // Add player reel speed influence
+    minigameState.markerPosition += minigameState.reelSpeed;
+
+    // Clamp marker position between 0 and 100
+    minigameState.markerPosition = Math.max(0, Math.min(100, minigameState.markerPosition));
+}
+
+// Update catch progress
+function updateCatchProgress() {
+    // Calculate target zone bounds
+    const targetZoneMin = minigameState.targetZonePosition - (minigameState.targetZoneSize / 2);
+    const targetZoneMax = minigameState.targetZonePosition + (minigameState.targetZoneSize / 2);
+
+    // If marker is in the target zone, make progress
+    if (minigameState.markerPosition >= targetZoneMin && minigameState.markerPosition <= targetZoneMax) {
+        // Progress is faster when tension is in the sweet spot (40-60%)
+        let progressRate = 0.1;
+        if (minigameState.tension >= 40 && minigameState.tension <= 60) {
+            progressRate = 0.3;
+        }
+
+        // Progress is boosted by reeling
+        progressRate += minigameState.reelSpeed * 0.5;
+
+        minigameState.playerProgress += progressRate;
+    } else {
+        // Slight progress loss when outside the zone
+        minigameState.playerProgress -= 0.05;
+        minigameState.playerProgress = Math.max(0, minigameState.playerProgress);
+    }
+}
+
+// Check minigame outcome conditions
+function checkMinigameOutcome() {
+    // Win condition
+    if (minigameState.playerProgress >= 100) {
+        minigameState.stage = 'caught';
+        playSound('fishCaught');
+    }
+
+    // Fish escapes if it has no more stamina and player hasn't made enough progress
+    if (minigameState.fishStamina <= 0 && minigameState.playerProgress < 75) {
+        minigameState.stage = 'escaped';
+        gameUI.elements.fishing.status.textContent = 'The fish fought free and escaped!';
+        gameUI.elements.fishing.status.style.color = 'rgba(255, 100, 100, 1)';
+        playSound('fishEscape');
+    }
+}
+
+// Update minigame UI based on current state
+function updateMinigameUI() {
+    const ui = gameUI.elements.fishing.minigame.enhanced;
+
+    // Update tension bar
+    ui.tensionBar.style.width = `${minigameState.tension}%`;
+
+    // Update tension bar color based on level
+    if (minigameState.tension > 80) {
+        ui.tensionBar.style.backgroundColor = '#F44336'; // Red - danger
+    } else if (minigameState.tension > 60) {
+        ui.tensionBar.style.backgroundColor = '#FF9800'; // Orange - warning
+    } else if (minigameState.tension >= 30) {
+        ui.tensionBar.style.backgroundColor = '#4CAF50'; // Green - good
+    } else if (minigameState.tension >= 20) {
+        ui.tensionBar.style.backgroundColor = '#FF9800'; // Orange - warning
+    } else {
+        ui.tensionBar.style.backgroundColor = '#F44336'; // Red - danger
+    }
+
+    // Update progress bar
+    ui.progressBar.style.width = `${minigameState.playerProgress}%`;
+
+    // Update stamina bar
+    ui.staminaBar.style.width = `${minigameState.fishStamina}%`;
+
+    // Update marker position
+    ui.marker.style.left = `${minigameState.markerPosition}%`;
+
+    // Update target zone position
+    ui.targetZone.style.left = `${minigameState.targetZonePosition - (minigameState.targetZoneSize / 2)}%`;
+    ui.targetZone.style.width = `${minigameState.targetZoneSize}%`;
+
+    // Update status message based on current state
+    if (minigameState.tension > 80) {
+        ui.statusMessage.textContent = 'Careful! Line tension too high!';
+        ui.statusMessage.style.color = '#F44336';
+    } else if (minigameState.tension < 20) {
+        ui.statusMessage.textContent = 'More tension needed! Fish might escape!';
+        ui.statusMessage.style.color = '#F44336';
+    } else if (minigameState.markerPosition >= minigameState.targetZonePosition - (minigameState.targetZoneSize / 2) &&
+        minigameState.markerPosition <= minigameState.targetZonePosition + (minigameState.targetZoneSize / 2)) {
+        ui.statusMessage.textContent = 'Perfect! Keep reeling!';
+        ui.statusMessage.style.color = '#4CAF50';
+    } else {
+        ui.statusMessage.textContent = 'Guide the marker into the green zone!';
+        ui.statusMessage.style.color = '#FFD700';
+    }
+}
+
+// Stop the enhanced minigame
+function stopEnhancedMinigame(success) {
     if (!minigameActive) return;
 
     minigameActive = false;
 
-    // Clear all intervals and timeouts to prevent conflicts
+    // Clear intervals and timeouts
     if (minigameInterval) {
         clearInterval(minigameInterval);
         minigameInterval = null;
@@ -349,54 +799,50 @@ function stopMinigame(success) {
         minigameTimeout = null;
     }
 
-    if (bobberAnimationInterval) {
-        clearInterval(bobberAnimationInterval);
-        bobberAnimationInterval = null;
-    }
+    // Remove event listeners
+    document.removeEventListener('keydown', handleFishingKeydown);
+    document.removeEventListener('keyup', handleFishingKeyup);
+
+    // Reset reeling state
+    reelKeyPressed = false;
 
     // Hide minigame UI
     gameUI.elements.fishing.minigame.container.style.display = 'none';
+
+    // Process outcome
+    if (success) {
+        catchFish(currentHookedFish);
+    } else {
+        gameUI.elements.fishing.status.textContent = 'The fish got away!';
+        gameUI.elements.fishing.status.style.color = 'rgba(255, 100, 100, 1)';
+
+        // Reset after a moment
+        setTimeout(() => {
+            if (isFishing) {
+                resetFishingState();
+            }
+        }, 2000);
+    }
 }
 
-// Helper function to reset fishing state and set up for next bite
-function resetFishingState() {
-    // Clear any existing timeouts
-    if (fishingTimeout) {
-        clearTimeout(fishingTimeout);
-    }
+// Modified catchFish to accept the specific fish being caught
+function catchFish(caughtFish = null) {
+    // If no specific fish provided, determine randomly (fallback to original behavior)
+    if (!caughtFish) {
+        const rand = Math.random();
+        let cumulativeRarity = 0;
+        caughtFish = FISH_TYPES[0]; // Default to most common fish
 
-    if (fishEscapeTimeout) {
-        clearTimeout(fishEscapeTimeout);
-    }
-
-    // Reset UI
-    gameUI.elements.fishing.status.textContent = 'Waiting for a bite...';
-    gameUI.elements.fishing.status.style.color = 'white';
-
-    // Set timeout for next fish bite
-    const biteTime = FISH_BITE_MIN_TIME + Math.random() * (FISH_BITE_MAX_TIME - FISH_BITE_MIN_TIME);
-    fishingTimeout = setTimeout(() => {
-        if (isFishing) {
-            fishBite();
-        }
-    }, biteTime * 1000);
-}
-
-// Catch a fish
-function catchFish() {
-    // Determine which fish was caught based on rarity
-    const rand = Math.random();
-    let cumulativeRarity = 0;
-    let caughtFish = FISH_TYPES[0]; // Default to most common fish
-
-    for (const fish of FISH_TYPES) {
-        cumulativeRarity += fish.rarity;
-        if (rand <= cumulativeRarity) {
-            caughtFish = fish;
-            break;
+        for (const fish of FISH_TYPES) {
+            cumulativeRarity += fish.rarity;
+            if (rand <= cumulativeRarity) {
+                caughtFish = fish;
+                break;
+            }
         }
     }
 
+    // The rest of the original catchFish function...
     // Update fish inventory
     if (!fishInventory[caughtFish.name]) {
         fishInventory[caughtFish.name] = {
@@ -415,6 +861,16 @@ function catchFish() {
     // Update inventory UI
     gameUI.updateInventory(fishInventory);
 
+    // Add fish to server inventory system
+    addToInventory({
+        item_type: 'fish',
+        item_name: caughtFish.name,
+        item_data: {
+            value: caughtFish.value,
+            color: caughtFish.color
+        }
+    });
+
     // Show success message
     gameUI.elements.fishing.status.textContent = `Caught a ${caughtFish.name}! (+${caughtFish.value})`;
     gameUI.elements.fishing.status.style.color = 'rgba(100, 255, 100, 1)';
@@ -424,12 +880,9 @@ function catchFish() {
 
     // Update player stats in network
     onFishCaught(1);
-
-    // If different fish have different values
-    const fishValue = caughtFish.value; // Use the fish's value directly
+    onMoneyEarned(caughtFish.value);
 
     // IMPORTANT: Directly update the UI stats panel
-    // This ensures the UI updates immediately without waiting for network responses
     gameUI.updatePlayerStats({
         fishCount: fishCaught,
     });
@@ -449,6 +902,20 @@ function catchFish() {
             }, biteTime * 1000);
         }
     }, 3000);
+}
+
+// Update the existing game with the new functions
+function resetFishingState() {
+    gameUI.elements.fishing.status.textContent = 'Waiting for a bite...';
+    gameUI.elements.fishing.status.style.color = 'white';
+
+    // Set timeout for next fish bite
+    const biteTime = FISH_BITE_MIN_TIME + Math.random() * (FISH_BITE_MAX_TIME - FISH_BITE_MIN_TIME);
+    fishingTimeout = setTimeout(() => {
+        if (isFishing) {
+            fishBite();
+        }
+    }, biteTime * 1000);
 }
 
 // Create visual effect for caught fish
@@ -531,4 +998,10 @@ function getFishValue(fishType) {
         case 'legendary': return 100;
         default: return 5;
     }
+}
+
+// Sound effects function placeholder
+function playSound(soundName) {
+    // Implement sound effects later
+    console.log(`Playing sound: ${soundName}`);
 } 
