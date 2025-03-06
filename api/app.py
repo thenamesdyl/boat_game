@@ -57,7 +57,7 @@ islands = {}
 last_db_update = defaultdict(float)  # Track last database update time for each player
 DB_UPDATE_INTERVAL = 0.2  # seconds between database updates
 # Add new distance threshold constant and tracking dictionary
-MIN_POSITION_UPDATE_DISTANCE = 1.5  # minimum distance in units to trigger a database update
+MIN_POSITION_UPDATE_DISTANCE = 20  # minimum distance in units to trigger a database update
 last_db_positions = {}  # Track last database position for each player
 
 # Add this near your other global variables (at the top of the file)
@@ -149,8 +149,8 @@ def handle_player_join(data):
     firebase_token = data.get('firebaseToken')
     claimed_firebase_uid = data.get('player_id')
 
-    logger.info(f"Firebase token: {firebase_token}")
-    logger.info(f"Claimed Firebase UID: {claimed_firebase_uid}")
+    # logger.info(f"Firebase token: {firebase_token}")
+    # logger.info(f"Claimed Firebase UID: {claimed_firebase_uid}")
     
     # ONLY proceed with database storage if Firebase authentication is provided and valid
     if firebase_token and claimed_firebase_uid:
@@ -446,15 +446,13 @@ def handle_chat_message(data):
         return
     
     # Create message in Firestore
-    message = firestore_models.Message.create(
-        player_id,
-        content,
-        message_type='global'
-    )
+    #message = firestore_models.Message.create(
+    #    player_id,
+    #    content,
+    #    message_type='global'
+    #)
     
-    if message:
-        # Broadcast message to all clients
-        emit('new_message', message, broadcast=True)
+    emit('new_message', content, broadcast=True)
 
 @socketio.on('update_player_color')
 def handle_update_player_color(data):
@@ -580,6 +578,55 @@ def create_island():
     
     return jsonify(island)
 
+@socketio.on('add_to_inventory')
+def handle_add_to_inventory(data):
+    """
+    Handle adding items to player's inventory
+    Expects: { player_id, item_type (fish/treasure), item_name, item_data }
+    """
+    player_id = data.get('player_id')
+    if not player_id:
+        logger.warning("Missing player ID in inventory update. Ignoring.")
+        return
+    
+    # Ensure player exists in cache
+    if player_id not in players:
+        logger.warning(f"Player ID {player_id} not found in cache. Ignoring inventory update.")
+        return
+    
+    item_type = data.get('item_type')
+    item_name = data.get('item_name')
+    item_data = data.get('item_data', {})
+    
+    if not item_type or not item_name:
+        logger.warning("Missing item type or name in inventory update. Ignoring.")
+        return
+    
+    result = None
+    
+    # Add to appropriate inventory type
+    if item_type == 'fish':
+        result = firestore_models.Inventory.add_fish(player_id, item_name, item_data)
+        logger.info(f"Added fish '{item_name}' to player {player_id}'s inventory")
+    elif item_type == 'treasure':
+        result = firestore_models.Inventory.add_treasure(player_id, item_name, item_data)
+        logger.info(f"Added treasure '{item_name}' to player {player_id}'s inventory")
+    else:
+        logger.warning(f"Unknown item type '{item_type}' in inventory update. Ignoring.")
+        return
+    
+    # Send updated inventory to the player
+    if result:
+        emit('inventory_updated', result)
+
+# Add API endpoint to get player inventory
+@app.route('/api/players/<player_id>/inventory', methods=['GET'])
+def get_player_inventory(player_id):
+    """Get a player's inventory"""
+    inventory = firestore_models.Inventory.get(player_id)
+    if inventory:
+        return jsonify(inventory)
+    return jsonify({'error': 'Inventory not found'}), 404
 
 if __name__ == '__main__':
     # Run the Socket.IO server with debug and reloader enabled
