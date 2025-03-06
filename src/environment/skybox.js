@@ -583,7 +583,7 @@ function updateCelestialBodyPositions(sunPosition, moonPosition, dayPhase) {
                 let maxOpacity = 0.6; // Default for glow
                 if (child === sunGlow) maxOpacity = 0.6;
                 else if (child === sunFlare) maxOpacity = 0.7;
-                else if (child === sunCorona) maxOpacity = 0.5;
+                else maxOpacity = 0.5; // Default for other sun components
 
                 // Scale the child's opacity proportionally
                 child.material.opacity = maxOpacity * opacity;
@@ -601,7 +601,8 @@ function updateCelestialBodyPositions(sunPosition, moonPosition, dayPhase) {
                     child.material.opacity = 0.6;
                 } else if (child === sunFlare) {
                     child.material.opacity = 0.7;
-                } else if (child === sunCorona) {
+                } else {
+                    // Default opacity for any other child elements
                     child.material.opacity = 0.5;
                 }
             }
