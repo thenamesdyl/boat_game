@@ -177,30 +177,42 @@ export function showAuthPopup(onSuccess) {
     const authForm = document.createElement('div');
     authForm.className = 'auth-form';
     authForm.style.cssText = `
-        background-color: white;
-        padding: 20px;
-        border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        background-color: #0f1626;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 0 30px rgba(0,100,255,0.3);
         width: 350px;
         max-width: 90%;
+        border: 1px solid rgba(50, 130, 240, 0.3);
     `;
 
     authForm.innerHTML = `
-        <h2 style="text-align: center; margin-bottom: 20px;">TideFall</h2>
+        <div style="position: relative; margin-bottom: 25px;">
+            <h2 style="text-align: center; color: #fff; font-size: 32px; margin-bottom: 5px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 10px rgba(66, 133, 244, 0.7);">TideFall</h2>
+            <div style="height: 3px; width: 60px; background: linear-gradient(to right, #4285f4, #34a853); margin: 0 auto 15px;"></div>
+            <div style="background: linear-gradient(135deg, rgba(10, 37, 64, 0.9), rgba(32, 58, 96, 0.9)); border-radius: 8px; padding: 15px; border-left: 2px solid #4285f4; margin-top: 10px;">
+                <p style="margin: 0; color: #e0e0e0; font-size: 15px; line-height: 1.5; font-weight: 400; text-align: center;">
+                Build alliances, claim vast lands, and hunt for loot in dangerous realms.                </p>
+            </div>
+        </div>
         <div style="text-align: center; margin-bottom: 20px;">
             <button id="google-signin" style="
-                background-color: white;
-                color: #757575;
-                border: 1px solid #dadce0;
+                background-color: #1a73e8;
+                color: white;
+                border: none;
                 border-radius: 4px;
-                padding: 10px 15px;
+                padding: 12px 15px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 width: 100%;
                 cursor: pointer;
                 font-family: 'Roboto', sans-serif;
+                font-weight: 500;
+                font-size: 14px;
                 margin-bottom: 15px;
+                transition: background-color 0.2s;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             ">
                 <span style="margin-right: 10px;">
                     <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
