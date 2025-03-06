@@ -184,7 +184,7 @@ export function updateShopAvailability(activeIslands, playerPosition) {
 // Handle 'E' key press to open the shop
 function handleShopKeyPress(event) {
     if (event.key.toLowerCase() === 'e') {
-        console.log(`Opening shop for island ${nearestIslandId}...`);
+        //console.log(`Opening shop for island ${nearestIslandId}...`);
         // Check if player is near any shop
         let canOpenShop = false;
         let nearestIslandId = null;
