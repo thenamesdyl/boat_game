@@ -1,4 +1,4 @@
-// chat.js - Integrated ship communications and radar system
+import * as THREE from 'three';
 import { sendChatMessage, getRecentMessages, onChatMessage, onRecentMessages } from '../core/network.js';
 
 export class ChatSystem {
@@ -484,17 +484,27 @@ export class MiniMap {
 
         // Reference the radar screen from ChatSystem
         this.chatSystem = null;
+        this.radarScreen = null; // Store reference to the actual circular radar screen
     }
 
     setChatSystem(chatSystem) {
         this.chatSystem = chatSystem;
-        // Use the radar screen as our map container
+
+        // Find the circular radar screen within the miniMapContainer
+        // This is the circular element that should contain our markers
         const radarScreen = this.chatSystem.miniMapContainer.querySelector('div');
-        this.miniMapContainer = radarScreen;
+        if (!radarScreen) {
+            console.error("Radar screen element not found in miniMapContainer");
+            return;
+        }
+
+        console.log("Radar screen found:", radarScreen);
+        this.miniMapContainer = this.chatSystem.miniMapContainer;
+        this.radarScreen = radarScreen; // Store reference to actual radar screen
     }
 
     addIslandMarker(id, position, radius) {
-        if (this.islandMarkers.has(id) || !this.miniMapContainer) return;
+        if (this.islandMarkers.has(id) || !this.radarScreen) return;
 
         const marker = document.createElement('div');
         marker.style.position = 'absolute';
@@ -505,7 +515,7 @@ export class MiniMap {
         marker.style.transform = 'translate(-50%, -50%)';
         marker.style.boxShadow = '0 0 3px #00ff88';
         marker.style.zIndex = '3';
-        this.miniMapContainer.appendChild(marker);
+        this.radarScreen.appendChild(marker);
 
         this.islandMarkers.set(id, {
             element: marker,
@@ -514,7 +524,7 @@ export class MiniMap {
     }
 
     addPlayerMarker(id, position, color) {
-        if (this.playerMarkers.has(id) || !this.miniMapContainer) return;
+        if (this.playerMarkers.has(id) || !this.radarScreen) return;
 
         const marker = document.createElement('div');
         marker.style.position = 'absolute';
@@ -525,7 +535,7 @@ export class MiniMap {
         marker.style.transform = 'translate(-50%, -50%)';
         marker.style.boxShadow = '0 0 3px ' + (color || '#ff3333');
         marker.style.zIndex = '4';
-        this.miniMapContainer.appendChild(marker);
+        this.radarScreen.appendChild(marker);
 
         this.playerMarkers.set(id, {
             element: marker,
@@ -534,16 +544,25 @@ export class MiniMap {
     }
 
     removePlayerMarker(id) {
-        if (!this.playerMarkers.has(id) || !this.miniMapContainer) return;
+        if (!this.playerMarkers.has(id) || !this.radarScreen) return;
 
         const marker = this.playerMarkers.get(id);
-        this.miniMapContainer.removeChild(marker.element);
+        this.radarScreen.removeChild(marker.element);
         this.playerMarkers.delete(id);
     }
 
     updateMonsterMarkers(monsters, playerPosition, playerRotation, mapScale) {
-        if (!this.miniMapContainer) return;
-        //console.log("Updating monster markers");
+        if (!this.radarScreen) return; // Use radarScreen instead of miniMapContainer
+
+        // Debug log to check for monsters and their positions
+        console.log(`Updating ${monsters.length} monster markers, player at ${playerPosition.x.toFixed(0)},${playerPosition.z.toFixed(0)}`);
+        if (monsters.length > 0) {
+            console.log(`First monster: Type=${monsters[0].monsterType}, State=${monsters[0].state}, Pos=${monsters[0].mesh.position.x.toFixed(0)},${monsters[0].mesh.position.z.toFixed(0)}`);
+        }
+
+        // Use a much smaller scale for monsters to amplify their movement
+        // This makes even small position changes very visible on the radar
+        const monsterMapScale = mapScale / 13; // Make monsters appear to move 4x more on the radar
 
         // Clear existing monster markers that are no longer needed
         const activeMonsterIds = new Set(monsters.map((_, index) => `monster-${index}`));
@@ -551,10 +570,9 @@ export class MiniMap {
         // Remove markers for monsters that no longer exist
         for (const id of this.monsterMarkers.keys()) {
             if (!activeMonsterIds.has(id)) {
-                console.log("Removing monster marker", id);
                 const marker = this.monsterMarkers.get(id);
                 if (marker && marker.element && marker.element.parentNode) {
-                    this.miniMapContainer.removeChild(marker.element);
+                    this.radarScreen.removeChild(marker.element); // Use radarScreen
                 }
                 this.monsterMarkers.delete(id);
             }
@@ -565,43 +583,138 @@ export class MiniMap {
             const monsterId = `monster-${index}`;
             let marker;
 
-            // Only show monsters that are in SURFACING or ATTACKING states
-            const shouldShow = monster.state === 'surfacing' || monster.state === 'attacking';
+            // Calculate distance to monster
+            const distanceToMonster = new THREE.Vector3()
+                .subVectors(monster.mesh.position, playerPosition)
+                .length();
+
+            // Only show monsters within detection range (800 units)
+            const detectionRange = 800;
+            const shouldShow = distanceToMonster <= detectionRange;
+
+            // Determine display style based on monster state
+            let markerColor, markerSize, markerPulse;
+
+            switch (monster.state) {
+                case 'attacking':
+                    markerColor = '#ff0000'; // Bright red for attacking monsters
+                    markerSize = 10; // Make bigger for better visibility
+                    markerPulse = true;
+                    break;
+                case 'surfacing':
+                    markerColor = '#ff3333'; // Red for surfacing monsters
+                    markerSize = 9; // Make bigger for better visibility
+                    markerPulse = false;
+                    break;
+                case 'hunting':
+                    markerColor = '#ff9900'; // Orange for hunting monsters
+                    markerSize = 8; // Make bigger for better visibility
+                    markerPulse = false;
+                    break;
+                default:
+                    markerColor = '#aa3333'; // Darker red for lurking monsters
+                    markerSize = 7; // Make bigger for better visibility
+                    markerPulse = false;
+                    break;
+            }
 
             if (!this.monsterMarkers.has(monsterId) && shouldShow) {
                 // Create new marker for this monster
                 marker = document.createElement('div');
                 marker.style.position = 'absolute';
-                marker.style.width = '6px';
-                marker.style.height = '6px';
-                marker.style.backgroundColor = '#ff3333'; // Red color for monsters
+                marker.style.width = `${markerSize}px`;
+                marker.style.height = `${markerSize}px`;
+                marker.style.backgroundColor = markerColor;
                 marker.style.borderRadius = '50%';
                 marker.style.transform = 'translate(-50%, -50%)';
-                marker.style.boxShadow = '0 0 5px #ff3333';
+                marker.style.boxShadow = `0 0 5px ${markerColor}`;
                 marker.style.zIndex = '6'; // Higher than player marker
-                this.miniMapContainer.appendChild(marker);
+
+                // Calculate initial position - use monsterMapScale
+                const centerX = this.radarScreen.clientWidth / 2; // Use radarScreen
+                const centerY = this.radarScreen.clientHeight / 2; // Use radarScreen
+                const relX = (monster.mesh.position.x - playerPosition.x) / monsterMapScale;
+                const relZ = (monster.mesh.position.z - playerPosition.z) / monsterMapScale;
+                const rotatedX = relX * Math.cos(-playerRotation) - relZ * Math.sin(-playerRotation);
+                const rotatedZ = relX * Math.sin(-playerRotation) + relZ * Math.cos(-playerRotation);
+
+                // Set initial position immediately
+                marker.style.left = `${centerX + rotatedX}px`;
+                marker.style.top = `${centerY + rotatedZ}px`;
+
+                // Add pulsing animation for attacking monsters
+                if (markerPulse) {
+                    marker.style.animation = 'pulse 1s infinite alternate';
+
+                    // Create style for pulse animation if it doesn't exist
+                    if (!document.getElementById('radar-pulse-animation')) {
+                        const style = document.createElement('style');
+                        style.id = 'radar-pulse-animation';
+                        style.textContent = `
+                            @keyframes pulse {
+                                0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+                                100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.4; }
+                            }
+                        `;
+                        document.head.appendChild(style);
+                    }
+                }
+
+                this.radarScreen.appendChild(marker); // Use radarScreen
+                console.log(`Created monster marker at ${centerX + rotatedX}, ${centerY + rotatedZ}`);
 
                 this.monsterMarkers.set(monsterId, {
                     element: marker,
-                    position: monster.mesh.position.clone()
+                    position: monster.mesh.position.clone(),
+                    state: monster.state
                 });
             } else if (this.monsterMarkers.has(monsterId)) {
                 // Update existing marker
                 marker = this.monsterMarkers.get(monsterId);
                 marker.position = monster.mesh.position.clone();
 
-                // Show/hide based on monster state
-                marker.element.style.display = shouldShow ? 'block' : 'none';
+                // Calculate updated position - use monsterMapScale
+                const centerX = this.radarScreen.clientWidth / 2; // Use radarScreen
+                const centerY = this.radarScreen.clientHeight / 2; // Use radarScreen
+                const relX = (monster.mesh.position.x - playerPosition.x) / monsterMapScale;
+                const relZ = (monster.mesh.position.z - playerPosition.z) / monsterMapScale;
+                const rotatedX = relX * Math.cos(-playerRotation) - relZ * Math.sin(-playerRotation);
+                const rotatedZ = relX * Math.sin(-playerRotation) + relZ * Math.cos(-playerRotation);
+
+                // Update position immediately
+                marker.element.style.left = `${centerX + rotatedX}px`;
+                marker.element.style.top = `${centerY + rotatedZ}px`;
+
+                // Update marker appearance if monster state changed
+                if (marker.state !== monster.state) {
+                    marker.state = monster.state;
+                    marker.element.style.backgroundColor = markerColor;
+                    marker.element.style.boxShadow = `0 0 5px ${markerColor}`;
+                    marker.element.style.width = `${markerSize}px`;
+                    marker.element.style.height = `${markerSize}px`;
+
+                    // Update pulse animation
+                    if (markerPulse) {
+                        marker.element.style.animation = 'pulse 1s infinite alternate';
+                    } else {
+                        marker.element.style.animation = 'none';
+                    }
+                }
+
+                // Hide if outside mini-map
+                const distance = Math.sqrt(rotatedX * rotatedX + rotatedZ * rotatedZ);
+                const radius = this.radarScreen.clientWidth / 2 - 5; // Use radarScreen
+                marker.element.style.display = (shouldShow && distance <= radius) ? 'block' : 'none';
             }
         });
     }
 
     updateMiniMap(playerPosition, playerRotation, mapScale) {
-        if (!this.miniMapContainer) return;
+        if (!this.radarScreen) return;
 
         // Center the player on the mini-map
-        const centerX = this.miniMapContainer.clientWidth / 2;
-        const centerY = this.miniMapContainer.clientHeight / 2;
+        const centerX = this.radarScreen.clientWidth / 2;
+        const centerY = this.radarScreen.clientHeight / 2;
 
         // Update self marker (already positioned at center)
         if (this.chatSystem && this.chatSystem.selfMarker) {
@@ -623,7 +736,7 @@ export class MiniMap {
 
             // Hide if outside mini-map
             const distance = Math.sqrt(rotatedX * rotatedX + rotatedZ * rotatedZ);
-            const radius = this.miniMapContainer.clientWidth / 2;
+            const radius = this.radarScreen.clientWidth / 2;
             if (distance > radius - 5) {
                 marker.element.style.display = 'none';
             } else {
@@ -645,7 +758,7 @@ export class MiniMap {
 
             // Hide if outside mini-map
             const distance = Math.sqrt(rotatedX * rotatedX + rotatedZ * rotatedZ);
-            const radius = this.miniMapContainer.clientWidth / 2;
+            const radius = this.radarScreen.clientWidth / 2;
             if (distance > radius - 5) {
                 marker.element.style.display = 'none';
             } else {
@@ -653,23 +766,8 @@ export class MiniMap {
             }
         });
 
-        // Update monster markers
-        this.monsterMarkers.forEach((marker, id) => {
-            const relX = (marker.position.x - playerPosition.x) / mapScale;
-            const relZ = (marker.position.z - playerPosition.z) / mapScale;
-
-            // Rotate relative to player heading
-            const rotatedX = relX * Math.cos(-playerRotation) - relZ * Math.sin(-playerRotation);
-            const rotatedZ = relX * Math.sin(-playerRotation) + relZ * Math.cos(-playerRotation);
-
-            marker.element.style.left = `${centerX + rotatedX}px`;
-            marker.element.style.top = `${centerY + rotatedZ}px`;
-
-            // Hide if outside mini-map
-            const distance = Math.sqrt(rotatedX * rotatedX + rotatedZ * rotatedZ);
-            const radius = this.miniMapContainer.clientWidth / 2 - 5;
-            marker.element.style.display = distance > radius ? 'none' : 'block';
-        });
+        // Note: Monster markers are now updated directly in updateMonsterMarkers method
+        // instead of here to ensure immediate positioning on creation
     }
 }
 

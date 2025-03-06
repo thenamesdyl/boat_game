@@ -728,7 +728,18 @@ class GameUI {
 
         // Update mini-map
         if (data.position && data.heading !== undefined) {
-            this.updateMiniMap(data.position, data.heading, data.mapScale || 100);
+            // First update monster markers if available
+            if (data.monsters && this.miniMap) {
+                this.miniMap.updateMonsterMarkers(
+                    data.monsters,
+                    data.position,
+                    data.heading,
+                    data.mapScale || 200
+                );
+            }
+
+            // Then update the overall minimap with positions
+            this.updateMiniMap(data.position, data.heading, data.mapScale || 200);
         }
 
         // Update player stats if requested
@@ -743,18 +754,6 @@ class GameUI {
 
         // Update FPS counter
         this.updateFPS();
-
-        /*
-        // Update monster positions on the radar if we have access to the minimap
-        if (data.monsters && this.miniMap) {
-            // console.log('Updating monster markers');
-            this.miniMap.updateMonsterMarkers(
-                data.monsters,
-                data.position,
-                data.heading,
-                data.mapScale
-            );
-        }*/
     }
 
     getCardinalDirection(degrees) {
