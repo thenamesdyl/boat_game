@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { scene, camera } from '../core/gameState.js';
 import { gameUI } from '../ui/ui.js';
-import { onFishCaught, onMoneyEarned } from '../core/network.js';
+import { onFishCaught, onMoneyEarned, addToInventory } from '../core/network.js';
 
 // Fishing system configuration
 const FISHING_CAST_DISTANCE = 15;
@@ -809,8 +809,63 @@ function stopEnhancedMinigame(success) {
     // Hide minigame UI
     gameUI.elements.fishing.minigame.container.style.display = 'none';
 
-    // Show results screen
+    // Update inventory if fish was caught successfully
+    if (success && currentHookedFish) {
+        // Increment total fish caught
+        fishCaught++;
+        updateFishCounter();
+
+        // Call network function to update global stats
+        onFishCaught(1);
+
+        // Update money earned based on fish value
+        onMoneyEarned(currentHookedFish.value);
+
+        // Add fish to inventory
+        if (!fishInventory[currentHookedFish.name]) {
+            fishInventory[currentHookedFish.name] = {
+                count: 0,
+                type: currentHookedFish.type,
+                value: currentHookedFish.value,
+                rarity: currentHookedFish.rarity,
+                color: currentHookedFish.color,
+                difficulty: currentHookedFish.difficulty
+            };
+        }
+
+        // Increment count of this specific fish
+        fishInventory[currentHookedFish.name].count++;
+
+        // Add to network inventory if available
+        if (typeof addToInventory === 'function') {
+            addToInventory({
+                item_type: 'fish',
+                item_name: currentHookedFish.name,
+                item_data: {
+                    count: 1,
+                    value: currentHookedFish.value,
+                    rarity: currentHookedFish.rarity,
+                    color: currentHookedFish.color,
+                    difficulty: currentHookedFish.difficulty
+                }
+            });
+        }
+
+        // Update UI
+        if (gameUI && gameUI.updateInventory) {
+            gameUI.updateInventory(fishInventory);
+        }
+    }
+
+    // Show results screen first
     showFishingResultsScreen(success, currentHookedFish);
+
+    // Then create visual effect for caught fish after a short delay
+    if (success && currentHookedFish) {
+        setTimeout(() => {
+            createCaughtFishEffect(currentHookedFish.type);
+        }, 500); // Delay the effect so it doesn't interfere with the results screen
+    }
 }
 
 // Show fishing results screen after minigame
