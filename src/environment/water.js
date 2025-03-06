@@ -5,9 +5,22 @@ import { ToonWater } from './toonWater.js';
 
 let waterMesh;
 let waterNormals;
-const waterSize = 10000; // Very large water plane
-const waterSegments = 200; // Increased from 100 for more detailed waves
+const waterSize = 10000; // Large water plane but not excessive
+const waterSegments = 10; // Reduced from 1000 to improve performance and stability
 let currentWaterStyle = 'realistic'; // Track current water style
+
+// Create and export waterShader object with wave parameters for other files to access
+export const waterShader = {
+    uniforms: {
+        time: { value: 0 },
+        waveSpeed: { value: 0.5 }, // Drastically reduced from 1000
+        waveHeight: { value: 0.4 }, // Drastically reduced from 1000000
+        flowDirection: { value: new THREE.Vector2(0, 0) }
+    }
+};
+
+// Also expose waterShader on the window object for global access
+window.waterShader = waterShader;
 
 // Generate a procedural cartoony water normal map
 function generateCartoonyWaterNormals() {
@@ -174,6 +187,28 @@ export function setupWater(style = 'realistic') {
         }
     }
 
+    // Update the waterShader uniforms for the boat floating calculation
+    // This ensures our waterShader has the same parameters as the water mesh
+    if (waterMesh.material.uniforms) {
+        // Copy any relevant values from the water mesh uniforms
+        if (waterMesh.material.uniforms.distortionScale) {
+            waterShader.uniforms.waveHeight.value = waterMesh.material.uniforms.distortionScale.value * 0.2;
+        }
+
+        // Set wave speed based on style
+        switch (style) {
+            case 'toon':
+                waterShader.uniforms.waveSpeed.value = 0.35;
+                break;
+            case 'cartoony':
+                waterShader.uniforms.waveSpeed.value = 0.4;
+                break;
+            default: // 'realistic'
+                waterShader.uniforms.waveSpeed.value = 0.35;
+                break;
+        }
+    }
+
     // Add to scene
     scene.add(waterMesh);
 
@@ -209,6 +244,9 @@ export function updateWater(deltaTime) {
 
     // Update animation time
     waterUniforms.time.value += deltaTime * animationSpeed;
+
+    // Update waterShader time for consistency between water and boat
+    waterShader.uniforms.time.value = waterUniforms.time.value;
 
     // Get wind data to influence wave direction and intensity
     const wind = getWindData();
@@ -246,6 +284,9 @@ export function updateWater(deltaTime) {
     // Adjust wave distortion based on wind and style
     waterUniforms.distortionScale.value = baseDistortion + windStrength * multiplier;
 
+    // Update waterShader's waveHeight based on distortion scale
+    waterShader.uniforms.waveHeight.value = waterUniforms.distortionScale.value * 0.2;
+
     // Update wave direction based on wind
     const windDirection = new THREE.Vector3(
         Math.sin(wind.direction),
@@ -273,10 +314,13 @@ export function updateWater(deltaTime) {
         windDirection.z * directionFactor
     );
 
-    // Update wave direction
+    // Update wave direction in water uniforms
     if (waterUniforms.flowDirection) {
         waterUniforms.flowDirection.value.copy(waveDirection);
     }
+
+    // Update the same in waterShader for boat physics
+    waterShader.uniforms.flowDirection.value.copy(waveDirection);
 
     // Update sun position and color
     if (scene.directionalLight) {

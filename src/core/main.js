@@ -7,7 +7,7 @@ import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectio
 import * as Network from './network.js';
 import { gameUI } from '../ui/ui.js';
 import { scene, camera, renderer, updateTime, getTime, boat, getWindData, boatVelocity, boatSpeed, rotationSpeed, keys } from './gameState.js';
-import { setupSkybox, updateSkybox, setupSky, updateTimeOfDay, updateSunPosition, getTimeOfDay } from '../environment/skybox.js';
+import { setupSkybox, updateSkybox, setupSky, updateTimeOfDay, updateSunPosition, getTimeOfDay, toggleSkySystem, updateRealisticSky } from '../environment/skybox.js';
 import { setupClouds, updateClouds } from '../environment/clouds.js';
 import { setupBirds, updateBirds } from '../entities/birds.js';
 import { setupSeaMonsters, updateSeaMonsters, getMonsters, updateLurkingMonster, updateHuntingMonster, updateSurfacingMonster, updateAttackingMonster, updateDivingMonster, updateDyingMonster, updateSpecialMonsterBehaviors } from '../entities/seaMonsters.js';
@@ -37,7 +37,7 @@ import * as Firebase from './firebase.js';
 
 // Initialize water with explicit realistic style as default
 console.log("Initializing water in main.js");
-const water = setupWater('realistic');
+const water = setupWater('cartoony');
 
 /*
 const cubeTextureLoader = new THREE.CubeTextureLoader();
@@ -77,6 +77,11 @@ document.body.appendChild(renderer.domElement);
 camera.position.set(0, 10, 20);
 camera.lookAt(0, 0, 0);
 
+// Ensure camera's far plane is large enough to see the sky
+camera.far = 50000;
+camera.updateProjectionMatrix();
+console.log("Camera setup:", { near: camera.near, far: camera.far, fov: camera.fov });
+
 initCameraControls();
 
 
@@ -110,6 +115,27 @@ composer.addPass(bloomPass);
 
 // Add sky setup here
 setupSky();
+// Enable realistic sky with clouds and stars
+console.log("Initializing realistic sky system...");
+
+// Force removal of any existing sky before toggling
+if (window.realisticSkyMesh) {
+    scene.remove(window.realisticSkyMesh);
+    window.realisticSkyMesh = null;
+}
+toggleSkySystem();
+
+// Toggle to enable realistic sky
+const skyEnabled = toggleSkySystem();
+console.log(`Realistic sky system initialized: ${skyEnabled}`);
+
+// Force update the sky once to ensure it's properly displayed
+if (window.realisticSkyMesh) {
+    const deltaTime = 1 / 60;
+    updateRealisticSky(window.realisticSkyMesh, deltaTime);
+    console.log("Forced initial sky update completed");
+}
+
 requestLeaderboard();
 MusicSystem.playMusic();
 MusicSystem.setVolume(0.1); // 30% volume
@@ -938,7 +964,7 @@ document.addEventListener('keydown', (event) => {
         case 'w': case 'ArrowUp': keys.forward = true; break;
         case 's': case 'ArrowDown': keys.backward = true; break;
         case 'a': case 'ArrowLeft': keys.left = true; break;
-        case 'd': case 'ArrowRight': keys.right = true; break;
+        case 'd': case 'ArrowRight': keys.right = true;
         // Toggle mouse camera control with 'c' key
         case 'c': mouseControl.isEnabled = !mouseControl.isEnabled; break;
         // Add hotkey for firing cannons (space bar)
@@ -947,6 +973,11 @@ document.addEventListener('keydown', (event) => {
             if (window.fireCannons) {
                 window.fireCannons();
             }
+            break;
+        // Press 'T' to toggle sky system
+        case 't': case 'T':
+            console.log("Toggling sky system...");
+            toggleSkySystem();
             break;
     }
 });
@@ -1047,7 +1078,7 @@ function animate() {
     const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(boat.quaternion);
     let newPosition = boat.position.clone().add(direction.multiplyScalar(boatVelocity.z));
 
-    // Update boat rocking motion
+    // Update boat rocking motion (this now handles boat height based on water surface)
     updateBoatRocking(deltaTime);
 
     // Check for island collisions
@@ -1057,7 +1088,10 @@ function animate() {
     }
 
     if (!collided) {
+        // Only update X and Z position here, Y position is updated in updateBoatRocking
+        const currentY = boat.position.y;
         boat.position.copy(newPosition);
+        boat.position.y = currentY; // Restore Y position as it's managed by updateBoatRocking
 
         if (boat.position.distanceTo(lastChunkUpdatePosition) > chunkUpdateThreshold) {
             updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
@@ -1097,31 +1131,8 @@ function animate() {
         h01 * (1 - xFraction) * zFraction +
         h11 * xFraction * zFraction;
 
-    // Add these lines for more consistent water placement
-    // Baseline height detection and correction
-    const normalWaterLevel = 0; // Expected average water level
-    const baseWaterLevel = normalWaterLevel; // Default water level if calculation fails
-
-    // Dampen bobbing effect to 50%
-    const bobbingFactor = 0.5; // Reduce vertical movement by 50%
-    const dampedHeight = baseWaterLevel * (1 - bobbingFactor) + interpolatedHeight * bobbingFactor;
-
-    // Set appropriate float offset (lower value = lower in water)
-    const floatOffset = 0.7; // Reduced from 1.5 to sit lower in water
-
-    // Smooth transitions between heights to prevent jumps
-    if (!boat.lastHeight) boat.lastHeight = dampedHeight + floatOffset;
-    const targetHeight = dampedHeight + floatOffset;
-    const smoothingFactor = 0.1; // Lower = smoother but slower transitions
-    boat.position.y = boat.lastHeight + (targetHeight - boat.lastHeight) * smoothingFactor;
-    boat.lastHeight = boat.position.y;
-
-    // Add safeguard against extreme heights (in case of calculation errors)
-    if (Math.abs(boat.position.y) > 10) { // If boat gets too high or low
-        console.warn("Boat height correction triggered:", boat.position.y);
-        boat.position.y = normalWaterLevel + floatOffset; // Reset to normal level
-        boat.lastHeight = boat.position.y;
-    }
+    // Note: Boat height adjustment and water interaction is now handled by updateBoatRocking
+    // in character.js, which samples the wave height directly from the shader functions
 
     // Update leaderboard periodically
     if (getTime() - lastLeaderboardUpdate > LEADERBOARD_UPDATE_INTERVAL) {
@@ -1129,7 +1140,6 @@ function animate() {
         lastLeaderboardUpdate = time;
     }
 
-    // Debugging
     // Camera positioning
     updateCamera();
 
@@ -1141,7 +1151,7 @@ function animate() {
     updateSunPosition();
     updateSkybox();
 
-    // Update clouds based on boat position
+    // Update clouds based on boat position - these are the separate clouds, not skybox clouds
     updateClouds(boat.position);
 
     // Update birds with delta time
@@ -1167,9 +1177,10 @@ function animate() {
 
     //water2.update(deltaTime);
 
-    renderer.render(scene, camera);
+    // Rendering
+    //renderer.render(scene, camera);  // Comment out the standard renderer
     requestAnimationFrame(animate);
-    //composer.render();
+    composer.render();  // Use the post-processing composer instead
 
     // Update FPS counter
     const currentFps = 1 / deltaTime;
@@ -1240,6 +1251,14 @@ setTimeout(() => {
     }
 }, 1000);
 
+// Add keypress handler for toggling the sky system
+window.addEventListener('keydown', (event) => {
+    // Press 'T' to toggle sky system
+    if (event.key === 't' || event.key === 'T') {
+        console.log("Toggling sky system...");
+        toggleSkySystem();
+    }
+});
 
 animate();
 

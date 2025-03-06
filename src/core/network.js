@@ -1,4 +1,3 @@
-
 import * as THREE from 'three';
 import { getAuth } from 'firebase/auth';
 import { showLoginScreen } from './main';
@@ -839,4 +838,19 @@ function requestInitialMessages() {
 // Add a getter for other modules that might need the ID
 export function getFirebaseUserId() {
     return firebaseDocId;
+}
+
+// Add fish or other items to the player's inventory
+export function addToInventory(itemData) {
+    if (!isConnected || !socket) return;
+
+    console.log(`Adding item to inventory: ${itemData.item_name} (${itemData.item_type})`);
+
+    // Send the inventory update to server
+    socket.emit('add_to_inventory', {
+        player_id: firebaseDocId,
+        item_type: itemData.item_type,
+        item_name: itemData.item_name,
+        item_data: itemData.item_data
+    });
 } 

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { getWindData, boatVelocity, boat, getTime } from '../core/gameState.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+// Instead of importing waterShader, we'll use a reference to it from the window object
 
 // Add these variables near the top with your other boat variables
 let boatRockAngleX = 0; // Pitch (forward/backward rocking)
@@ -496,18 +497,78 @@ export function updateBoatRocking(deltaTime) {
     const windData = getWindData();
     const windSpeed = windData.speed;
 
+    // Get current time for wave calculation
+    const time = getTime() * 0.001; // Convert to seconds
+
+    // Get the boat's position
+    const boatPos = boat.position.clone();
+
+    // Sample water height and normal at the boat's position
+    const waterInfo = sampleWaterHeightAndNormal(boatPos.x, boatPos.z, time);
+
+    // Set the boat's height based on the water height plus a small offset
+    // to ensure the boat stays on top of the water
+    const floatHeight = waterInfo.height + 0.5; // 0.5 units above water surface
+
+    // Safety check to prevent extreme height values
+    const maxHeightChange = 0.5; // Maximum allowed height change per frame
+    const normalWaterLevel = 0; // Expected average water level
+
+    // If height is extreme or changes too rapidly, clamp it
+    if (Math.abs(floatHeight) > 10) {
+        console.warn("Boat height extreme value detected:", floatHeight);
+        boat.position.y = normalWaterLevel + 0.5; // Reset to normal level + offset
+    } else if (boat.lastFloatHeight && Math.abs(floatHeight - boat.lastFloatHeight) > maxHeightChange) {
+        // If height change is too rapid, dampen it
+        const clampedChange = Math.sign(floatHeight - boat.lastFloatHeight) * maxHeightChange;
+        boat.position.y = boat.lastFloatHeight + clampedChange;
+    } else {
+        boat.position.y = floatHeight;
+    }
+
+    // Store last height for next frame
+    boat.lastFloatHeight = boat.position.y;
+
+    // Calculate rocking based on water normal and boat speed
+
     // Combine boat speed and wind for total rocking factor
     // Wind has a smaller effect than boat speed
     const rockingFactor = speedMagnitude + (windSpeed * 0.1);
 
-    // Calculate target rocking angles
-    const targetRockAngleX = Math.sin(getTime() * rockSpeed) * maxRockAngle * rockingFactor;
-    const targetRockAngleZ = Math.sin(getTime() * rockSpeed * 0.7) * maxRockAngle * rockingFactor;
+    // Use water normal to influence the boat's orientation
+    // This makes the boat align with the wave surface
+    const waterNormal = waterInfo.normal;
+
+    // Calculate target angles based on water normal and additional rocking
+    // We convert the normal to Euler angles for pitch (X) and roll (Z)
+    const upVector = new THREE.Vector3(0, 1, 0);
+    const alignmentQuaternion = new THREE.Quaternion().setFromUnitVectors(upVector, waterNormal);
+    const alignmentEuler = new THREE.Euler().setFromQuaternion(alignmentQuaternion);
+
+    // Base angles from water normal - scale down to prevent extreme tilting
+    // Reduce the influence of the water normal to 60% to prevent excessive tilting
+    const normalInfluence = 0.6;
+    const baseAngleX = alignmentEuler.x * normalInfluence;
+    const baseAngleZ = alignmentEuler.z * normalInfluence;
+
+    // Add additional oscillation for rocking effect, reduced since we're already getting movement from the water
+    const additionalRockX = Math.sin(time * rockSpeed) * maxRockAngle * rockingFactor * 0.5;
+    const additionalRockZ = Math.sin(time * rockSpeed * 0.7) * maxRockAngle * rockingFactor * 0.5;
+
+    // Combined angles
+    const targetRockAngleX = baseAngleX + additionalRockX;
+    const targetRockAngleZ = baseAngleZ + additionalRockZ;
+
+    // Clamp maximum angles to prevent extreme tilting
+    const maxAngle = 0.2; // About 11.5 degrees
+    const clampedTargetX = Math.max(-maxAngle, Math.min(maxAngle, targetRockAngleX));
+    const clampedTargetZ = Math.max(-maxAngle, Math.min(maxAngle, targetRockAngleZ));
 
     // Smoothly interpolate current angles toward target angles
-    const smoothFactor = Math.min(deltaTime * 3, 1.0);
-    boatRockAngleX += (targetRockAngleX - boatRockAngleX) * smoothFactor;
-    boatRockAngleZ += (targetRockAngleZ - boatRockAngleZ) * smoothFactor;
+    // Use a slower smoothing factor for more stable movement
+    const smoothFactor = Math.min(deltaTime * 2.0, 1.0);
+    boatRockAngleX += (clampedTargetX - boatRockAngleX) * smoothFactor;
+    boatRockAngleZ += (clampedTargetZ - boatRockAngleZ) * smoothFactor;
 
     // Apply the rocking rotation (keep existing Y rotation)
     const currentYRotation = boat.rotation.y;
@@ -520,6 +581,89 @@ export function updateBoatRocking(deltaTime) {
 
     // Update damage flash effect
     updateDamageFlash(deltaTime);
+}
+
+/**
+ * Samples the water height and normal at the given x,z position
+ * Uses the same wave equations as used in the water shader
+ * @param {number} x - X position to sample
+ * @param {number} z - Z position to sample
+ * @param {number} time - Current time (in seconds)
+ * @returns {Object} Object containing height and normal
+ */
+function sampleWaterHeightAndNormal(x, z, time) {
+    // Get the water shader parameters
+    // This assumes we can access the global waterShader or we can pass it in
+    const waveSpeed = window.waterShader ? window.waterShader.uniforms.waveSpeed.value : 1.0;
+    const waveHeight = window.waterShader ? window.waterShader.uniforms.waveHeight.value : 0.5;
+
+    // Sample multiple points around the boat for better stability
+    // This creates a more realistic effect as the boat spans multiple wave points
+    const boatSize = 3.0; // Approximate boat size
+    const numSamples = 5; // Number of sample points
+    let totalHeight = 0;
+
+    // Sample grid of points under the boat
+    const samplePoints = [];
+    for (let i = 0; i < numSamples; i++) {
+        const offsetX = (i / (numSamples - 1) - 0.5) * boatSize;
+        for (let j = 0; j < numSamples; j++) {
+            const offsetZ = (j / (numSamples - 1) - 0.5) * boatSize;
+            const sampleX = x + offsetX;
+            const sampleZ = z + offsetZ;
+
+            // Sample wave height at this point
+            const height = sampleWaveHeight(sampleX, sampleZ, time, waveSpeed, waveHeight);
+
+            totalHeight += height;
+            samplePoints.push({ x: sampleX, z: sampleZ, height });
+        }
+    }
+
+    // Average height from all samples
+    const height = totalHeight / (numSamples * numSamples);
+
+    // Find four points near the center to calculate normal
+    const centerIdx = Math.floor(samplePoints.length / 2);
+    const delta = 1; // Skip distance
+
+    // Use central differencing for more accurate normal calculation
+    // Sample heights at nearby points
+    const heightPlusX = sampleWaveHeight(x + delta, z, time, waveSpeed, waveHeight);
+    const heightMinusX = sampleWaveHeight(x - delta, z, time, waveSpeed, waveHeight);
+    const heightPlusZ = sampleWaveHeight(x, z + delta, time, waveSpeed, waveHeight);
+    const heightMinusZ = sampleWaveHeight(x, z - delta, time, waveSpeed, waveHeight);
+
+    // Calculate derivatives (slopes) in X and Z directions
+    const slopeX = (heightPlusX - heightMinusX) / (2 * delta);
+    const slopeZ = (heightPlusZ - heightMinusZ) / (2 * delta);
+
+    // Create normal vector (perpendicular to the surface)
+    // For a heightmap, normal is (-dHeight/dX, 1, -dHeight/dZ) normalized
+    const normal = new THREE.Vector3(-slopeX, 1, -slopeZ).normalize();
+
+    return { height, normal };
+}
+
+/**
+ * Helper function to sample wave height at a single point
+ * @param {number} x - X position
+ * @param {number} z - Z position
+ * @param {number} time - Current time
+ * @param {number} waveSpeed - Speed of waves
+ * @param {number} waveHeight - Height of waves
+ * @returns {number} Wave height at the given position
+ */
+function sampleWaveHeight(x, z, time, waveSpeed, waveHeight) {
+    const wave1 = Math.sin(x * 0.1 + time * waveSpeed) *
+        Math.cos(z * 0.1 + time * waveSpeed) * waveHeight;
+
+    const wave2 = Math.sin(x * 0.2 + time * waveSpeed * 1.2) *
+        Math.cos(z * 0.15 + time * waveSpeed) * waveHeight * 0.5;
+
+    const wave3 = Math.sin(x * 0.05 + time * waveSpeed * 0.8) * waveHeight * 0.3;
+
+    return wave1 + wave2 + wave3;
 }
 
 // Add this function to apply wind influence to boat movement
