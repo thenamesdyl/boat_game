@@ -2,13 +2,15 @@ import * as THREE from 'three';
 import { scene, camera, directionalLight, ambientLight, getTime } from '../core/gameState.js';
 
 const skyRadius = 20001; // Larger sky radius
-const sunSize = 500; // Increased from 10 to make the sun larger
+const sunSize = 600; // Increased size for more impressive sun
+const moonSize = 400; // Slightly smaller moon
 let skyMaterial;
 let skyMesh;
 let lastTimeOfDay = "";
 let skyboxTransitionProgress = 0;
 let skyboxTransitionDuration = 20; // Seconds for transition
-let sunMesh;
+let sunMesh, moonMesh;
+let sunGlow, moonGlow, sunFlare, moonHalo;
 
 // Add a flag to track which skybox system is active
 let useRealisticSky = false;
@@ -58,13 +60,14 @@ export function getGradualSkyboxColor() {
     // Normalize time to 0-1 range for a full day cycle
     const dayPhase = (getTime() * 0.005) % 1;
 
-    // Define key colors for different times of day
+    // Define key colors for different times of day with extremely extended day time
     const colors = [
-        { phase: 0.0, color: new THREE.Color(0x191970) }, // Night (start/end)
-        { phase: 0.2, color: new THREE.Color(0xffa07a) }, // Dawn
-        { phase: 0.4, color: new THREE.Color(0x4287f5) }, // Day
-        { phase: 0.7, color: new THREE.Color(0xff7f50) }, // Dusk
-        { phase: 0.9, color: new THREE.Color(0x191970) }  // Night (approaching end of cycle)
+        { phase: 0.0, color: new THREE.Color(0x191970) },   // Night (start/end)
+        { phase: 0.025, color: new THREE.Color(0xffa07a) }, // Dawn
+        { phase: 0.05, color: new THREE.Color(0x4287f5) },  // Day start
+        { phase: 0.925, color: new THREE.Color(0x4287f5) }, // Day end
+        { phase: 0.95, color: new THREE.Color(0xff7f50) },  // Dusk
+        { phase: 0.975, color: new THREE.Color(0x191970) }  // Night (approaching end of cycle)
     ];
 
     // Find the two colors to interpolate between
@@ -126,53 +129,185 @@ export function setupSky() {
     skyMesh.renderOrder = -1; // Ensure it renders first
     scene.add(skyMesh);
 
-    // Create a sun/moon mesh with larger size
+    // ===== SUN IMPLEMENTATION =====
+    // Create a sun mesh with larger size and more detailed geometry
     const sunGeometry = new THREE.SphereGeometry(sunSize, 32, 32);
     const sunMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffaa,
+        color: 0xffffcc, // Warmer yellow color
         transparent: true,
-        opacity: 0.9,
-        depthWrite: false, // Prevent sun from writing to depth buffer
-        depthTest: false   // Disable depth testing for the sun
+        opacity: 1.0,
+        depthWrite: false,
+        depthTest: false
     });
 
-    // Add a glow effect to the sun
-    const sunGlowGeometry = new THREE.SphereGeometry(sunSize * 1.2, 32, 32);
+    // Add a primary glow effect to the sun
+    const sunGlowGeometry = new THREE.SphereGeometry(sunSize * 1.4, 32, 32);
     const sunGlowMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffdd,
+        color: 0xffdd88, // Warm orange-yellow glow
         transparent: true,
-        opacity: 0.4,
+        opacity: 0.6,
         side: THREE.BackSide,
-        depthWrite: false, // Prevent glow from writing to depth buffer
-        depthTest: false   // Disable depth testing for the glow
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending // Add additive blending for brighter effect
     });
 
-    const sunGlow = new THREE.Mesh(sunGlowGeometry, sunGlowMaterial);
+    // Create an outer corona effect
+    const sunCoronaGeometry = new THREE.SphereGeometry(sunSize * 2.5, 32, 32);
+    const sunCoronaMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffaa44, // Orange corona
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.BackSide,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending
+    });
 
+    // Create sun lens flare effect (simplified circle)
+    const sunFlareGeometry = new THREE.CircleGeometry(sunSize * 0.4, 32);
+    const sunFlareMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.7,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+    });
+
+    // Create meshes for all sun effects
+    sunGlow = new THREE.Mesh(sunGlowGeometry, sunGlowMaterial);
+    const sunCorona = new THREE.Mesh(sunCoronaGeometry, sunCoronaMaterial);
+    sunFlare = new THREE.Mesh(sunFlareGeometry, sunFlareMaterial);
+
+    // Position the flare slightly offset from the sun
+    sunFlare.position.set(sunSize * 0.1, sunSize * 0.1, -sunSize * 0.5);
+
+    // Create the main sun mesh and add all effects as children
     sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
-    sunMesh.add(sunGlow); // Add glow as a child of the sun
-    sunMesh.renderOrder = 1000; // Ensure sun renders after everything else
-    sunMesh.frustumCulled = false; // This prevents the sun from being culled when far away
+    sunMesh.add(sunGlow);
+    sunMesh.add(sunCorona);
+    sunMesh.add(sunFlare);
+    sunMesh.renderOrder = 1000;
+    sunMesh.frustumCulled = false;
 
-    // Position it at the same position as the directional light
-    // but scaled to be at the edge of the skybox
+    // ===== MOON IMPLEMENTATION =====
+    // Create moon with craters texture effect (procedural)
+    const moonGeometry = new THREE.SphereGeometry(moonSize, 32, 32);
+    const moonMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff, // Pure white base color for better visibility
+        transparent: true,
+        opacity: 1.0,
+        depthWrite: false,
+        depthTest: false
+    });
+
+    // Create procedural moon texture with more contrast
+    const moonCanvas = document.createElement('canvas');
+    moonCanvas.width = 512;
+    moonCanvas.height = 512;
+    const moonContext = moonCanvas.getContext('2d');
+
+    // Fill with base color
+    moonContext.fillStyle = '#ffffff';
+    moonContext.fillRect(0, 0, 512, 512);
+
+    // Add more visible craters with higher contrast
+    for (let i = 0; i < 40; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const radius = 5 + Math.random() * 25;
+        const shade = 120 + Math.floor(Math.random() * 70); // Darker craters for contrast
+
+        // Create gradient for each crater
+        const gradient = moonContext.createRadialGradient(x, y, 0, x, y, radius);
+        gradient.addColorStop(0, `rgb(${shade}, ${shade}, ${shade + 20})`);
+        gradient.addColorStop(1, '#ffffff');
+
+        moonContext.beginPath();
+        moonContext.fillStyle = gradient;
+        moonContext.arc(x, y, radius, 0, Math.PI * 2);
+        moonContext.fill();
+    }
+
+    // Add distinctive mare patterns (darker areas)
+    for (let i = 0; i < 5; i++) {
+        const x = 100 + Math.random() * 312;
+        const y = 100 + Math.random() * 312;
+        const radius = 40 + Math.random() * 60;
+
+        moonContext.beginPath();
+        moonContext.fillStyle = `rgba(100, 110, 150, 0.15)`;
+        moonContext.arc(x, y, radius, 0, Math.PI * 2);
+        moonContext.fill();
+    }
+
+    // Create texture from canvas
+    const moonTexture = new THREE.CanvasTexture(moonCanvas);
+    moonMaterial.map = moonTexture;
+
+    // Add a soft glow effect to the moon
+    const moonGlowGeometry = new THREE.SphereGeometry(moonSize * 1.5, 32, 32);
+    const moonGlowMaterial = new THREE.MeshBasicMaterial({
+        color: 0xaaddff, // Blue-tinted glow
+        transparent: true,
+        opacity: 0.5, // Increased from 0.4
+        side: THREE.BackSide,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending
+    });
+
+    // Create a halo effect for the moon
+    const moonHaloGeometry = new THREE.RingGeometry(moonSize * 1.6, moonSize * 2.5, 32);
+    const moonHaloMaterial = new THREE.MeshBasicMaterial({
+        color: 0x8899ff, // Stronger blue halo
+        transparent: true,
+        opacity: 0.3, // Increased from 0.2
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending
+    });
+
+    // Create moon meshes
+    moonGlow = new THREE.Mesh(moonGlowGeometry, moonGlowMaterial);
+    moonHalo = new THREE.Mesh(moonHaloGeometry, moonHaloMaterial);
+
+    // Create the main moon mesh and add effects
+    moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
+    moonMesh.add(moonGlow);
+    moonMesh.add(moonHalo);
+    moonMesh.renderOrder = 1000;
+    moonMesh.frustumCulled = false;
+
+    // Initially hide the moon (will be shown at night)
+    moonMesh.visible = false;
+
+    // Position sun and moon based on directional light
     const lightDirection = new THREE.Vector3()
         .copy(directionalLight.position)
         .normalize();
     sunMesh.position.copy(lightDirection.multiplyScalar(skyRadius * 0.95));
 
-    scene.add(sunMesh);
+    // Position moon on opposite side
+    const moonDirection = lightDirection.clone().multiplyScalar(-1);
+    moonMesh.position.copy(moonDirection.multiplyScalar(skyRadius * 0.95));
 
-    // Also ensure camera far plane is sufficient
-    // Add this right after the above code
+    // Add both to scene
+    scene.add(sunMesh);
+    scene.add(moonMesh);
+
+    // Ensure camera far plane is sufficient
     if (camera.far < skyRadius * 2) {
         camera.far = skyRadius * 2;
         camera.updateProjectionMatrix();
-        console.log("Increased camera far plane to see sun:", camera.far);
+        console.log("Increased camera far plane to see sky objects:", camera.far);
     }
 }
 
-// Modify updateTimeOfDay to skip skybox material changes when using realistic sky
+// Modify updateTimeOfDay to use the sun/moon transition
 export function updateTimeOfDay(deltaTime) {
     const timeOfDay = getTimeOfDay().toLowerCase();
 
@@ -202,41 +337,10 @@ export function updateTimeOfDay(deltaTime) {
         ambientLight.color.lerp(targetAmbientLight.color, 0.05);
         ambientLight.intensity += (targetAmbientLight.intensity - ambientLight.intensity) * 0.05;
 
-        // Update directional light with faster transition
+        // Update directional light with faster transition - only for color and intensity
+        // Position is now handled by updateSunPosition
         directionalLight.color.lerp(targetDirectionalLight.color, 0.05);
         directionalLight.intensity += (targetDirectionalLight.intensity - directionalLight.intensity) * 0.05;
-
-        // Update directional light position with faster transition
-        directionalLight.position.x += (targetDirectionalLight.position.x - directionalLight.position.x) * 0.05;
-        directionalLight.position.y += (targetDirectionalLight.position.y - directionalLight.position.y) * 0.05;
-        directionalLight.position.z += (targetDirectionalLight.position.z - directionalLight.position.z) * 0.05;
-
-        // Update sun position to match directional light but ensure it stays within skybox
-        if (sunMesh) {
-            // Calculate direction from origin to light
-            const lightDirection = new THREE.Vector3()
-                .copy(directionalLight.position)
-                .normalize();
-
-            // Position sun at the edge of the skybox in the light direction
-            sunMesh.position.copy(lightDirection.multiplyScalar(skyRadius * 0.95));
-
-            // Always face the sun toward the camera
-            sunMesh.lookAt(camera.position);
-
-            // Update sun color and size based on time of day
-            if (timeOfDay === 'night') {
-                sunMesh.material.color.set(0xccddff); // Brighter moon (was 0xaaaaff)
-                sunMesh.scale.set(0.7, 0.7, 0.7); // Smaller moon
-                updateMoonGlow(); // Update moon glow
-            } else if (timeOfDay === 'dawn' || timeOfDay === 'dusk') {
-                sunMesh.material.color.set(0xff7700); // Orange for sunrise/sunset
-                sunMesh.scale.set(1.2, 1.2, 1.2); // Slightly larger sun at dawn/dusk
-            } else {
-                sunMesh.material.color.set(0xffffaa); // Yellow for day
-                sunMesh.scale.set(1.0, 1.0, 1.0); // Normal size for day
-            }
-        }
 
         // Update skybox to match time of day - but only when NOT using realistic sky
         if (!useRealisticSky) {
@@ -247,6 +351,9 @@ export function updateTimeOfDay(deltaTime) {
     // Always update moon glow when it's night
     if (lastTimeOfDay === 'night') {
         updateMoonGlow();
+    } else {
+        // Add subtle pulsing effect to sun during the day
+        updateSunPulse(deltaTime);
     }
 }
 
@@ -285,43 +392,316 @@ export function getDirectionalLight(timeOfDay) {
     }
 }
 
-// Update updateSunPosition to avoid conflicts with realistic sky
+// Update function to properly handle the sun and moon positions realistically
 export function updateSunPosition() {
-    if (sunMesh && directionalLight) {
-        // Get gradual sun position
-        const sunPosition = getGradualSunPosition();
+    // Use same day phase calculation as skybox for consistency
+    const dayPhase = (getTime() * 0.005) % 1;
 
-        // Update directional light position to match sun
-        directionalLight.position.copy(sunPosition);
+    // Get the positions for both sun and moon
+    const sunPosition = calculateSunPosition(dayPhase);
+    const moonPosition = calculateMoonPosition(dayPhase);
 
-        // Position sun mesh at edge of skybox in light direction
-        const lightDirection = new THREE.Vector3()
-            .copy(directionalLight.position)
-            .normalize();
+    // Update sun and moon positions and visibility
+    updateCelestialBodyPositions(sunPosition, moonPosition, dayPhase);
 
-        sunMesh.position.copy(lightDirection.multiplyScalar(skyRadius * 0.95));
+    // Update directional light to follow the main light source (sun during day, moon during night)
+    updateLightSource(sunPosition, moonPosition, dayPhase);
+}
 
-        // Always face the sun toward the camera
-        sunMesh.lookAt(camera.position);
+// Replace getGradualSunPosition with specific calculations for sun
+function calculateSunPosition(dayPhase) {
+    // Calculate angle: 0 at dawn (rising in east), π/2 at noon (directly above), π at dusk (setting in west)
+    // Dawn: 0.025, Day: 0.475, Afternoon: 0.925, Dusk: 0.95, Night: 1.0
 
-        // Update sun color and intensity
-        const sunColor = getGradualSunColor();
-        sunMesh.material.color.lerp(sunColor, 0.05);
+    // Map dayPhase to sun angle
+    let sunAngle;
 
-        // Update sun size based on time (smaller at night)
-        const dayPhase = (getTime() * 0.005) % 1;
-        const sunScale = (dayPhase > 0.85 || dayPhase < 0.15) ? 0.7 : 1.0;
-        sunMesh.scale.lerp(new THREE.Vector3(sunScale, sunScale, sunScale), 0.05);
+    if (dayPhase < 0.025) {
+        // Dawn - rising from horizon
+        sunAngle = Math.PI * (dayPhase / 0.025) - Math.PI;
+    } else if (dayPhase < 0.475) {
+        // Morning - rising to zenith
+        sunAngle = (dayPhase - 0.025) / (0.475 - 0.025) * (Math.PI / 2);
+    } else if (dayPhase < 0.925) {
+        // Afternoon - moving from zenith toward west, still above horizon
+        // Adjust this range to make sure the sun is visible in the afternoon
+        // It should only start setting closer to dusk
+        const afternoonProgress = (dayPhase - 0.475) / (0.925 - 0.475);
+        // Make the afternoon descent slower - only go 3/8 of the way down by end of afternoon
+        sunAngle = Math.PI / 2 + afternoonProgress * (Math.PI / 4);
+    } else if (dayPhase < 0.95) {
+        // Dusk - setting below horizon - make this transition more dramatic
+        const duskProgress = (dayPhase - 0.925) / (0.95 - 0.925);
+        // Start from where afternoon left off (π/2 + π/4 = 3π/4) and go to just below horizon
+        sunAngle = 3 * Math.PI / 4 + duskProgress * (Math.PI / 4);
+    } else {
+        // Night - sun is below horizon, set to opposite side
+        sunAngle = Math.PI * 1.5;
+    }
 
-        // Update directional light intensity and color
-        const intensity = getGradualLightIntensity();
-        directionalLight.intensity = directionalLight.intensity * 0.95 + intensity * 0.05;
-        directionalLight.color.lerp(sunColor, 0.05);
+    // Calculate position in 3D space - we want it to go below the horizon
+    const distance = skyRadius * 0.9; // Distance from center
 
-        // Update ambient light intensity (brighter during day)
-        if (ambientLight) {
-            ambientLight.intensity = 0.2 + intensity * 0.3;
+    // Calculate height based on sine of angle, but adjust to make the sun clearly visible at all appropriate times
+    // At angle 0 or PI, height should be 0 (horizon)
+    // At angle PI/2, height should be maximum (zenith)
+    const height = Math.sin(sunAngle) * distance;
+
+    // Calculate x,z position
+    const x = Math.cos(sunAngle) * distance;
+    // Add a small z offset to make the sun's path slightly tilted for visual interest
+    const z = Math.sin(sunAngle * 0.2) * distance * 0.2;
+
+    return new THREE.Vector3(x, height, z);
+}
+
+// New function to calculate moon position based on dayPhase
+function calculateMoonPosition(dayPhase) {
+    // The moon follows opposite cycle to the sun
+    // When sun is at noon, moon is below horizon
+    // When sun sets, moon rises from opposite horizon
+
+    // Offset moon phase by 0.5 to place it opposite the sun in the cycle
+    const moonPhase = (dayPhase + 0.5) % 1;
+
+    // Use the same angle calculation logic as the sun but modified for better visibility
+    let moonAngle;
+
+    if (moonPhase < 0.025) {
+        // Moon rising from horizon
+        moonAngle = Math.PI * (moonPhase / 0.025) - Math.PI;
+    } else if (moonPhase < 0.475) {
+        // Moon rising to zenith
+        moonAngle = (moonPhase - 0.025) / (0.475 - 0.025) * (Math.PI / 2);
+    } else if (moonPhase < 0.925) {
+        // Moon moving from zenith toward west
+        const afternoonProgress = (moonPhase - 0.475) / (0.925 - 0.475);
+        // Make the moon's movement mirror the sun's
+        moonAngle = Math.PI / 2 + afternoonProgress * (Math.PI / 4);
+    } else if (moonPhase < 0.95) {
+        // Moon setting below horizon
+        const duskProgress = (moonPhase - 0.925) / (0.95 - 0.925);
+        moonAngle = 3 * Math.PI / 4 + duskProgress * (Math.PI / 4);
+    } else {
+        // Moon below horizon
+        moonAngle = Math.PI * 1.5;
+    }
+
+    // Calculate position - similar to sun but rotate 180 degrees on x-z plane
+    const distance = skyRadius * 0.85; // Slightly closer than sun
+    const height = Math.sin(moonAngle) * distance;
+
+    // Rotate 180 degrees from sun position at same angle
+    const x = -Math.cos(moonAngle) * distance;
+    // Add a small tilt in a different direction from the sun
+    const z = Math.sin(moonAngle * 0.2) * distance * -0.2;
+
+    return new THREE.Vector3(x, height, z);
+}
+
+// New function to update both celestial bodies based on their calculated positions
+function updateCelestialBodyPositions(sunPosition, moonPosition, dayPhase) {
+    if (!sunMesh || !moonMesh) return;
+
+    // Update sun position and visibility
+    sunMesh.position.copy(sunPosition);
+
+    // Update moon position and visibility
+    moonMesh.position.copy(moonPosition);
+
+    // Set visibility based on height (if below horizon, not visible)
+    // Add some transition to avoid abrupt appearing/disappearing
+    // Reduced horizon buffer to make transitions shorter and ensure full visibility
+    const horizonBuffer = 50;
+
+    // Sun visibility based on height
+    if (sunPosition.y < -horizonBuffer * 2) {
+        // Well below horizon
+        sunMesh.visible = false;
+    } else if (sunPosition.y < horizonBuffer) {
+        // Transition zone near horizon
+        sunMesh.visible = true;
+        // Calculate opacity based on height
+        const opacity = (sunPosition.y + horizonBuffer) / (2 * horizonBuffer);
+        sunMesh.material.opacity = opacity;
+        // Also adjust children opacity
+        sunMesh.children.forEach(child => {
+            if (child.material && child.material.opacity !== undefined) {
+                child.material.opacity = child.material.opacity * opacity;
+            }
+        });
+    } else {
+        // Well above horizon
+        sunMesh.visible = true;
+        sunMesh.material.opacity = 1.0;
+        // Reset children opacity
+        sunMesh.children.forEach(child => {
+            if (child.material && child.material.opacity !== undefined) {
+                // Reset to natural opacity based on child type
+                if (child === sunGlow) {
+                    child.material.opacity = 0.6;
+                } else if (child === sunFlare) {
+                    child.material.opacity = 0.7;
+                }
+            }
+        });
+    }
+
+    // Moon visibility based on height
+    if (moonPosition.y < -horizonBuffer * 2) {
+        // Well below horizon
+        moonMesh.visible = false;
+    } else if (moonPosition.y < horizonBuffer) {
+        // Transition zone near horizon
+        moonMesh.visible = true;
+        // Calculate opacity based on height
+        const opacity = (moonPosition.y + horizonBuffer) / (2 * horizonBuffer);
+        moonMesh.material.opacity = opacity;
+        // Also adjust children opacity
+        moonMesh.children.forEach(child => {
+            if (child.material && child.material.opacity !== undefined) {
+                child.material.opacity = child.material.opacity * opacity;
+            }
+        });
+    } else {
+        // Well above horizon - make the moon more visible with brighter material
+        moonMesh.visible = true;
+        moonMesh.material.opacity = 1.0;
+
+        // Make moon more visible at night
+        if (dayPhase >= 0.95 || dayPhase < 0.025) {
+            // Boost moon brightness at night 
+            if (moonMesh.material.color) {
+                moonMesh.material.color.set(0xffffff); // Brighter white
+            }
+
+            // Reset children opacity with higher values
+            moonMesh.children.forEach(child => {
+                if (child.material && child.material.opacity !== undefined) {
+                    // Enhanced opacity for night
+                    if (child === moonGlow) {
+                        child.material.opacity = 0.7; // Increased from 0.4
+                    } else if (child === moonHalo) {
+                        child.material.opacity = 0.35; // Increased from 0.2
+                    }
+                }
+            });
+        } else {
+            // Reset children opacity to normal values when moon is visible during day
+            moonMesh.children.forEach(child => {
+                if (child.material && child.material.opacity !== undefined) {
+                    if (child === moonGlow) {
+                        child.material.opacity = 0.4;
+                    } else if (child === moonHalo) {
+                        child.material.opacity = 0.2;
+                    }
+                }
+            });
         }
+    }
+
+    // Always face celestial bodies toward the camera
+    sunMesh.lookAt(camera.position);
+    moonMesh.lookAt(camera.position);
+
+    // Update sun appearance based on phase
+    updateSunAppearance(dayPhase);
+}
+
+// Update directional light to follow the active celestial body (sun or moon)
+function updateLightSource(sunPosition, moonPosition, dayPhase) {
+    // Determine which celestial body is the primary light source
+    let primaryLightPosition;
+    let primaryLightColor;
+    let lightIntensity;
+
+    // Night is from 0.95 to 0.025
+    const isNight = (dayPhase >= 0.95 || dayPhase < 0.025);
+
+    if (isNight) {
+        // Use moon as light source during night
+        primaryLightPosition = moonPosition;
+        primaryLightColor = new THREE.Color(0x6a8abc); // Moonlight color
+        lightIntensity = 1.0; // Moon light intensity
+    } else {
+        // Use sun as light source during day
+        primaryLightPosition = sunPosition;
+
+        // Adjust color based on sun position
+        if (dayPhase < 0.05) {
+            // Dawn
+            primaryLightColor = new THREE.Color(0xffb55a);
+            lightIntensity = 1.4;
+        } else if (dayPhase >= 0.9) {
+            // Dusk
+            primaryLightColor = new THREE.Color(0xff6a33);
+            lightIntensity = 1.4;
+        } else {
+            // Day
+            primaryLightColor = new THREE.Color(0xffefd1);
+            lightIntensity = 1.6;
+        }
+    }
+
+    // Update directional light
+    directionalLight.position.lerp(primaryLightPosition, 0.05);
+    directionalLight.color.lerp(primaryLightColor, 0.05);
+    directionalLight.intensity = directionalLight.intensity * 0.95 + lightIntensity * 0.05;
+
+    // Update ambient light intensity based on time (brighter during day)
+    const ambientIntensity = isNight ? 0.5 : 0.2 + lightIntensity * 0.3;
+    ambientLight.intensity = ambientLight.intensity * 0.95 + ambientIntensity * 0.05;
+
+    // Update ambient light color
+    const ambientColor = isNight
+        ? new THREE.Color(0x2a3045)  // Night ambient
+        : new THREE.Color(0x89a7c5); // Day ambient
+    ambientLight.color.lerp(ambientColor, 0.05);
+}
+
+// Update sun appearance based on the time of day
+function updateSunAppearance(dayPhase) {
+    if (!sunMesh) return;
+
+    let sunColor, glowColor, flareOpacity, sunScale;
+
+    if (dayPhase < 0.025) {
+        // Dawn
+        sunColor = new THREE.Color(0xff8800);
+        glowColor = new THREE.Color(0xff6600);
+        flareOpacity = 0.8;
+        sunScale = 1.2;
+    } else if (dayPhase < 0.925) {
+        // Day
+        sunColor = new THREE.Color(0xffffcc);
+        glowColor = new THREE.Color(0xffdd88);
+        flareOpacity = 0.7;
+        sunScale = 1.0;
+    } else if (dayPhase < 0.95) {
+        // Dusk
+        sunColor = new THREE.Color(0xff8800);
+        glowColor = new THREE.Color(0xff6600);
+        flareOpacity = 0.8;
+        sunScale = 1.2;
+    } else {
+        // Night (sun not visible, but update anyway)
+        sunColor = new THREE.Color(0xff8800);
+        glowColor = new THREE.Color(0xff6600);
+        flareOpacity = 0.7;
+        sunScale = 1.0;
+    }
+
+    // Apply changes with smooth transitions
+    sunMesh.material.color.lerp(sunColor, 0.05);
+    sunMesh.scale.lerp(new THREE.Vector3(sunScale, sunScale, sunScale), 0.05);
+
+    // Update sun effects
+    if (sunGlow) {
+        sunGlow.material.color.lerp(glowColor, 0.05);
+    }
+
+    if (sunFlare && sunFlare.material) {
+        sunFlare.material.opacity = sunFlare.material.opacity * 0.95 + flareOpacity * 0.05;
     }
 }
 
@@ -329,11 +709,12 @@ export function getTimeOfDay() {
     // Cycle through different times of day
     const dayPhase = (getTime() * 0.005) % 1; // 0 to 1 representing full day cycle
 
-    if (dayPhase < 0.2) return "Dawn";
-    if (dayPhase < 0.4) return "Day";
-    if (dayPhase < 0.6) return "Afternoon";
-    if (dayPhase < 0.8) return "Dusk";
-    return "Night";
+    // Modified distribution to make day 20x longer (90% of the cycle)
+    if (dayPhase < 0.025) return "Dawn";      // 2.5% for dawn
+    if (dayPhase < 0.475) return "Day";       // 45% for day 
+    if (dayPhase < 0.925) return "Afternoon"; // 45% for afternoon (90% total for blue sky)
+    if (dayPhase < 0.95) return "Dusk";       // 2.5% for dusk
+    return "Night";                           // 5% for night
 }
 
 function getSkyColor(timeOfDay) {
@@ -381,230 +762,117 @@ function getAmbientLight(timeOfDay) {
     }
 }
 
-function getGradualSunPosition() {
-    // Use same day phase calculation as skybox for consistency
-    const dayPhase = (getTime() * 0.005) % 1;
-
-    // Calculate sun position in an arc from east to west
-    // Angle goes from -π/2 (dawn) through π/2 (noon) to 3π/2 (dusk/night)
-    const angle = (dayPhase * Math.PI * 2) - Math.PI / 2;
-
-    // Sun height follows a sine curve (highest at noon)
-    const height = Math.sin(dayPhase * Math.PI) * 800;
-    const distance = 1000;
-
-    // Calculate position
-    const x = Math.cos(angle) * distance;
-    const y = Math.max(height, -700); // Keep minimum height
-    const z = Math.sin(angle) * distance;
-
-    return new THREE.Vector3(x, y, z);
-}
-
-function getGradualSunColor() {
-    const dayPhase = (getTime() * 0.005) % 1;
-
-    // Define colors for different phases
-    if (dayPhase < 0.2) {
-        // Dawn
-        return new THREE.Color(0xff7700); // Orange sunrise
-    } else if (dayPhase < 0.75) {
-        // Day
-        return new THREE.Color(0xffffaa); // Yellow day
-    } else if (dayPhase < 0.85) {
-        // Dusk
-        return new THREE.Color(0xff7700); // Orange sunset
-    } else {
-        // Night
-        return new THREE.Color(0xaaaaff); // Bluish moon
-    }
-}
-
-// Get gradual light intensity based on time
-function getGradualLightIntensity() {
-    const dayPhase = (getTime() * 0.005) % 1;
-
-    // Highest at noon, lowest at night (all values doubled)
-    if (dayPhase < 0.25) {
-        // Dawn - rising intensity
-        return 0.4 + (dayPhase / 0.25) * 1.6; // Doubled from 0.2 + * 0.8
-    } else if (dayPhase < 0.75) {
-        // Day - full intensity
-        return 2.0; // Doubled from 1.0
-    } else if (dayPhase < 0.85) {
-        // Dusk - falling intensity
-        return 2.0 - ((dayPhase - 0.75) / 0.1) * 1.6; // Doubled from 1.0 - * 0.8
-    } else {
-        // Night - low intensity
-        return 0.4; // Doubled from 0.2
-    }
-}
-
-// Add this function to enhance moon glow at night
+// Enhanced function to update moon glow with subtle animation
 function updateMoonGlow() {
-    if (sunMesh && lastTimeOfDay === 'night') {
-        // Find the glow child of the sun/moon
-        sunMesh.children.forEach(child => {
-            if (child.material) {
-                // Enhance the glow for the moon
-                child.material.opacity = 0.6; // Increased from 0.4
-                child.scale.set(1.5, 1.5, 1.5); // Larger glow for moon
-                child.material.color.set(0xaaddff); // Bluer glow for moon
-            }
-        });
+    if (moonMesh && (lastTimeOfDay === 'night' || moonMesh.visible)) {
+        // Create more dynamic pulsing effect for moon glow
+        const time = getTime() * 0.001;
+        const pulseAmount = Math.sin(time * 0.5) * 0.08 + 0.96; // 0.88 to 1.04 range
+        const secondaryPulse = Math.sin(time * 0.2) * 0.03; // Second subtle pulse
 
-        // Make the moon itself brighter
-        if (sunMesh.material) {
-            sunMesh.material.color.set(0xccddff); // Brighter moon
-            sunMesh.material.opacity = 1.0; // Full opacity
+        // Apply to moon glow with enhanced effects
+        if (moonGlow) {
+            // Determine base opacity based on time of day
+            const baseOpacity = lastTimeOfDay === 'night' ? 0.8 : 0.4;
+            moonGlow.material.opacity = baseOpacity * (pulseAmount + secondaryPulse);
+
+            // More dynamic scaling
+            const glowScale = lastTimeOfDay === 'night' ? 1.5 : 1.3;
+            moonGlow.scale.set(
+                glowScale * pulseAmount,
+                glowScale * pulseAmount,
+                glowScale * pulseAmount
+            );
+
+            // Update glow color based on time
+            if (lastTimeOfDay === 'night') {
+                // Slightly shift color for visual interest
+                const blueShift = 0.9 + secondaryPulse * 0.2;
+                moonGlow.material.color.setRGB(0.7, 0.85 * blueShift, 1.0 * blueShift);
+            }
+        }
+
+        // Apply to moon halo with enhanced rotation
+        if (moonHalo) {
+            // Rotate the halo at varying speeds
+            moonHalo.rotation.z += 0.0003 + Math.sin(time * 0.1) * 0.0001;
+
+            // Determine base opacity based on time of day
+            const baseOpacity = lastTimeOfDay === 'night' ? 0.4 : 0.2;
+            moonHalo.material.opacity = baseOpacity * pulseAmount;
+
+            // Scale halo slightly with pulse
+            const haloScale = 1.0 + secondaryPulse * 0.5;
+            moonHalo.scale.set(haloScale, haloScale, 1);
+        }
+
+        // Make the moon itself brighter at night with subtle color variations
+        if (moonMesh.material) {
+            if (lastTimeOfDay === 'night') {
+                // Subtle color shift for visual interest
+                const blueShift = 1.0 + secondaryPulse * 0.05;
+                moonMesh.material.color.setRGB(1, 1, blueShift);
+
+                // Slightly enlarged moon at night for better visibility
+                const moonScale = 1.2 + secondaryPulse * 0.1;
+                moonMesh.scale.set(moonScale, moonScale, moonScale);
+            } else {
+                moonMesh.material.color.set(0xddddff); // Slightly blue-tinted during day
+                moonMesh.scale.set(1.0, 1.0, 1.0); // Normal size during day
+            }
         }
     }
 }
 
-// Create a shader-based sky with realistic gradients
-export function setupRealisticSky() {
-    // Create a sphere for the sky
-    const skyGeometry = new THREE.SphereGeometry(skyRadius, 64, 64);
-    // Inside faces
-    skyGeometry.scale(-1, 1, 1);
+// Add function to create subtle pulsing/flickering effect for the sun
+function updateSunPulse(deltaTime) {
+    if (sunMesh && sunMesh.visible) {
+        // Create subtle pulsing effect for sun
+        const time = getTime() * 0.001;
 
-    // Create a shader material for realistic sky gradients with enhanced gradients
-    const skyShaderMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-            sunPosition: { value: new THREE.Vector3(0, 0, 0) },
-            sunColor: { value: new THREE.Color(0xffaa44) },
-            horizonColor: { value: new THREE.Color(0xff7700) },
-            zenithColor: { value: new THREE.Color(0x1a3b80) },
-            fadeExponent: { value: 2.5 },        // Increased for more dramatic gradient
-            sunSize: { value: 0.04 },            // Increased sun size
-            sunFuzziness: { value: 0.02 },       // Increased fuzziness
-            gradientSharpness: { value: 0.6 },   // New parameter for gradient control
-            time: { value: 0.0 }
-        },
-        vertexShader: `
-            varying vec3 vWorldPosition;
-            varying vec3 vSunDirection;
-            uniform vec3 sunPosition;
+        // Combine multiple sine waves for a more organic effect
+        const pulse1 = Math.sin(time * 0.5) * 0.03;
+        const pulse2 = Math.sin(time * 1.3) * 0.015;
+        const pulseAmount = 1.0 + pulse1 + pulse2; // Range from ~0.955 to ~1.045
 
-            void main() {
-                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-                vWorldPosition = worldPosition.xyz;
-                
-                // Compute sun direction for each vertex
-                vSunDirection = normalize(sunPosition);
-                
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-        `,
-        fragmentShader: `
-            varying vec3 vWorldPosition;
-            varying vec3 vSunDirection;
-            
-            uniform vec3 sunColor;
-            uniform vec3 horizonColor;
-            uniform vec3 zenithColor;
-            uniform float fadeExponent;
-            uniform float sunSize;
-            uniform float sunFuzziness;
-            uniform float gradientSharpness;
-            uniform float time;
-            
-            vec3 getSkyColor(vec3 direction) {
-                // Calculate gradient based on height (y-coordinate)
-                float y = normalize(direction).y;
-                
-                // More pronounced horizon band
-                float horizonBand = 1.0 - pow(abs(y), gradientSharpness);
-                
-                // Main sky gradient - more dramatic from zenith to horizon
-                float horizonFactor = pow(1.0 - abs(y), fadeExponent);
-                
-                // Add sun-influenced warmth on the sun's side of the sky
-                float sunSideFactor = max(0.0, dot(normalize(direction), normalize(vec3(vSunDirection.x, 0.0, vSunDirection.z))));
-                sunSideFactor = pow(sunSideFactor, 2.0); // More concentrated toward sun direction
-                
-                // Mix zenith color with horizon color based on enhanced factors
-                vec3 baseColor = mix(zenithColor, horizonColor, horizonFactor);
-                
-                // Add sun-side warming effect to the base color
-                baseColor = mix(baseColor, mix(horizonColor, sunColor, 0.3), sunSideFactor * 0.5);
-                
-                return baseColor;
-            }
-            
-            void main() {
-                // Normalize the world position to get the ray direction
-                vec3 direction = normalize(vWorldPosition);
-                
-                // Get base sky gradient
-                vec3 skyColor = getSkyColor(direction);
-                
-                // Calculate sun effect with larger, more diffuse sun
-                float angle = max(0.0, dot(direction, vSunDirection));
-                float sunFactor = smoothstep(1.0 - sunSize - sunFuzziness, 1.0 - sunSize + sunFuzziness, angle);
-                
-                // Add much stronger atmospheric scattering effect
-                float scatterAngle = max(0.0, dot(direction, vec3(vSunDirection.x, 0.0, vSunDirection.z)));
-                float scatter = pow(scatterAngle, 4.0) * 0.8;
-                scatter *= (1.0 - direction.y * 0.75); // More scattering near horizon
-                
-                // Add direction-based color variation
-                // This creates a more pronounced gradient that depends on view angle relative to the sun
-                float eastWestFactor = abs(dot(normalize(vec3(direction.x, 0.0, direction.z)), 
-                                            normalize(vec3(vSunDirection.x, 0.0, vSunDirection.z))));
-                eastWestFactor = pow(eastWestFactor, 3.0); // More concentrated
-                
-                // Enhance colors opposite to the sun (purplish/pinkish hues at dusk/dawn)
-                float oppositeSun = 1.0 - eastWestFactor;
-                vec3 oppositeTint = mix(vec3(0.4, 0.2, 0.6), vec3(0.7, 0.3, 0.5), oppositeSun);
-                
-                // Mix sky with sun and scattering colors
-                vec3 finalColor = mix(skyColor, sunColor, sunFactor);
-                
-                // Apply scatter effect (stronger)
-                finalColor = mix(finalColor, mix(horizonColor, sunColor, 0.7), scatter);
-                
-                // Apply opposite-sun coloring in a more subtle way
-                if (vSunDirection.y < 0.3 && vSunDirection.y > -0.3) { // Only during dawn/dusk
-                    finalColor = mix(finalColor, finalColor * oppositeTint, oppositeSun * (1.0 - abs(direction.y)) * 0.3);
-                }
-                
-                // Add subtle cloud-like variations
-                float noise = sin(direction.x * 50.0 + time * 0.2) * 
-                              sin(direction.z * 50.0 + time * 0.1) * 
-                              sin(direction.y * 30.0 + time * 0.15) * 0.03;
-                              
-                finalColor += noise * vec3(1.0, 0.8, 0.6) * (1.0 - abs(direction.y));
-                
-                gl_FragColor = vec4(finalColor, 1.0);
-            }
-        `,
-        side: THREE.BackSide,
-        depthWrite: false
-    });
+        // Apply to sun glow
+        if (sunGlow) {
+            const baseScale = 1.4;
+            sunGlow.scale.set(
+                baseScale * pulseAmount,
+                baseScale * pulseAmount,
+                baseScale * pulseAmount
+            );
 
-    // Create the sky mesh with shader material
-    const realisticSkyMesh = new THREE.Mesh(skyGeometry, skyShaderMaterial);
-    realisticSkyMesh.renderOrder = -1; // Ensure it renders first
-    scene.add(realisticSkyMesh);
+            // Also slightly vary the opacity
+            sunGlow.material.opacity = 0.6 * (0.95 + 0.1 * Math.sin(time * 0.7));
+        }
 
-    // Store reference globally for updates
-    window.realisticSkyMesh = realisticSkyMesh;
-    useRealisticSky = true;
-
-    return realisticSkyMesh;
+        // Apply subtle rotation to sun flare
+        if (sunFlare) {
+            sunFlare.rotation.z += deltaTime * 0.1;
+        }
+    }
 }
 
-// Update realistic sky shader with current sun position and time of day
-export function updateRealisticSky(skyMesh, deltaTime) {
+// Update function for the updateSkybox method to call
+function updateRealisticSky(skyMesh, deltaTime) {
     if (!skyMesh || !skyMesh.material || !skyMesh.material.uniforms) return;
 
-    // Get time of day using existing function
+    // Get time of day and phase
     const timeOfDay = getTimeOfDay().toLowerCase();
-    const sunPosition = getGradualSunPosition();
+    const dayPhase = (getTime() * 0.005) % 1;
+
+    // Use our new sun position calculation
+    const sunPosition = calculateSunPosition(dayPhase);
+    const moonPosition = calculateMoonPosition(dayPhase);
+
+    // Determine which celestial body to use for the sky shader
+    const isNight = (dayPhase >= 0.95 || dayPhase < 0.025);
+    const celestialPosition = isNight ? moonPosition : sunPosition;
 
     // Update sun position uniform
-    skyMesh.material.uniforms.sunPosition.value.copy(sunPosition);
+    skyMesh.material.uniforms.sunPosition.value.copy(celestialPosition);
 
     // Update time uniform for animated effects - slow it down
     skyMesh.material.uniforms.time.value += deltaTime * 0.5;
@@ -675,12 +943,12 @@ export function updateRealisticSky(skyMesh, deltaTime) {
     }
 
     // Update all shader uniforms
-    skyMesh.material.uniforms.sunColor.value.copy(sunColor);
-    skyMesh.material.uniforms.horizonColor.value.copy(horizonColor);
-    skyMesh.material.uniforms.zenithColor.value.copy(zenithColor);
-    skyMesh.material.uniforms.fadeExponent.value = fadeExponent;
-    skyMesh.material.uniforms.sunSize.value = sunSize;
-    skyMesh.material.uniforms.sunFuzziness.value = sunFuzziness;
+    if (skyMesh.material.uniforms.sunColor) skyMesh.material.uniforms.sunColor.value.copy(sunColor);
+    if (skyMesh.material.uniforms.horizonColor) skyMesh.material.uniforms.horizonColor.value.copy(horizonColor);
+    if (skyMesh.material.uniforms.zenithColor) skyMesh.material.uniforms.zenithColor.value.copy(zenithColor);
+    if (skyMesh.material.uniforms.fadeExponent) skyMesh.material.uniforms.fadeExponent.value = fadeExponent;
+    if (skyMesh.material.uniforms.sunSize) skyMesh.material.uniforms.sunSize.value = sunSize;
+    if (skyMesh.material.uniforms.sunFuzziness) skyMesh.material.uniforms.sunFuzziness.value = sunFuzziness;
 
     // Add the new gradient sharpness parameter
     if (skyMesh.material.uniforms.gradientSharpness) {
