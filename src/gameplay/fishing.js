@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { scene, camera } from '../core/gameState.js';
 import { gameUI } from '../ui/ui.js';
-import { onFishCaught, onMoneyEarned, addToInventory } from '../core/network.js';
+import { onFishCaught, onMoneyEarned } from '../core/network.js';
 
 // Fishing system configuration
 const FISHING_CAST_DISTANCE = 15;
@@ -53,7 +53,7 @@ export function initFishing(playerBoat) {
 
     // Set up event listeners for fishing UI
     gameUI.elements.fishing.castButton.onclick = toggleFishing;
-    gameUI.elements.fishing.minigame.catchButton.addEventListener('click', attemptCatch);
+    //gameUI.elements.fishing.minigame.catchButton.addEventListener('click', attemptCatch);
 
     // Update fish counter
     updateFishCounter();
