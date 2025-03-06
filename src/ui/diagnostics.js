@@ -1126,7 +1126,7 @@ function runBasicChecks() {
     checkHardwareAcceleration();
 
     // Check for common issues
-    checkForCommonIssues();
+    //checkForCommonIssues();
 
     // Update warnings and suggestions
     updateWarningsAndSuggestions();
@@ -1150,7 +1150,7 @@ function runDiagnostics() {
     updatePerformanceTestsUI(false);
 
     // Check for common issues
-    checkForCommonIssues();
+    //checkForCommonIssues();
 
     // Update warnings and suggestions
     updateWarningsAndSuggestions();
