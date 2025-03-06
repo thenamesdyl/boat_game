@@ -186,7 +186,7 @@ export function showAuthPopup(onSuccess) {
     `;
 
     authForm.innerHTML = `
-        <h2 style="text-align: center; margin-bottom: 20px;">The Boat Game</h2>
+        <h2 style="text-align: center; margin-bottom: 20px;">TideFall</h2>
         <div style="text-align: center; margin-bottom: 20px;">
             <button id="google-signin" style="
                 background-color: white;
