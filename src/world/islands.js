@@ -10,7 +10,8 @@ import {
 } from './massiveIslands.js';
 // import { createCoastalCliffScene } from './coastalCliff.js';
 import { spawnBlockCave, createBlockCave } from './blockCave.js';
-import { createSmugglersHideout } from './smugglerHideout.js';
+import { createPirateTavern2 } from './pirateTavern2.js';
+import { createTreehouseTavern } from './treehouseTavern.js';
 
 // Island generation variables
 let islandColliders = [];
@@ -139,6 +140,16 @@ function generateChunk(chunkX, chunkZ, scene) {
     }
 }
 
+// SPAWN CONTROLS - Update these values
+const SPAWN_CONTROLS = {
+    enableRandomSpawning: false,  // Enable random spawning (was false)
+    smugglersHideout: false,
+    pirateTavern: false,
+    pirateTavern2: false,
+    treehouseTavern: true,
+    blockCave: false,
+};
+
 // Function to create a single island with specified parameters
 function createIsland(x, z, seed, scene) {
     // Use the seed to create deterministic randomness for this island
@@ -149,6 +160,9 @@ function createIsland(x, z, seed, scene) {
 
     // Create a unique ID for this island
     const islandId = `island_${Math.floor(x)}_${Math.floor(z)}`;
+
+    // Add this line to define features
+    const features = []; // Empty array since there are no explicit features in this function
 
     // Skip if this island already exists
     if (activeIslands.has(islandId)) {
@@ -410,26 +424,49 @@ function createIsland(x, z, seed, scene) {
     }
 
     // Add the Smuggler's Hideout (with a certain probability or on specific islands)
-    if (random() < 1.0) {
-        console.log("Adding Smuggler's Hideout to island");
+    if (random() < 0.0) {  // Changed from 1.0 to 0.5 for 50% chance
+        console.log("Adding Pirate Tavern to island");
 
-        // Find a good spot on the island perimeter (preferably on a cliff or hillside)
+        // Find a good spot on the island
         const angle = random() * Math.PI * 2;
-        const distance = island.userData.radius * 0.7; // Position toward the edge
+        const distance = 35; // Slightly closer to center
 
-        const hideoutPosition = new THREE.Vector3(
+        const tavernPosition = new THREE.Vector3(
+            Math.cos(angle) * distance,
+            0,
+            Math.sin(angle) * distance
+        );
+
+        // Create the tavern with a random rotation
+        createPirateTavern2({
+            parent: island,
+            random: random,
+            position: tavernPosition,
+            rotation: random() * Math.PI * 2,
+            scale: 5.0
+        });
+    }
+
+    if (random() < 1.0) {  // 40% chance to spawn a treehouse tavern
+        console.log("Adding Treehouse Tavern to island");
+
+        // Find a spot with trees on the island
+        const angle = random() * Math.PI * 2;
+        const distance = 20 + random() * 15; // Position it among the trees
+
+        const tavernPosition = new THREE.Vector3(
             Math.cos(angle) * distance,
             0, // At ground level
             Math.sin(angle) * distance
         );
 
-        // Create the hideout, facing outward from the island center
-        createSmugglersHideout({
+        // Create the treehouse tavern
+        createTreehouseTavern({
             parent: island,
             random: random,
-            position: hideoutPosition,
-            cliffFace: angle + Math.PI, // Face away from island center
-            scale: 1.0 // Adjust scale as needed
+            position: tavernPosition,
+            rotation: random() * Math.PI * 2,
+            scale: 1.0
         });
     }
 
@@ -1463,7 +1500,7 @@ export function spawnIslands(scene, position) {
     return true;
 }
 
-// Export the functions and variables needed in other files
+// Export everything together at the bottom of the file
 export {
     islandColliders,
     activeIslands,
@@ -1475,5 +1512,6 @@ export {
     findNearestIsland,
     checkIslandCollision,
     updateIslandEffects,
-    areShoreEffectsEnabled
+    areShoreEffectsEnabled,
+    SPAWN_CONTROLS
 }; 
