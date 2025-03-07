@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { scene, camera, boat, keys } from '../core/gameState.js';
 import { updateCameraPosition } from '../controls/cameraControls.js';
 import { islandCommands } from './islandCommands.js';
+import { fireCommands, updateFireballs } from './fireCommands.js';
+import { shipCommands } from './shipCommands.js';
 
 // Create a global variable to track fly mode state
 // This will be checked by the updateCameraPosition function
@@ -59,11 +61,24 @@ export function initCommandSystem() {
         registerCommand(cmd.name, cmd.handler, cmd.description);
     });
 
+    // Register fire commands from the fireCommands module
+    fireCommands.forEach(cmd => {
+        registerCommand(cmd.name, cmd.handler, cmd.description);
+    });
+
+    // Register ship commands from the shipCommands module
+    shipCommands.forEach(cmd => {
+        registerCommand(cmd.name, cmd.handler, cmd.description);
+    });
+
     // Patch the animation loop once the page is fully loaded
     if (!animationLoopPatched) {
         // Patch the animation loop after a short delay to ensure
         // the main.js code has fully loaded
         setTimeout(patchAnimationLoop, 1000);
+
+        // Set up the animation update for fireballs
+        setupFireballUpdates();
     }
 
     console.log("✅ Command system initialized with commands:", Array.from(commands.keys()));
@@ -757,5 +772,48 @@ function patchAnimationLoop() {
         animationLoopPatched = true;
     } else {
         console.warn("⚠️ updateCamera function not found - fly mode may not work correctly");
+    }
+}
+
+/**
+ * Set up fireball updates by hooking into the animation loop
+ */
+function setupFireballUpdates() {
+    // Get the original animate function if it exists
+    const originalAnimate = window.animate;
+
+    if (typeof originalAnimate === 'function') {
+        // Create a wrapper that calls updateFireballs before the original animation
+        window.animate = function () {
+            // Calculate delta time (similar to how it's done in main.js)
+            const now = performance.now();
+            const deltaTime = (now - (window.lastTime || now)) / 1000; // Convert to seconds
+            window.lastTime = now;
+
+            // Update fireballs
+            updateFireballs(deltaTime);
+
+            // Call the original animate function
+            return originalAnimate.apply(this, arguments);
+        };
+
+        console.log("✅ Fireball updates integrated into animation loop");
+    } else {
+        // If we can't find the original animate function, set up our own update loop
+        console.warn("⚠️ Could not find main animation loop, setting up separate fireball update loop");
+
+        let lastTime = performance.now();
+
+        function updateLoop() {
+            const now = performance.now();
+            const deltaTime = (now - lastTime) / 1000;
+            lastTime = now;
+
+            updateFireballs(deltaTime);
+
+            requestAnimationFrame(updateLoop);
+        }
+
+        requestAnimationFrame(updateLoop);
     }
 } 

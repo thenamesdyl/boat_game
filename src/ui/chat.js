@@ -590,9 +590,9 @@ export class MiniMap {
         if (!this.radarScreen) return; // Use radarScreen instead of miniMapContainer
 
         // Debug log to check for monsters and their positions
-        console.log(`Updating ${monsters.length} monster markers, player at ${playerPosition.x.toFixed(0)},${playerPosition.z.toFixed(0)}`);
+        //console.log(`Updating ${monsters.length} monster markers, player at ${playerPosition.x.toFixed(0)},${playerPosition.z.toFixed(0)}`);
         if (monsters.length > 0) {
-            console.log(`First monster: Type=${monsters[0].monsterType}, State=${monsters[0].state}, Pos=${monsters[0].mesh.position.x.toFixed(0)},${monsters[0].mesh.position.z.toFixed(0)}`);
+            //console.log(`First monster: Type=${monsters[0].monsterType}, State=${monsters[0].state}, Pos=${monsters[0].mesh.position.x.toFixed(0)},${monsters[0].mesh.position.z.toFixed(0)}`);
         }
 
         // Use a much smaller scale for monsters to amplify their movement

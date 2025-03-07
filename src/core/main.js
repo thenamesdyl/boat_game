@@ -1087,9 +1087,12 @@ function animate() {
     // water.geometry.attributes.position.needsUpdate = true;
     //water.geometry.computeVertexNormals(); // For lighting in shader
 
+    // Get the boat speed multiplier if it exists
+    const speedMultiplier = window.boatSpeedMultiplier || 1.0;
+
     // Boat movement - realistic turning that causes forward motion
-    if (keys.forward) boatVelocity.z -= boatSpeed;
-    if (keys.backward) boatVelocity.z += boatSpeed * 0.5; // Slower in reverse
+    if (keys.forward) boatVelocity.z -= boatSpeed * speedMultiplier;
+    if (keys.backward) boatVelocity.z += boatSpeed * 0.5 * speedMultiplier; // Slower in reverse
 
     // Initialize turn-induced forward motion
     let turnInducedMotion = 0;
@@ -1097,7 +1100,7 @@ function animate() {
     // When turning, add forward momentum
     if (keys.left || keys.right) {
         // Turning automatically applies some forward momentum
-        turnInducedMotion = -boatSpeed * 0.4; // Forward motion from turning
+        turnInducedMotion = -boatSpeed * 0.4 * speedMultiplier; // Forward motion from turning
 
         // Apply turn (more effective with existing forward speed)
         const forwardMotion = Math.abs(boatVelocity.z);
@@ -1120,6 +1123,15 @@ function animate() {
 
     // Update boat rocking motion (this now handles boat height based on water surface)
     updateBoatRocking(deltaTime);
+
+    // Apply speed-based tilt if it exists
+    if (typeof boat.speedTilt === 'number') {
+        // Apply a slight forward tilt at high speeds
+        // We don't want to directly set rotation.x as that would override the rocking
+        // Instead we adjust the target position slightly
+        const tiltAdjustment = new THREE.Vector3(0, -boat.speedTilt, 0).applyQuaternion(boat.quaternion);
+        newPosition.add(tiltAdjustment);
+    }
 
     // Check for island collisions
     let collided = false;
