@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { sendChatMessage, getRecentMessages, onChatMessage, onRecentMessages } from '../core/network.js';
+// Import the command system
+import { initCommandSystem, isCommand, processCommand } from '../commands/commandSystem.js';
 
 export class ChatSystem {
     constructor() {
@@ -7,6 +9,9 @@ export class ChatSystem {
         this.visible = false;
         this.minimized = false;
         this.unreadCount = 0;
+
+        // Initialize command system
+        this.commandSystem = null;
 
         // Create the UI elements
         this.createChatUI();
@@ -395,6 +400,15 @@ export class ChatSystem {
         // Clear input field
         this.messageInput.value = '';
 
+        // Check if this is a command
+        if (this.commandSystem && isCommand(content)) {
+            // Process the command
+            const wasProcessed = processCommand(content, this);
+            if (wasProcessed) {
+                return; // Command processed, don't send as a chat message
+            }
+        }
+
         // Send message via network.js function
         sendChatMessage(content, 'global');
     }
@@ -774,6 +788,10 @@ export class MiniMap {
 // Export init functions
 export function initChat() {
     const chatSystem = new ChatSystem();
+
+    // Initialize the command system and attach it to the chat system
+    chatSystem.commandSystem = initCommandSystem();
+
     return chatSystem;
 }
 

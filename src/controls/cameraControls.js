@@ -39,6 +39,11 @@ export function initCameraControls() {
 
 // Update camera position around the boat
 export function updateCameraPosition() {
+    // Check if fly mode is enabled (from command system)
+    if (window.flyModeEnabled) {
+        return; // Skip camera update when in fly mode
+    }
+
     if (!boat) return;
 
     // Calculate camera position in spherical coordinates

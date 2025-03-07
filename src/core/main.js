@@ -971,7 +971,8 @@ document.addEventListener('mousemove', (event) => {
 });
 
 // Keyboard input
-document.addEventListener('keydown', (event) => {
+// Store keyboard event handlers so they can be managed by the command system
+const keydownHandler = (event) => {
     switch (event.key) {
         case 'w': case 'ArrowUp': keys.forward = true; break;
         case 's': case 'ArrowDown': keys.backward = true; break;
@@ -992,15 +993,24 @@ document.addEventListener('keydown', (event) => {
             toggleSkySystem();
             break;
     }
-});
-document.addEventListener('keyup', (event) => {
+};
+
+const keyupHandler = (event) => {
     switch (event.key) {
         case 'w': case 'ArrowUp': keys.forward = false; break;
         case 's': case 'ArrowDown': keys.backward = false; break;
         case 'a': case 'ArrowLeft': keys.left = false; break;
         case 'd': case 'ArrowRight': keys.right = false; break;
     }
-});
+};
+
+// Store event listeners for reference by the command system
+document.eventListeners = document.eventListeners || {};
+document.eventListeners.keydown = keydownHandler;
+document.eventListeners.keyup = keyupHandler;
+
+document.addEventListener('keydown', keydownHandler);
+document.addEventListener('keyup', keyupHandler);
 
 // Animation
 let lastChunkUpdatePosition = new THREE.Vector3();
@@ -1156,7 +1166,7 @@ function animate() {
     }
 
     // Camera positioning
-    updateCamera();
+    //updateCamera();
 
     // Network and UI updates
     Network.updatePlayerPosition();
