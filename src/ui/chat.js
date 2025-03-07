@@ -435,6 +435,8 @@ export class ChatSystem {
     }
 
     addMessage(message, shouldScroll = true) {
+        console.log('Adding message to UI:', message);
+
         // Create message element with quill-written appearance
         const messageEl = document.createElement('div');
         messageEl.className = 'chat-message';
@@ -445,24 +447,46 @@ export class ChatSystem {
         messageEl.style.lineHeight = '20px';
 
         // Format timestamp
-        const date = new Date(message.timestamp * 1000);
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        let timeStr = '';
+        if (typeof message === 'string') {
+            // Handle simple string messages (backward compatibility)
+            timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            messageEl.innerHTML = `
+                <span style="color: #8B4513; font-size: 10px; font-style: italic;">${timeStr}</span>
+                <span style="color: #3D1C00;">${message}</span>
+            `;
+        } else {
+            // Handle object messages (new format)
+            // Format timestamp if available
+            if (message.timestamp) {
+                // Check if timestamp is a number (unix timestamp) or ISO string
+                const date = typeof message.timestamp === 'number' ?
+                    new Date(message.timestamp * 1000) :
+                    new Date(message.timestamp);
+                timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else {
+                timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
 
-        // Format message color based on sender color
-        let colorStyle = '#8B4513'; // Default dark brown ink
-        if (message.sender_color) {
-            const r = Math.floor(message.sender_color.r * 255);
-            const g = Math.floor(message.sender_color.g * 255);
-            const b = Math.floor(message.sender_color.b * 255);
-            colorStyle = `rgb(${r}, ${g}, ${b})`;
+            // Format message color based on sender color
+            let colorStyle = '#8B4513'; // Default dark brown ink
+            if (message.sender_color) {
+                const r = Math.floor(message.sender_color.r * 255);
+                const g = Math.floor(message.sender_color.g * 255);
+                const b = Math.floor(message.sender_color.b * 255);
+                colorStyle = `rgb(${r}, ${g}, ${b})`;
+            }
+
+            // Default sender name if not provided
+            const senderName = message.sender_name || "Unknown Sailor";
+
+            // Create message HTML with quill writing style
+            messageEl.innerHTML = `
+                <span style="color: #8B4513; font-size: 10px; font-style: italic;">${timeStr}</span>
+                <span style="color: ${colorStyle}; font-weight: bold;"> ${senderName}: </span>
+                <span style="color: #3D1C00;">${message.content || message}</span>
+            `;
         }
-
-        // Create message HTML with quill writing style
-        messageEl.innerHTML = `
-            <span style="color: #8B4513; font-size: 10px; font-style: italic;">${timeStr}</span>
-            <span style="color: ${colorStyle}; font-weight: bold;"> ${message.sender_name}: </span>
-            <span style="color: #3D1C00;">${message.content}</span>
-        `;
 
         // Add to messages area
         this.messagesArea.appendChild(messageEl);

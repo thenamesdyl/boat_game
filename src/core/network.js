@@ -787,16 +787,57 @@ function initializePlayerStats() {
 
 // Send a chat message
 export function sendChatMessage(content, messageType = 'global') {
-    if (!isConnected || !socket || !playerId) return false;
+    // First check for socket connection
+    if (!isConnected || !socket) {
+        console.error("Cannot send message - not connected to server");
+        return false;
+    }
 
-    console.log('Sending chat message:', content);
+    // Log current state
+    console.log('Attempt to send chat message:', content);
+    console.log('Connection status:', isConnected ? 'Connected' : 'Disconnected');
+    console.log('Current player ID:', playerId);
+    console.log('Current Firebase doc ID:', firebaseDocId);
 
+    // Ensure we have a valid player ID
+    // Try to get it from different sources if not available
+    if (!playerId && socket.id) {
+        // If no player ID but we have a socket ID, use that temporarily
+        console.log('No player ID found, using socket ID temporarily');
+        playerId = socket.id;
+    }
+
+    // Make sure firebaseDocId is properly set
+    if (!firebaseDocId && playerId) {
+        // If we have playerId but no firebaseDocId, set it
+        console.log('Setting firebaseDocId from playerId:', playerId);
+        firebaseDocId = playerId.startsWith('firebase_') ?
+            playerId : 'firebase_' + playerId;
+    } else if (!firebaseDocId) {
+        // Last resort - create a temporary ID
+        console.error('No player ID available, using temporary ID');
+        const tempId = 'firebase_temp_' + Math.floor(Math.random() * 10000);
+        firebaseDocId = tempId;
+        playerId = tempId.replace('firebase_', '');
+    }
+
+    // Ensure the firebaseDocId is correctly formatted
+    if (!firebaseDocId.startsWith('firebase_')) {
+        firebaseDocId = 'firebase_' + firebaseDocId;
+        console.log('Fixed Firebase doc ID format:', firebaseDocId);
+    }
+
+    console.log('Sending chat message with player_id:', firebaseDocId);
+
+    // Now send the message with the properly formatted ID
     socket.emit('send_message', {
         content: content,
         type: messageType,
-        player_id: firebaseDocId
+        player_id: firebaseDocId,
+        player_name: playerName  // Add the player's name to the message
     });
 
+    console.log('Message emitted successfully');
     return true;
 }
 
