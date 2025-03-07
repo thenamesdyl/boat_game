@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { scene, camera, boat, keys } from '../core/gameState.js';
 import { updateCameraPosition } from '../controls/cameraControls.js';
+import { islandCommands } from './islandCommands.js';
 
 // Create a global variable to track fly mode state
 // This will be checked by the updateCameraPosition function
@@ -33,6 +34,7 @@ const state = {
     },
     mouseLook: {
         isLocked: false,
+        isDragging: false,
         lastX: 0,
         lastY: 0,
         sensitivity: 0.002
@@ -49,8 +51,13 @@ let animationLoopPatched = false;
  * Initialize the command system
  */
 export function initCommandSystem() {
-    // Register all available commands
+    // Register core commands
     registerCommand('fly', flyCommand, 'Toggle fly mode or control flying options');
+
+    // Register island commands from the islandCommands module
+    islandCommands.forEach(cmd => {
+        registerCommand(cmd.name, cmd.handler, cmd.description);
+    });
 
     // Patch the animation loop once the page is fully loaded
     if (!animationLoopPatched) {
@@ -180,7 +187,7 @@ function flyCommand(args, chatSystem) {
             `Fly mode enabled with speed ${speed.toFixed(1)}x. ` +
             `Use WASD or arrow keys to fly. Space to go up, Shift to go down. ` +
             `P to rotate left, O to rotate right. ` +
-            `Mouse to look around. /fly again to exit. ` +
+            `Click and drag to look around. /fly again to exit. ` +
             `Change speed with /fly speed [value].`
         );
 
@@ -229,20 +236,23 @@ function enableFlyMode(speed = 1.0) {
     document.addEventListener('keydown', handleFlyModeKeyDown);
     document.addEventListener('keyup', handleFlyModeKeyUp);
 
-    // Add mouse move handler for looking around
+    // Add mouse handlers
     document.addEventListener('mousemove', handleFlyModeMouseMove);
+    document.addEventListener('mousedown', handleFlyModeMouseDown);
+    document.addEventListener('mouseup', handleFlyModeMouseUp);
 
     // Set up mouse look
     state.mouseLook = {
         isLocked: false,
+        isDragging: false,
         lastX: 0,
         lastY: 0,
         sensitivity: 0.002
     };
 
-    // Request pointer lock on click
-    document.addEventListener('click', requestPointerLock);
-    document.addEventListener('pointerlockchange', handlePointerLockChange);
+    // Request pointer lock on click (disabled - now using click and drag instead)
+    // document.addEventListener('click', requestPointerLock);
+    // document.addEventListener('pointerlockchange', handlePointerLockChange);
 
     // Set fly mode state
     state.flyMode = true;
@@ -328,7 +338,7 @@ function createFlyModeIndicator() {
             <div><b>Shift</b>: Down</div>
             <div><b>P</b>: Rotate Left</div>
             <div><b>O</b>: Rotate Right</div>
-            <div><b>Mouse</b>: Look</div>
+            <div><b>Click+Drag</b>: Look</div>
             <div><b>/fly</b>: Exit</div>
         </div>
         <div style="border-top: 1px solid #B8860B; margin-top: 5px; font-size: 12px; text-align: center;">
@@ -359,10 +369,10 @@ function disableFlyMode() {
 
     // Remove mouse handlers
     document.removeEventListener('mousemove', handleFlyModeMouseMove);
-    document.removeEventListener('click', requestPointerLock);
-    document.removeEventListener('pointerlockchange', handlePointerLockChange);
+    document.removeEventListener('mousedown', handleFlyModeMouseDown);
+    document.removeEventListener('mouseup', handleFlyModeMouseUp);
 
-    // Exit pointer lock if active
+    // Exit pointer lock if active (legacy cleanup)
     if (document.pointerLockElement) {
         document.exitPointerLock();
     }
@@ -413,21 +423,58 @@ function handlePointerLockChange() {
 }
 
 /**
+ * Handle mouse down events in fly mode
+ * @param {MouseEvent} event - Mouse event
+ */
+function handleFlyModeMouseDown(event) {
+    if (!state.flyMode) return;
+
+    // Only handle left mouse button (button 0)
+    if (event.button === 0) {
+        state.mouseLook.isDragging = true;
+        state.mouseLook.lastX = event.clientX;
+        state.mouseLook.lastY = event.clientY;
+        console.log("Fly mode: Started camera drag");
+    }
+}
+
+/**
+ * Handle mouse up events in fly mode
+ * @param {MouseEvent} event - Mouse event
+ */
+function handleFlyModeMouseUp(event) {
+    if (!state.flyMode) return;
+
+    // Only handle left mouse button (button 0)
+    if (event.button === 0) {
+        state.mouseLook.isDragging = false;
+        console.log("Fly mode: Ended camera drag");
+    }
+}
+
+/**
  * Handle mouse movement in fly mode
  * @param {MouseEvent} event - Mouse event
  */
 function handleFlyModeMouseMove(event) {
-    if (!state.flyMode || !state.mouseLook.isLocked) return;
+    if (!state.flyMode) return;
 
-    const movementX = event.movementX || 0;
-    const movementY = event.movementY || 0;
+    // Only rotate camera if mouse is being dragged (clicked and moved)
+    if (state.mouseLook.isDragging) {
+        const movementX = event.clientX - state.mouseLook.lastX;
+        const movementY = event.clientY - state.mouseLook.lastY;
 
-    // Update camera rotation based on mouse movement
-    camera.rotation.y -= movementX * state.mouseLook.sensitivity;
+        // Update camera rotation based on mouse movement
+        camera.rotation.y -= movementX * state.mouseLook.sensitivity;
 
-    // Limit vertical rotation to avoid flipping
-    const newRotationX = camera.rotation.x - movementY * state.mouseLook.sensitivity;
-    camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, newRotationX));
+        // Limit vertical rotation to avoid flipping
+        const newRotationX = camera.rotation.x - movementY * state.mouseLook.sensitivity;
+        camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, newRotationX));
+
+        // Store current position for next frame
+        state.mouseLook.lastX = event.clientX;
+        state.mouseLook.lastY = event.clientY;
+    }
 }
 
 /**
@@ -435,6 +482,15 @@ function handleFlyModeMouseMove(event) {
  * @param {KeyboardEvent} event - Keyboard event
  */
 function handleFlyModeKeyDown(event) {
+    // Skip if chat input is active or any input element is focused
+    if (window.chatInputActive ||
+        (document.activeElement &&
+            (document.activeElement.tagName === 'INPUT' ||
+                document.activeElement.tagName === 'TEXTAREA' ||
+                document.activeElement.isContentEditable))) {
+        return;
+    }
+
     // First log the event to debug
     console.log(`Fly mode key down: ${event.key}`);
 
@@ -466,10 +522,10 @@ function handleFlyModeKeyDown(event) {
         case 'SHIFT':
             state.flyKeys.down = true;
             break;
-        case 'P': // Rotate left
+        case 'P':
             state.flyKeys.rotateLeft = true;
             break;
-        case 'O': // Rotate right
+        case 'O':
             state.flyKeys.rotateRight = true;
             break;
         default:
@@ -489,6 +545,15 @@ function handleFlyModeKeyDown(event) {
  * @param {KeyboardEvent} event - Keyboard event
  */
 function handleFlyModeKeyUp(event) {
+    // Skip if chat input is active or any input element is focused
+    if (window.chatInputActive ||
+        (document.activeElement &&
+            (document.activeElement.tagName === 'INPUT' ||
+                document.activeElement.tagName === 'TEXTAREA' ||
+                document.activeElement.isContentEditable))) {
+        return;
+    }
+
     // First log the event to debug
     console.log(`Fly mode key up: ${event.key}`);
 
@@ -520,10 +585,10 @@ function handleFlyModeKeyUp(event) {
         case 'SHIFT':
             state.flyKeys.down = false;
             break;
-        case 'P': // Rotate left
+        case 'P':
             state.flyKeys.rotateLeft = false;
             break;
-        case 'O': // Rotate right
+        case 'O':
             state.flyKeys.rotateRight = false;
             break;
         default:

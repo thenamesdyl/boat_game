@@ -973,6 +973,15 @@ document.addEventListener('mousemove', (event) => {
 // Keyboard input
 // Store keyboard event handlers so they can be managed by the command system
 const keydownHandler = (event) => {
+    // Skip game controls if chat or any text input is focused
+    if (window.chatInputActive || // Check the global flag set by chat
+        (document.activeElement &&
+            (document.activeElement.tagName === 'INPUT' ||
+                document.activeElement.tagName === 'TEXTAREA' ||
+                document.activeElement.isContentEditable))) {
+        return;
+    }
+
     switch (event.key) {
         case 'w': case 'ArrowUp': keys.forward = true; break;
         case 's': case 'ArrowDown': keys.backward = true; break;
@@ -996,6 +1005,15 @@ const keydownHandler = (event) => {
 };
 
 const keyupHandler = (event) => {
+    // Skip game controls if chat or any text input is focused
+    if (window.chatInputActive || // Check the global flag set by chat
+        (document.activeElement &&
+            (document.activeElement.tagName === 'INPUT' ||
+                document.activeElement.tagName === 'TEXTAREA' ||
+                document.activeElement.isContentEditable))) {
+        return;
+    }
+
     switch (event.key) {
         case 'w': case 'ArrowUp': keys.forward = false; break;
         case 's': case 'ArrowDown': keys.backward = false; break;

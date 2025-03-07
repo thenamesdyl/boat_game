@@ -347,11 +347,32 @@ export class ChatSystem {
             this.sendMessage();
         });
 
-        // Send message on Enter key
+        // Handle keys in the message input
         this.messageInput.addEventListener('keydown', (e) => {
+            // Send message on Enter key
             if (e.key === 'Enter') {
                 this.sendMessage();
+                // Don't propagate Enter key to game controls
+                e.preventDefault();
+                e.stopPropagation();
             }
+
+            // Prevent game controls from capturing input when typing in chat
+            // This ensures keys like WASD don't control the boat while typing
+            e.stopPropagation();
+        });
+
+        // Add focus and blur event handlers to track when chat is active
+        this.messageInput.addEventListener('focus', () => {
+            // Set a global flag that can be checked by other handlers
+            window.chatInputActive = true;
+            console.log("Chat input focused - game controls disabled");
+        });
+
+        this.messageInput.addEventListener('blur', () => {
+            // Clear the global flag
+            window.chatInputActive = false;
+            console.log("Chat input blurred - game controls enabled");
         });
     }
 
