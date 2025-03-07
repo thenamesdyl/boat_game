@@ -431,28 +431,74 @@ def handle_player_action(data):
 
 @socketio.on('send_message')
 def handle_chat_message(data):
-    content = data.get('content', '').strip()
+    # Log the entire data payload
+    print(f"=====================================")
+    logger.error(f"CHAT DEBUG: Message data received: {data}")
+    logger.error(f"CHAT DEBUG: Message data received: {data}")
+    
+    # Handle different message formats
+    if isinstance(data, str):
+        print(f"CHAT DEBUG: Data is a string, converting to object")
+        content = data.strip()
+        player_id = None
+        player_name = None
+    else:
+        content = data.get('content', '').strip()
+        player_id = data.get('player_id', None)
+        player_name = data.get('player_name', None)
+
+    print(f"CHAT DEBUG: Content: '{content}'")
+    print(f"CHAT DEBUG: Player ID: '{player_id}'")
+    print(f"CHAT DEBUG: Player Name: '{player_name}'")
     
     # Validate message
     if not content or len(content) > 500:
+        logger.warning(f"CHAT DEBUG: Invalid message content (empty or too long): '{content}'")
         return
-    
-    # Simplified: Just use the player_id from the current request
-    player_id = data.get('player_id', None)
     
     # Check if player_id is available and valid
     if not player_id or not player_id.startswith('firebase_'):
-        logger.warning(f"Missing or invalid player ID. Ignoring chat message.")
+        logger.warning(f"CHAT DEBUG: Missing or invalid player ID: {player_id}. Ignoring chat message.")
         return
+
+    # If player_name wasn't provided, try to get it from our players cache
+    if not player_name and player_id in players:
+        player_name = players[player_id].get('name', 'Unknown Sailor')
+        print(f"CHAT DEBUG: Retrieved player name from cache: {player_name}")
     
-    # Create message in Firestore
-    #message = firestore_models.Message.create(
-    #    player_id,
-    #    content,
-    #    message_type='global'
-    #)
+    # Debug log to check if we actually have the player in cache
+    if player_id in players:
+        print(f"CHAT DEBUG: PLAYER FOUND IN CACHE: {player_id}")
+        print(f"CHAT DEBUG: PLAYER NAME IN CACHE: {players[player_id].get('name', 'No name found!')}")
+    else:
+        print(f"CHAT DEBUG: PLAYER NOT FOUND IN CACHE: {player_id}")
+        print(f"CHAT DEBUG: AVAILABLE PLAYER IDS: {list(players.keys())[:10]}") # Show up to 10 for brevity
     
-    emit('new_message', content, broadcast=True)
+    # IMPORTANT: Always use the client-provided name if available
+    final_name = player_name or 'Unknown Sailor'
+    print(f"CHAT DEBUG: FINAL NAME FOR CHAT: {final_name}")
+    
+    # Send message object with more info instead of just content
+    message_obj = {
+        'content': content,
+        'player_id': player_id,
+        'sender_name': final_name,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    print(f"CHAT DEBUG: Broadcasting message object: {message_obj}")
+    logger.info(f"CHAT DEBUG: Broadcasting message with player name: '{final_name}'")
+    
+    # IMPORTANT: Make sure we're sending the OBJECT, not just the content string
+    try:
+        # Send as JSON to ensure proper serialization
+        emit('new_message', message_obj, broadcast=True, json=True)
+        print(f"CHAT DEBUG: Broadcast complete")
+    except Exception as e:
+        print(f"CHAT DEBUG: ERROR BROADCASTING MESSAGE: {str(e)}")
+        logger.error(f"CHAT DEBUG: Error broadcasting message: {str(e)}")
+    
+    print(f"=====================================")
 
 @socketio.on('update_player_color')
 def handle_update_player_color(data):
@@ -494,33 +540,92 @@ def handle_update_player_name(data):
     Update a player's name
     Expects: { player_id, name }
     """
+    print(f"DEBUG: Received player name update: {data}")
+    logger.info(f"Received player name update: {data}")
+    
     player_id = data.get('player_id')
     if not player_id:
         logger.warning("Missing player ID in name update. Ignoring.")
         return
     
     name = data.get('name')
-    if not name or not isinstance(name, str) or len(name) > 50:
-        logger.warning("Invalid name in update. Ignoring.")
+    print(f"DEBUG: Name from update: '{name}'")
+    
+    if not name or not isinstance(name, str):
+        logger.warning(f"Invalid name in update (empty or not a string): '{name}'. Ignoring.")
         return
+    
+    # Apply server-side sanitization for extra security
+    sanitized_name = sanitize_player_name(name)
+    print(f"DEBUG: Sanitized name: '{sanitized_name}'")
+    
+    if not sanitized_name or len(sanitized_name) < 2:
+        logger.warning(f"Name invalid after sanitization: '{name}' -> '{sanitized_name}'. Ignoring.")
+        return
+        
+    if len(sanitized_name) > 50:
+        logger.warning(f"Name too long ({len(sanitized_name)} chars): '{sanitized_name}'. Truncating.")
+        sanitized_name = sanitized_name[:50]
     
     # Ensure player exists in cache
     if player_id not in players:
         logger.warning(f"Player ID {player_id} not found in cache. Ignoring name update.")
         return
     
+    # Log previous player name for debugging
+    prev_name = players[player_id].get('name', 'Unknown')
+    print(f"DEBUG: Updating player {player_id} name from '{prev_name}' to '{sanitized_name}'")
+    
     # Update in-memory cache
-    players[player_id]['name'] = name
+    players[player_id]['name'] = sanitized_name
     
     # Update in Firestore directly
-    firestore_models.Player.update(player_id, name=name)
-    logger.info(f"Updated player {player_id} name to {name}")
+    firestore_models.Player.update(player_id, name=sanitized_name)
+    logger.info(f"Updated player {player_id} name to {sanitized_name}")
     
     # Broadcast to all other clients
     emit('player_updated', {
         'id': player_id,
-        'name': name
+        'name': sanitized_name
     }, broadcast=True)
+    
+    print(f"DEBUG: Broadcast player name update: {player_id} = '{sanitized_name}'")
+
+def sanitize_player_name(name):
+    """
+    Sanitize player names to prevent XSS attacks and ensure valid formatting
+    """
+    # Skip if name is None
+    if name is None:
+        return None
+        
+    # Basic HTML sanitization
+    import re
+    
+    # Remove potentially dangerous HTML/JS characters
+    sanitized = re.sub(r'<[^>]*>', '', name)  # Remove HTML tags
+    sanitized = re.sub(r'&[^;]+;', '', sanitized)  # Remove HTML entities
+    
+    # Remove other potentially problematic characters
+    sanitized = sanitized.replace('\\', '')
+    sanitized = sanitized.replace('/', '')
+    sanitized = sanitized.replace('"', '')
+    sanitized = sanitized.replace("'", '')
+    
+    # Allow clan tags in square brackets but sanitize their content
+    def sanitize_clan_tags(match):
+        # Extract the clan tag content (without brackets)
+        clan_content = match.group(1)
+        # Sanitize the clan content
+        clean_content = re.sub(r'[<>&\\/\'"]', '', clan_content)
+        # Return with brackets
+        return f"[{clean_content}]"
+    
+    # Pattern matches [anything]
+    sanitized = re.sub(r'\[(.*?)\]', sanitize_clan_tags, sanitized)
+    
+    # Trim whitespace and return
+    return sanitized.strip()
 
 # API endpoints
 @app.route('/api/players', methods=['GET'])

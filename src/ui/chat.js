@@ -453,9 +453,12 @@ export class ChatSystem {
             console.log('CHAT UI: Processing string message:', message);
             // Handle simple string messages (backward compatibility)
             timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            // Sanitize the string message to prevent XSS
+            const sanitizedMessage = this.sanitizeText(message);
             messageEl.innerHTML = `
                 <span style="color: #8B4513; font-size: 10px; font-style: italic;">${timeStr}</span>
-                <span style="color: #3D1C00;">${message}</span>
+                <span style="color: #3D1C00;">${sanitizedMessage}</span>
             `;
         } else if (message && typeof message === 'object') {
             console.log('CHAT UI: Processing object message with keys:', Object.keys(message));
@@ -492,9 +495,10 @@ export class ChatSystem {
                 }
             }
 
-            // Default sender name if not provided
-            const senderName = message.sender_name || "Unknown Sailor";
-            console.log('CHAT UI: Using sender name:', senderName);
+            // Default sender name if not provided - sanitize it
+            const rawSenderName = message.sender_name || "Unknown Sailor";
+            const senderName = this.sanitizeText(rawSenderName);
+            console.log('CHAT UI: Using sanitized sender name:', senderName);
 
             // Add special styling for messages with clan tags (matching [Tag] format)
             let formattedSenderName = senderName;
@@ -507,6 +511,7 @@ export class ChatSystem {
                     console.log('CHAT UI: Clan tag regex match:', tagMatch);
 
                     if (tagMatch && tagMatch[1] && tagMatch[2]) {
+                        // Both parts are already sanitized since we sanitized the whole name
                         const clanTag = tagMatch[1];
                         const baseName = tagMatch[2];
 
@@ -528,8 +533,11 @@ export class ChatSystem {
                 formattedSenderName = `<span style="color: ${colorStyle};">${senderName}</span>`;
             }
 
+            // Sanitize message content
+            const rawMessageContent = message.content || (typeof message === 'string' ? message : "");
+            const messageContent = this.sanitizeText(rawMessageContent);
+
             // Create message HTML with quill writing style
-            const messageContent = message.content || (typeof message === 'string' ? message : "");
             messageEl.innerHTML = `
                 <span style="color: #8B4513; font-size: 10px; font-style: italic;">${timeStr}</span>
                 <span style="font-weight: bold;"> ${formattedSenderName}: </span>
@@ -560,6 +568,24 @@ export class ChatSystem {
         if (shouldScroll && (this.visible && !this.minimized)) {
             this.scrollToBottom();
         }
+    }
+
+    /**
+     * Sanitize text to prevent XSS attacks
+     * @param {string} text - The text to sanitize
+     * @returns {string} - The sanitized text
+     */
+    sanitizeText(text) {
+        if (!text) return '';
+
+        // Create a temporary element
+        const tempElement = document.createElement('div');
+
+        // Set the text as textContent which automatically handles HTML encoding
+        tempElement.textContent = text;
+
+        // Return the encoded HTML which now has special characters escaped
+        return tempElement.innerHTML;
     }
 
     addSystemMessage(text) {

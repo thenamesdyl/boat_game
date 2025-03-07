@@ -1,6 +1,47 @@
 import { setPlayerName, getPlayerName } from '../core/network.js';
 
 /**
+ * Sanitize a clan name to prevent XSS and ensure valid formatting
+ * @param {string} clanName - The raw clan name input
+ * @returns {string} - The sanitized clan name
+ */
+function sanitizeClanName(clanName) {
+    if (!clanName) return '';
+
+    console.log("Sanitizing clan name:", clanName);
+
+    // Step 1: Remove HTML tags and special characters that could be used for script injection
+    let sanitized = clanName
+        .replace(/</g, '') // Remove < to prevent HTML tags
+        .replace(/>/g, '') // Remove > to prevent HTML tags
+        .replace(/&/g, '') // Remove & to prevent HTML entities
+        .replace(/"/g, '') // Remove double quotes
+        .replace(/'/g, '') // Remove single quotes
+        .replace(/\\/g, '') // Remove backslashes
+        .replace(/\//g, '') // Remove forward slashes
+        .replace(/\[/g, '') // Remove square brackets (since we add these ourselves)
+        .replace(/\]/g, ''); // Remove square brackets (since we add these ourselves)
+
+    // Step 2: Trim whitespace and limit length
+    sanitized = sanitized.trim();
+
+    // Step 3: Ensure a minimum length after sanitization
+    if (sanitized.length < 2) {
+        console.log("Clan name too short after sanitization:", sanitized);
+        return '';
+    }
+
+    // Step 4: Limit maximum length
+    if (sanitized.length > 15) {
+        sanitized = sanitized.substring(0, 15);
+        console.log("Clan name truncated to 15 characters:", sanitized);
+    }
+
+    console.log("Sanitized clan name:", sanitized);
+    return sanitized;
+}
+
+/**
  * Clan command implementation
  * @param {Array<string>} args - Command arguments
  * @param {object} chatSystem - Reference to the chat system
@@ -45,17 +86,15 @@ function handleClanCreate(args, chatSystem) {
     }
 
     // Join all remaining arguments to form the clan name
-    const clanName = args.join(' ').trim();
-    console.log("Clan name to be created:", clanName);
+    const rawClanName = args.join(' ').trim();
+    console.log("Raw clan name input:", rawClanName);
 
-    // Validate clan name
-    if (clanName.length < 2) {
-        chatSystem.addSystemMessage('Clan name must be at least 2 characters long.');
-        return;
-    }
+    // Sanitize the clan name to prevent XSS and ensure valid formatting
+    const clanName = sanitizeClanName(rawClanName);
 
-    if (clanName.length > 20) {
-        chatSystem.addSystemMessage('Clan name cannot exceed 20 characters.');
+    // Validate sanitized clan name
+    if (!clanName || clanName.length < 2) {
+        chatSystem.addSystemMessage('Invalid clan name. Please use at least 2 alphanumeric characters and avoid special characters.');
         return;
     }
 

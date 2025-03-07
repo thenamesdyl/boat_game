@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { getAuth } from 'firebase/auth';
 import { showLoginScreen } from './main';
-import { setPlayerStateFromDb } from './gameState';
+import { setPlayerStateFromDb, getPlayerStateFromDb } from './gameState';
 
 // Network configuration
-const SERVER_URL = 'http://localhost:5001';
-//const SERVER_URL = 'https://boat-game-python.onrender.com';
+//const SERVER_URL = 'http://localhost:5001';
+const SERVER_URL = 'https://boat-game-python.onrender.com';
 
 // Network state
 let socket;
@@ -21,6 +21,12 @@ let playerStats = {
     money: 0
 };
 
+// Chat system variables
+let chatMessageCallback = null;
+let recentMessagesCallback = null;
+let messageHistory = [];
+const DEFAULT_MESSAGE_LIMIT = 50;
+
 // Reference to scene and game objects (to be set from script.js)
 let sceneRef;
 let playerStateRef;
@@ -28,12 +34,6 @@ let boatRef;
 let character;
 let islandCollidersRef;
 let activeIslandsRef;
-
-// Chat system variables
-let chatMessageCallback = null;
-let recentMessagesCallback = null;
-let messageHistory = [];
-const DEFAULT_MESSAGE_LIMIT = 50;
 
 // Export a getter for the player name
 export function getPlayerName() {
@@ -261,8 +261,12 @@ function setupSocketEvents() {
         console.log("setting player data ", data);
         setPlayerStateFromDb(data);
 
-        // Set player name
-        setPlayerName(playerName);
+        // IMPORTANT FIX: Update the playerName variable with the server-stored name
+        // This ensures clan tags are maintained after page reload
+        if (data.name) {
+            console.log("Updating player name from server data:", data.name);
+            playerName = data.name; // Update the local variable directly with server data
+        }
 
         // Register islands
         registerIslands();
@@ -865,73 +869,96 @@ function initializePlayerStats() {
 
 // Send a chat message
 export function sendChatMessage(content, messageType = 'global') {
-    // First check for socket connection
-    if (!isConnected || !socket) {
-        console.error("Cannot send message - not connected to server");
+    try {
+        // First check for socket connection
+        if (!isConnected || !socket) {
+            console.error("Cannot send message - not connected to server");
+            return false;
+        }
+
+        // Log current state
+        console.log('Attempt to send chat message:', content);
+        console.log('Connection status:', isConnected ? 'Connected' : 'Disconnected');
+        console.log('Current player ID:', playerId);
+        console.log('Current Firebase doc ID:', firebaseDocId);
+        console.log('Current player name:', playerName);
+
+        // Ensure we have a valid player ID
+        // Try to get it from different sources if not available
+        if (!playerId && socket && socket.id) {
+            // If no player ID but we have a socket ID, use that temporarily
+            console.log('No player ID found, using socket ID temporarily');
+            playerId = socket.id;
+        }
+
+        // Make sure firebaseDocId is properly set
+        if (!firebaseDocId && playerId) {
+            // If we have playerId but no firebaseDocId, set it
+            console.log('Setting firebaseDocId from playerId:', playerId);
+            firebaseDocId = playerId.startsWith('firebase_') ?
+                playerId : 'firebase_' + playerId;
+        } else if (!firebaseDocId) {
+            // Last resort - create a temporary ID
+            console.error('No player ID available, using temporary ID');
+            const tempId = 'firebase_temp_' + Math.floor(Math.random() * 10000);
+            firebaseDocId = tempId;
+            playerId = tempId.replace('firebase_', '');
+        }
+
+        // Ensure the firebaseDocId is correctly formatted
+        if (!firebaseDocId.startsWith('firebase_')) {
+            firebaseDocId = 'firebase_' + firebaseDocId;
+            console.log('Fixed Firebase doc ID format:', firebaseDocId);
+        }
+
+        // Safely retrieve player data if available
+        let finalPlayerName = playerName;
+        try {
+            // Try to get player data from server (including clan tag)
+            const playerDataFromServer = getPlayerStateFromDb();
+            if (playerDataFromServer && playerDataFromServer.name) {
+                // Use the name from server data, which will include clan tag
+                if (finalPlayerName !== playerDataFromServer.name) {
+                    console.log('Using player name from server data:', playerDataFromServer.name);
+                    console.log('(This preserves clan tags after page reload)');
+                    finalPlayerName = playerDataFromServer.name;
+                }
+            }
+        } catch (e) {
+            console.warn('Error retrieving player data:', e);
+            // Continue with the existing player name
+        }
+
+        // For safety, make sure we have a player name
+        if (!finalPlayerName || finalPlayerName.trim() === '') {
+            console.warn('No player name set, using default name');
+            finalPlayerName = `Sailor_${Math.floor(Math.random() * 1000)}`;
+        }
+
+        console.log('Sending chat message with player_id:', firebaseDocId);
+        console.log('Sending chat message with player_name:', finalPlayerName);
+
+        // Create the message object
+        const messageObj = {
+            content: content,
+            type: messageType,
+            player_id: firebaseDocId,
+            player_name: finalPlayerName  // Add the player's name to the message
+        };
+
+        // Log the complete message object being sent
+        console.log('Sending complete message object:', messageObj);
+
+        // Now send the message
+        socket.emit('send_message', messageObj);
+
+        console.log('Message emitted with player name:', finalPlayerName);
+        console.log('Message emitted successfully');
+        return true;
+    } catch (error) {
+        console.error('Error sending chat message:', error);
         return false;
     }
-
-    // Log current state
-    console.log('Attempt to send chat message:', content);
-    console.log('Connection status:', isConnected ? 'Connected' : 'Disconnected');
-    console.log('Current player ID:', playerId);
-    console.log('Current Firebase doc ID:', firebaseDocId);
-    console.log('Current player name:', playerName);
-
-    // Ensure we have a valid player ID
-    // Try to get it from different sources if not available
-    if (!playerId && socket.id) {
-        // If no player ID but we have a socket ID, use that temporarily
-        console.log('No player ID found, using socket ID temporarily');
-        playerId = socket.id;
-    }
-
-    // Make sure firebaseDocId is properly set
-    if (!firebaseDocId && playerId) {
-        // If we have playerId but no firebaseDocId, set it
-        console.log('Setting firebaseDocId from playerId:', playerId);
-        firebaseDocId = playerId.startsWith('firebase_') ?
-            playerId : 'firebase_' + playerId;
-    } else if (!firebaseDocId) {
-        // Last resort - create a temporary ID
-        console.error('No player ID available, using temporary ID');
-        const tempId = 'firebase_temp_' + Math.floor(Math.random() * 10000);
-        firebaseDocId = tempId;
-        playerId = tempId.replace('firebase_', '');
-    }
-
-    // Ensure the firebaseDocId is correctly formatted
-    if (!firebaseDocId.startsWith('firebase_')) {
-        firebaseDocId = 'firebase_' + firebaseDocId;
-        console.log('Fixed Firebase doc ID format:', firebaseDocId);
-    }
-
-    // For safety, make sure we have a player name
-    if (!playerName || playerName.trim() === '') {
-        console.warn('No player name set, using default name');
-        playerName = `Sailor_${Math.floor(Math.random() * 1000)}`;
-    }
-
-    console.log('Sending chat message with player_id:', firebaseDocId);
-    console.log('Sending chat message with player_name:', playerName);
-
-    // Create the message object
-    const messageObj = {
-        content: content,
-        type: messageType,
-        player_id: firebaseDocId,
-        player_name: playerName  // Add the player's name to the message
-    };
-
-    // Log the complete message object being sent
-    console.log('Sending complete message object:', messageObj);
-
-    // Now send the message
-    socket.emit('send_message', messageObj);
-
-    console.log('Message emitted with player name:', playerName);
-    console.log('Message emitted successfully');
-    return true;
 }
 
 // Request recent messages from the server
