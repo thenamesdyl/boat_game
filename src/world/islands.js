@@ -325,16 +325,20 @@ function createIsland(x, z, seed, scene) {
     }
 
     // Vegetation (always add some trees regardless of structure)
-
     for (let v = 0; v < 2; v++) {
         // Create a tree group to hold trunk and foliage
         const tree = new THREE.Group();
 
-        // Random tree properties with variation
-        const treeHeight = 10 + random() * 8;
+        // Define minimum sizes for trees
+        const MIN_TREE_HEIGHT = 20;     // Was 10
+        const MIN_TRUNK_RADIUS = 0.8;   // Was 0.5
+        const MIN_FOLIAGE_RADIUS = 5;   // Was 3
+
+        // Random tree properties with better minimum values
+        const treeHeight = MIN_TREE_HEIGHT + random() * 8;
         const trunkHeight = treeHeight * 0.6;
-        const trunkRadius = 0.5 + random() * 0.3;
-        const foliageRadius = 3 + random() * 3;
+        const trunkRadius = MIN_TRUNK_RADIUS + random() * 0.4;
+        const foliageRadius = MIN_FOLIAGE_RADIUS + random() * 3;
         const foliageHeight = treeHeight - trunkHeight;
 
         // Tree type variation (0: cone, 1: rounded)
