@@ -373,4 +373,14 @@ export function getUsername() {
         return currentUser.displayName;
     }
     return `Sailor ${Math.floor(Math.random() * 1000)}`;
+}
+
+/**
+ * Check if Firebase authentication is required
+ * @returns {boolean} True if authentication is required
+ */
+export function isAuthRequired() {
+    // Implement your logic to determine if auth is needed
+    // For example, only require for multiplayer or specific features
+    return true; // Or false, depending on your requirements
 } 

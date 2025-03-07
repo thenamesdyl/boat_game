@@ -1,5 +1,15 @@
 import * as THREE from 'three';
 import { createShoreEffect, updateShores, setShoreVisibility, removeShore, clearAllShores } from './shores.js';
+import {
+    createSingleMassiveIsland,
+    checkMassiveIslandCollision,
+    getMassiveIslandColliders,
+    updateMassiveIslandShores,
+    findNearestMassiveIsland,
+    setMassiveIslandVisibility
+} from './massiveIslands.js';
+// import { createCoastalCliffScene } from './coastalCliff.js';
+import { spawnBlockCave, createBlockCave } from './blockCave.js';
 
 // Island generation variables
 let islandColliders = [];
@@ -1040,6 +1050,141 @@ function updateIslandEffects(deltaTime) {
     if (areShoreEffectsEnabled()) {
         updateShores(deltaTime);
     }
+}
+
+// Add these variables to track the massive island
+let massiveIslandSpawned = false;
+let massiveIslandPosition = { x: 2000, z: 2000 }; // Position for the massive island
+
+/**
+ * Spawns a single massive island at the specified position
+ * @param {THREE.Scene} scene - The scene to add the island to
+ */
+export function spawnMassiveIsland(scene) {
+    console.log("DEBUG: Massive Island spawn DISABLED", massiveIslandPosition);
+    return null; // Return null instead of creating the island
+}
+
+/**
+ * Checks collisions with all island types
+ * @param {THREE.Vector3} position - Position to check
+ * @param {number} extraRadius - Extra radius to add to collision check
+ * @returns {boolean} Whether there is a collision
+ */
+export function checkAllIslandCollisions(position, extraRadius = 2) {
+    // Check regular islands
+    const regularIslandCollision = checkIslandCollision(position, extraRadius);
+
+    // Check massive islands
+    const massiveIslandCollision = checkMassiveIslandCollision(position, extraRadius);
+
+    return regularIslandCollision || massiveIslandCollision;
+}
+
+/**
+ * Finds the nearest island of any type
+ * @param {THREE.Object3D} boat - The boat object
+ * @returns {object} Object with distance and name of nearest island
+ */
+export function findNearestAnyIsland(boat) {
+    // Find nearest regular island
+    const nearestRegular = findNearestIsland(boat);
+
+    // Find nearest massive island if spawned
+    let nearestMassive = { distance: Infinity, name: "None" };
+    if (massiveIslandSpawned) {
+        nearestMassive = findNearestMassiveIsland(boat.position);
+    }
+
+    // Return the closest one
+    if (nearestMassive.distance < nearestRegular.distance) {
+        return nearestMassive;
+    } else {
+        return nearestRegular;
+    }
+}
+
+/**
+ * Updates all island effects
+ * @param {number} deltaTime - Time since last update
+ */
+export function updateAllIslandEffects(deltaTime) {
+    // Update regular island shores
+    updateIslandEffects(deltaTime);
+
+    // Update massive island shores
+    if (massiveIslandSpawned) {
+        updateMassiveIslandShores(deltaTime);
+    }
+}
+
+/**
+ * Handles island visibility based on boat position
+ * @param {THREE.Object3D} boat - The boat object
+ * @param {THREE.Scene} scene - The scene
+ * @param {Object} waterShader - The water shader
+ * @param {THREE.Vector3} lastChunkUpdatePosition - Last position chunks were updated
+ */
+export function updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition) {
+    // Update regular island chunks
+    const chunksUpdated = updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
+
+    // Update massive island visibility
+    if (massiveIslandSpawned) {
+        const distanceToMassiveIsland = boat.position.distanceTo(
+            new THREE.Vector3(massiveIslandPosition.x, 0, massiveIslandPosition.z)
+        );
+
+        // Only check visibility when within view distance
+        if (distanceToMassiveIsland < 4000) {
+            const nearestMassive = findNearestMassiveIsland(boat.position);
+            if (nearestMassive.id) {
+                const isVisible = distanceToMassiveIsland < visibleDistance * 2;
+                setMassiveIslandVisibility(nearestMassive.id, isVisible);
+            }
+        }
+    }
+
+    return chunksUpdated;
+}
+
+/**
+ * Spawns a massive block-based cave system at the specified position
+ * @param {THREE.Scene} scene - The scene to add the cave to
+ * @param {THREE.Vector3} position - Position to place the cave (optional)
+ * @returns {Object} - References to the cave system
+ */
+export function spawnBlockCave(scene, position = new THREE.Vector3(0, 0, 0)) {
+    console.log("Spawning massive block-based cave system at:", position);
+    return createBlockCave(scene, position);
+}
+
+/**
+ * Placeholder function for coastal cliff scene (disabled for now)
+ * @param {THREE.Scene} scene - The scene object
+ * @param {THREE.Vector3} position - Position for the cliff
+ * @returns {Object} - Empty object
+ */
+export function spawnCoastalCliffScene(scene, position = new THREE.Vector3(0, 0, 0)) {
+    console.log("DEBUG: Coastal Cliff spawn DISABLED", position);
+    return null; // Return null instead of creating the cliff
+}
+
+// Main function that spawns islands and cave systems
+export function spawnIslands(scene, position) {
+    console.log("Spawning islands at position:", position);
+
+    // ONLY spawn the block cave - everything else is disabled
+    try {
+        console.log("DEBUG: Only spawning block cave, all other features disabled");
+        spawnBlockCave(scene, position);
+    } catch (error) {
+        console.error("Error spawning block cave:", error);
+    }
+
+    // Return immediately after spawning block cave
+    // This ensures no other island generation code runs
+    return true;
 }
 
 // Export the functions and variables needed in other files

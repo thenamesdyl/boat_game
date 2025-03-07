@@ -37,6 +37,19 @@ import {
     areShoreEffectsEnabled
 } from '../world/islands.js';
 import { createTestRockyIsland, createTestRockyIslandCluster } from '../world/testRockyIslands.js';
+import {
+    spawnMassiveIsland,
+    checkAllIslandCollisions,
+    findNearestAnyIsland,
+    updateAllIslandEffects,
+    updateAllIslandVisibility,
+    spawnCoastalCliffScene,
+    spawnBlockCave
+} from '../world/islands.js';
+import { showMessageOfDay, shouldShowMessageOfDay, forceShowMessageOfDay } from '../ui/motd.js';
+import { startScreenSequence, resetScreenSequence } from '../ui/messages.js';
+import { getCurrentUser } from '../ui/auth.js';
+import { getPlayerInfo } from '../ui/login.js';
 
 
 // Initialize water with explicit realistic style as default
@@ -203,7 +216,16 @@ const waterMaterial = new THREE.ShaderMaterial({
 //water.rotation.x = -Math.PI / 2;
 //scene.add(water);
 
+// Comment out any calls to spawn massive islands
+/*
+spawnMassiveIsland(scene);
+*/
 
+// Add this line to spawn your block cave instead
+const blockCave = spawnBlockCave(scene, new THREE.Vector3(0, 0, 0));
+console.log("Block cave system created");
+
+spawnMassiveIsland(scene);
 // Add this at the beginning of your script.js file
 let playerName = '';
 let playerColor = '#3498db'; // Default blue
@@ -222,10 +244,22 @@ async function initializeFirebaseAuth() {
 
     // Show Firebase auth popup
     Firebase.showAuthPopup((user) => {
-        console.log("Firebase authentication successful:", user);
+        console.log("🔍 MAIN DEBUG: Firebase auth completed, user:", user?.uid || 'No user');
 
-        // Pass the user directly to initializeNetworkWithPlayerInfo
-        initializeNetworkWithPlayerInfo(user);
+        if (user && !user.displayName) {
+            console.log('🔍 MAIN DEBUG: User needs to set name, showing login screen');
+
+            // Your showLoginScreen function
+            showLoginScreen(() => {
+                console.log('🔍 MAIN DEBUG: Login screen complete, now showing MOTD');
+                // This is the ONLY place we call onAuthAndLoginComplete
+                onAuthAndLoginComplete(user);
+            });
+        } else {
+            console.log('🔍 MAIN DEBUG: User already has name, going to MOTD');
+            // User already has a name, go straight to MOTD
+            onAuthAndLoginComplete(user);
+        }
     });
 }
 
@@ -233,8 +267,31 @@ async function initializeFirebaseAuth() {
 // (can be placed right before or after other initialization code)
 initializeFirebaseAuth();
 
+// Create a new helper function to handle the sequence
+function completeAuthAndShowMOTD(user = null) {
+    console.log("🔔 Main: Authentication and login complete, checking MOTD");
+
+    // Add a short delay to ensure any UI elements are properly closed
+    setTimeout(() => {
+        if (shouldShowMessageOfDay()) {
+            console.log("🔔 Main: Showing MOTD after auth/login complete");
+            showMessageOfDay(() => {
+                // Complete network initialization after MOTD is closed
+                if (user) {
+                    console.log("🔔 Main: Initializing network with user after MOTD");
+                    initializeNetworkWithPlayerInfo(user);
+                }
+            });
+        } else if (user) {
+            // Skip MOTD and initialize directly
+            console.log("🔔 Main: Skipping MOTD, initializing network directly");
+            initializeNetworkWithPlayerInfo(user);
+        }
+    }, 500); // Short delay to ensure UI elements are updated
+}
+
 // Create a simple login UI
-export function showLoginScreen() {
+export function showLoginScreen(onComplete) {
     // Create container
     const loginContainer = document.createElement('div');
     loginContainer.style.position = 'fixed';
@@ -302,11 +359,13 @@ export function showLoginScreen() {
 
         // Remove login screen
         document.body.removeChild(loginContainer);
-
         setPlayerName(playerName);
 
-        // Connect to server with player info
-        //initializeNetworkWithPlayerInfo();
+        // Call the completion callback directly
+        if (onComplete && typeof onComplete === 'function') {
+            console.log("🔔 Main: Login screen completed, calling callback");
+            onComplete();
+        }
     });
 
     loginContainer.appendChild(form);
@@ -315,7 +374,7 @@ export function showLoginScreen() {
 
 // Initialize network with player info
 function initializeNetworkWithPlayerInfo(firebaseUser = null) {
-    console.log(`Connecting as: ${playerName} with color: ${playerColor}`);
+    console.log(`🔔 Main: Connecting as: ${playerName} with color: ${playerColor}`);
 
     // Convert hex color to RGB (0-1 range for Three.js)
     const hexToRgb = (hex) => {
@@ -327,18 +386,17 @@ function initializeNetworkWithPlayerInfo(firebaseUser = null) {
 
     const rgbColor = hexToRgb(playerColor);
     setPlayerColor(rgbColor);
-    console.log("RGB Color:", rgbColor);
 
     // Get Firebase user ID from the passed user parameter
     let firebaseUserId = null;
     if (firebaseUser) {
         firebaseUserId = firebaseUser.uid;
-        console.log("Using Firebase authentication with UID:", firebaseUserId);
+        console.log("🔔 Main: Using Firebase authentication with UID:", firebaseUserId);
     } else {
-        console.log("No Firebase user, using anonymous mode");
+        console.log("🔔 Main: No Firebase user, using anonymous mode");
     }
 
-    // Initialize network connection WITH Firebase user ID
+    // Complete the initialization directly - MOTD should have been shown by now
     Network.initializeNetwork(
         scene,
         playerState,
@@ -347,7 +405,7 @@ function initializeNetworkWithPlayerInfo(firebaseUser = null) {
         activeIslands,
         playerName,
         rgbColor,
-        firebaseUserId  // Pass the Firebase UID here
+        firebaseUserId
     );
 }
 
@@ -1146,10 +1204,7 @@ function animate() {
         boat.position.y = currentY; // Restore Y position as it's managed by updateBoatRocking
 
         if (boat.position.distanceTo(lastChunkUpdatePosition) > chunkUpdateThreshold) {
-            updateVisibleIslands(boat, scene, waterShader, lastChunkUpdatePosition, {
-                generatedRockyChunks,
-                maxViewDistance
-            });
+            updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition);
             // Add this line to update villagers whenever chunks update
             if (activeIslands && activeIslands.size > 0) {
                 //updateVillagers(activeIslands);
@@ -1244,10 +1299,7 @@ function animate() {
     updateDiagnosticsDisplay(currentFps);
 
     // Update island visibility using the new islandManager
-    updateVisibleIslands(boat, scene, waterShader, lastChunkUpdatePosition, {
-        generatedRockyChunks,
-        maxViewDistance
-    });
+    updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition);
 
     // Use consolidated island colliders for collision detection
     const allIslandColliders = getAllIslandColliders();
@@ -1270,7 +1322,7 @@ function updateGameUI() {
     // Import at the top of your file: import { gameUI } from './ui.js';
 
     const windData = getWindData();
-    const nearestIsland = findNearestIsland(boat);
+    const nearestIsland = findNearestAnyIsland(boat);
     const monsters = getMonsters(); // Get current monsters
 
     // Update UI with all available data
@@ -1301,10 +1353,7 @@ function updateGameUI() {
 
 // Initialize by generating the starting chunks
 lastChunkUpdatePosition.copy(boat.position);
-updateVisibleIslands(boat, scene, waterShader, lastChunkUpdatePosition, {
-    generatedRockyChunks,
-    maxViewDistance
-});
+updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition);
 
 // Force an initial update to ensure islands are generated
 setTimeout(() => {
@@ -1393,3 +1442,157 @@ updateLeaderboardData(leaderboardData);
 // Add this after your other initialization code (near where you initialize other systems)
 // This function is already configured to do nothing if ENABLE_DIAGNOSTICS is false
 initDiagnostics();
+
+// Create the coastal cliff scene at a position offset from the starting point
+const startPosition = new THREE.Vector3(boat.position.x + 1000, 0, boat.position.z + 1000);
+const cliffScene = spawnCoastalCliffScene(scene, startPosition);
+console.log("Coastal cliff scene created at:", startPosition);
+
+// Create a global command to show MOTD for testing
+window.showMOTD = function () {
+    console.log("🔔 Main: Manually showing MOTD via global command");
+    forceShowMessageOfDay();
+};
+
+console.log("🔔 MOTD: Global command available - call window.showMOTD() to display");
+
+/**
+ * Initialize the game with proper UI sequence
+ */
+function initializeGame() {
+    console.log("🎮 Main: Starting game initialization");
+
+    // Check if we need to show Firebase auth and login screens
+    const needsAuth = !getCurrentUser();
+    const needsLogin = !localStorage.getItem('playerName');
+
+    if (needsAuth || needsLogin) {
+        // If auth or login needed, start the full screen sequence
+        // which will show MOTD only AFTER login completes
+        console.log('🔍 MAIN DEBUG: Starting screen sequence WITHOUT MOTD');
+        startScreenSequence(() => {
+            console.log('🔍 MAIN DEBUG: Screen sequence complete, handling auth result');
+            const user = getCurrentUser(); // If you have this function
+            onAuthAndLoginComplete(user);
+        });
+    } else {
+        // User is already authenticated and has set their profile
+        // Show MOTD directly if it should be shown today
+        const { showMessageOfDay, shouldShowMessageOfDay } = require('../ui/motd.js');
+
+        if (shouldShowMessageOfDay()) {
+            showMessageOfDay(() => {
+                finishInitialization();
+            });
+        } else {
+            finishInitialization();
+        }
+    }
+}
+
+// Common finish function to avoid code duplication
+function finishInitialization() {
+    console.log("🎮 Main: UI sequence complete, initializing network");
+
+    // Get current user state after all screens
+    const firebaseUser = getCurrentUser();
+    const playerInfo = getPlayerInfo();
+
+    // Initialize network with collected player info
+    Network.initializeNetwork(
+        scene,
+        playerState,
+        boat,
+        getAllIslandColliders(),
+        activeIslands,
+        playerInfo.name,
+        hexToRgb(playerInfo.color),
+        firebaseUser ? firebaseUser.uid : null
+    );
+
+    console.log("🎮 Main: Game fully initialized");
+}
+
+/**
+ * Convert hex color to RGB (0-1 range for Three.js)
+ */
+function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    return { r, g, b };
+}
+
+// Start the game initialization when ready
+document.addEventListener('DOMContentLoaded', () => {
+    // Set up the game environment (scene, camera, etc.)
+    setupEnvironment();
+
+    // Initialize the game with proper UI sequence
+    initializeGame();
+
+    // Start animation loop
+    animate();
+});
+
+/**
+ * Function to handle when login/auth is complete
+ * This is the ONLY place we should show the MOTD!
+ */
+function onAuthAndLoginComplete(user) {
+    console.log('🔍 MAIN DEBUG: Auth and login complete, user:', user?.displayName || 'No name');
+
+    // Check if MOTD should be shown based on localStorage
+    if (shouldShowMessageOfDay()) {
+        console.log('🔍 MAIN DEBUG: MOTD should be shown, displaying it now...');
+        showMessageOfDay(() => {
+            console.log('🔍 MAIN DEBUG: MOTD closed, continuing with game initialization');
+            initializeGameAfterLogin(user);
+        });
+    } else {
+        console.log('🔍 MAIN DEBUG: MOTD already shown before, skipping');
+        // Proceed directly to game initialization
+        initializeGameAfterLogin(user);
+    }
+}
+
+/**
+ * Initialize the game after all login/MOTD screens
+ */
+function initializeGameAfterLogin(user) {
+    console.log('🔍 MAIN DEBUG: Initializing game with user:', user?.displayName || 'No name');
+
+    // Your network initialization code here
+    // For example:
+    if (typeof initializeNetworkWithPlayerInfo === 'function') {
+        initializeNetworkWithPlayerInfo(user);
+    } else {
+        console.log('🔍 MAIN DEBUG: Network initialization function not found');
+    }
+}
+
+function initializeWorld() {
+    // ... existing setup code ...
+
+    console.log("DEBUG: Initializing world with ONLY block cave");
+
+    // Only spawn block cave
+    if (typeof spawnBlockCave === 'function') {
+        spawnBlockCave(scene, new THREE.Vector3(0, 0, 0));
+    }
+
+    // Ensure these don't run by replacing calls with console logs
+    if (typeof spawnMassiveIsland === 'function') {
+        console.log("DEBUG: Massive Island initialization DISABLED");
+        // Do NOT call spawnMassiveIsland
+    }
+
+    if (typeof spawnCoastalCliffScene === 'function') {
+        console.log("DEBUG: Coastal Cliff initialization DISABLED");
+        // Do NOT call spawnCoastalCliffScene
+    }
+
+    // ... rest of initialization ...
+}
+
+

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createIsland, updateVisibleChunks as updateRegularIslands, islandColliders } from './islands.js';
 import { createRockyIsland, getRockyIslandColliders } from './rockyIslands.js';
+import { createCoastalCliffScene } from './coastalCliff.js';
 
 // Consistent chunk size used across the game
 const chunkSize = 600; // Size of each "chunk" of ocean
@@ -220,4 +221,15 @@ export function findNearestIsland(boat) {
     }
 
     return nearestIsland;
+}
+
+/**
+ * Spawns a dramatic coastal cliff scene at the specified position
+ * @param {THREE.Scene} scene - The scene to add the cliff to
+ * @param {THREE.Vector3} position - Position to place the cliff (optional)
+ */
+export function spawnCoastalCliffScene(scene, position = new THREE.Vector3(0, 0, 0)) {
+    console.log("Creating coastal cliff scene at:", position);
+    const cliffScene = createCoastalCliffScene(scene, position);
+    return cliffScene;
 } 
