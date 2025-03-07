@@ -123,13 +123,18 @@ export function getPlayerInfo() {
     };
 }
 
-// Export the updateShipMovement function with reduced passive movement
+// Export the updateShipMovement function with moderately increased movement
 export function updateShipMovement(deltaTime) {
-    // Ship physical properties
-    const shipMass = 5000; // kg - gives the ship weight and inertia
-    const sailPower = 12; // maximum force from sails
-    const rudderPower = 0.8; // how strong the rudder turns the ship
-    const waterResistance = 0.3; // drag coefficient in water
+    console.log("🚢 UPDATE SHIP MOVEMENT - Current keys state:",
+        { forward: keys.forward, backward: keys.backward, left: keys.left, right: keys.right });
+    console.log("🚢 Current velocity:",
+        { x: boatVelocity.x.toFixed(3), y: boatVelocity.y.toFixed(3), z: boatVelocity.z.toFixed(3) });
+
+    // Ship physical properties - MODERATELY INCREASED POWER
+    const shipMass = 5000; // More reasonable mass (was 2000 in extreme version, 5000 in original)
+    const sailPower = 18; // Moderate increase in power (was 50 in extreme, 12 in original)
+    const rudderPower = 1.0; // Moderate turning (was 1.5 in extreme, 0.8 in original)
+    const waterResistance = 0.3; // Balanced resistance (was 0.1 in extreme, 0.3 in original)
 
     // Get wind info for sailing mechanics
     const windData = getWindData();
@@ -140,91 +145,110 @@ export function updateShipMovement(deltaTime) {
     const currentSpeed = boatVelocity.length();
     const shipHeading = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), boat.rotation.y);
 
+    console.log("🚢 Ship heading vector:",
+        { x: shipHeading.x.toFixed(3), y: shipHeading.y.toFixed(3), z: shipHeading.z.toFixed(3) });
+
     // Calculate sailing efficiency based on wind angle
     const windVector = new THREE.Vector3(Math.cos(windDirection), 0, Math.sin(windDirection));
     const windAngleToShip = shipHeading.angleTo(windVector);
 
-    // Wind efficiency ranges from 0.1 (against wind) to 1.0 (with wind)
+    // Wind efficiency - More realistic than extreme version
     const windEfficiency = 0.1 + 0.9 * (1 - Math.abs(windAngleToShip - Math.PI) / Math.PI);
+    console.log("🚢 Wind data:", { direction: windDirection.toFixed(2), speed: windSpeed.toFixed(2), efficiency: windEfficiency.toFixed(2) });
 
     // SAILING MECHANICS
     // Calculate forces acting on the ship
     let accelerationForce = new THREE.Vector3();
 
-    // Strong player control - more dominant force than environmental factors
+    // MODERATELY INCREASED FORWARD MOVEMENT
     if (keys.forward) {
-        // Increased player control by reducing wind efficiency impact
-        // Wind still helps but player input is dominant
-        const windFactor = 0.2 + (windEfficiency * 0.3); // 0.2 base + up to 0.3 more from wind
-        const sailForce = sailPower * windFactor;
+        console.log("🚢 FORWARD KEY ACTIVE - Calculating forward force");
+        // Moderately increased forward force for noticeable movement
+        const sailForce = sailPower * 1.2; // Reduced from 2.0
         accelerationForce.add(shipHeading.clone().multiplyScalar(sailForce));
+        console.log("🚢 Applied forward force:", sailForce.toFixed(2));
     }
 
+    // MODERATELY INCREASED BACKWARD MOVEMENT
     if (keys.backward) {
-        // Rowing backward - consistent force regardless of wind
-        accelerationForce.add(shipHeading.clone().multiplyScalar(-sailPower * 0.4));
+        console.log("🚢 BACKWARD KEY ACTIVE - Calculating backward force");
+        // Moderately increased backward force for noticeable movement
+        const backwardForce = -sailPower * 0.8; // Reduced from 1.5
+        accelerationForce.add(shipHeading.clone().multiplyScalar(backwardForce));
+        console.log("🚢 Applied backward force:", backwardForce.toFixed(2));
     }
 
-    // TURNING MECHANICS
+    // TURNING MECHANICS - MODERATELY RESPONSIVE
     let turnEffect = 0;
-    const speedFactor = Math.max(0.2, Math.min(1, currentSpeed / 5));
+    const speedFactor = Math.max(0.2, Math.min(1, currentSpeed / 8)); // Adjusted from 10
     const turnPower = rudderPower / speedFactor;
 
     if (keys.left) {
         turnEffect = turnPower;
+        console.log("🚢 LEFT KEY ACTIVE - Turn effect:", turnEffect.toFixed(2));
     } else if (keys.right) {
         turnEffect = -turnPower;
+        console.log("🚢 RIGHT KEY ACTIVE - Turn effect:", turnEffect.toFixed(2));
     }
 
-    // Apply turn effect based on current speed
-    boat.rotation.y += turnEffect * deltaTime;
+    const rotationSpeedMultiplier = 0.5; // Reduce turning speed by 50%
 
-    // Add drift when turning hard at speed (realistic turning)
+
+    // Apply turn effect based on current speed
+    boat.rotation.y += turnEffect * deltaTime * rotationSpeedMultiplier;
+
+    // Add drift when turning hard at speed
     if (Math.abs(turnEffect) > 0.1 && currentSpeed > 1) {
         const driftDirection = new THREE.Vector3(shipHeading.z, 0, -shipHeading.x);
-        driftDirection.normalize().multiplyScalar(turnEffect * currentSpeed * 0.2);
+        driftDirection.normalize().multiplyScalar(turnEffect * currentSpeed * 0.25); // Reduced from 0.3
         accelerationForce.add(driftDirection);
+        console.log("🚢 Added turning drift force");
     }
 
     // PHYSICS UPDATE
-    // Apply water resistance (increases with speed²)
+    // Balanced water resistance
     const resistanceForce = boatVelocity.clone().normalize().multiplyScalar(-waterResistance * currentSpeed * currentSpeed);
     accelerationForce.add(resistanceForce);
 
     // Calculate acceleration (F = ma)
     const acceleration = accelerationForce.divideScalar(shipMass);
 
-    // Update velocity with acceleration
-    boatVelocity.add(acceleration.multiplyScalar(deltaTime * 50));
+    // Apply acceleration with force multiplier
+    boatVelocity.add(acceleration.multiplyScalar(deltaTime * 60));
 
     // Limit maximum speed
-    const maxSpeed = 5 * (keys.forward ? 1 : 0.5);
-    if (boatVelocity.length() > maxSpeed) {
+    const maxSpeed = keys.forward ? 0.55 * (keys.forward ? 1 : 0.5) : 8.5;
+    const currentSpeedValue = boatVelocity.length();
+    if (currentSpeedValue > maxSpeed) {
+        // Hard cap at maximum speed
         boatVelocity.normalize().multiplyScalar(maxSpeed);
+        console.log("🚨 MAXIMUM SPEED REACHED:", maxSpeed.toFixed(2),
+            "Current:", currentSpeedValue.toFixed(2));
     }
 
-    // DRASTICALLY REDUCED WIND DRIFT
-    // Only apply a tiny amount of passive movement from wind
-    // Reduced by 50x from previous value (from 0.01 to 0.0002)
-    const windDrift = windVector.clone().multiplyScalar(windSpeed * 0.0002 * deltaTime);
+    // Almost eliminated wind drift
+    const windDriftAmount = 0.00005 * deltaTime; // Small but noticeable drift
+    const windDrift = windVector.clone().multiplyScalar(windDriftAmount);
     boatVelocity.add(windDrift);
 
-    // IMPROVED IDLE DAMPING
-    // Apply stronger damping when not actively sailing
-    // This ensures the ship stops much more quickly when not under player control
+    // MODERATELY LOWER DAMPING
     if (!keys.forward && !keys.backward) {
-        // Apply stronger damping (0.97 instead of 0.9)
-        // This is applied every frame when not pressing keys, regardless of speed
-        boatVelocity.multiplyScalar(0.97);
+        // Moderate damping - slower deceleration than original but faster than extreme
+        const dampingFactor = 0.975; // Between original (0.95) and extreme (0.99)
+        boatVelocity.multiplyScalar(dampingFactor);
+        console.log("🚢 Applied idle damping factor:", dampingFactor);
 
-        // Extra strong damping at very low speeds to stop completely
-        if (currentSpeed < 0.1) { // Increased threshold from 0.05 to 0.1
-            boatVelocity.multiplyScalar(0.8); // Stronger damping to stop completely
+        // Only apply stronger damping at low speeds
+        if (currentSpeed < 0.08) { // Higher threshold than extreme (0.05)
+            const lowSpeedDampingFactor = 0.85; // Between original (0.7) and extreme (0.9)
+            boatVelocity.multiplyScalar(lowSpeedDampingFactor);
+            console.log("🚢 Applied low-speed damping factor:", lowSpeedDampingFactor);
         }
     }
 
-    // DEBUG: Log info for testing (only show 0.1% of the time to reduce spam)
-    if (Math.random() < 0.001) {
-        console.log(`Speed: ${currentSpeed.toFixed(2)}, Wind Effect: ${(windSpeed * 0.0002).toFixed(5)}`);
-    }
+    console.log("🚢 FINAL velocity:",
+        { x: boatVelocity.x.toFixed(3), y: boatVelocity.y.toFixed(3), z: boatVelocity.z.toFixed(3) });
+
+    // Return calculated velocity
+    return boatVelocity;
 }

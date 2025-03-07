@@ -1027,7 +1027,7 @@ document.addEventListener('mousemove', (event) => {
 // Store keyboard event handlers so they can be managed by the command system
 const keydownHandler = (event) => {
     // Skip game controls if chat or any text input is focused
-    if (window.chatInputActive || // Check the global flag set by chat
+    if (window.chatInputActive ||
         (document.activeElement &&
             (document.activeElement.tagName === 'INPUT' ||
                 document.activeElement.tagName === 'TEXTAREA' ||
@@ -1036,10 +1036,22 @@ const keydownHandler = (event) => {
     }
 
     switch (event.key) {
-        case 'w': case 'ArrowUp': keys.forward = true; break;
-        case 's': case 'ArrowDown': keys.backward = true; break;
-        case 'a': case 'ArrowLeft': keys.left = true; break;
-        case 'd': case 'ArrowRight': keys.right = true;
+        case 'w': case 'ArrowUp':
+            keys.forward = true;
+            console.log("⌨️ KEYDOWN: W/UP pressed - keys.forward set to:", keys.forward);
+            break;
+        case 's': case 'ArrowDown':
+            keys.backward = true;
+            console.log("⌨️ KEYDOWN: S/DOWN pressed - keys.backward set to:", keys.backward);
+            break;
+        case 'a': case 'ArrowLeft':
+            keys.left = true;
+            console.log("⌨️ KEYDOWN: A/LEFT pressed - keys.left set to:", keys.left);
+            break;
+        case 'd': case 'ArrowRight':
+            keys.right = true;
+            console.log("⌨️ KEYDOWN: D/RIGHT pressed - keys.right set to:", keys.right);
+            break;
         // Toggle mouse camera control with 'c' key
         case 'c': mouseControl.isEnabled = !mouseControl.isEnabled; break;
         // Add hotkey for firing cannons (space bar)
@@ -1059,7 +1071,7 @@ const keydownHandler = (event) => {
 
 const keyupHandler = (event) => {
     // Skip game controls if chat or any text input is focused
-    if (window.chatInputActive || // Check the global flag set by chat
+    if (window.chatInputActive ||
         (document.activeElement &&
             (document.activeElement.tagName === 'INPUT' ||
                 document.activeElement.tagName === 'TEXTAREA' ||
@@ -1068,10 +1080,22 @@ const keyupHandler = (event) => {
     }
 
     switch (event.key) {
-        case 'w': case 'ArrowUp': keys.forward = false; break;
-        case 's': case 'ArrowDown': keys.backward = false; break;
-        case 'a': case 'ArrowLeft': keys.left = false; break;
-        case 'd': case 'ArrowRight': keys.right = false; break;
+        case 'w': case 'ArrowUp':
+            keys.forward = false;
+            console.log("⌨️ KEYUP: W/UP released - keys.forward set to:", keys.forward);
+            break;
+        case 's': case 'ArrowDown':
+            keys.backward = false;
+            console.log("⌨️ KEYUP: S/DOWN released - keys.backward set to:", keys.backward);
+            break;
+        case 'a': case 'ArrowLeft':
+            keys.left = false;
+            console.log("⌨️ KEYUP: A/LEFT released - keys.left set to:", keys.left);
+            break;
+        case 'd': case 'ArrowRight':
+            keys.right = false;
+            console.log("⌨️ KEYUP: D/RIGHT released - keys.right set to:", keys.right);
+            break;
     }
 };
 
@@ -1144,10 +1168,17 @@ function animate() {
     const speedMultiplier = window.boatSpeedMultiplier || 1.0;
 
     // Use the new updateShipMovement function for boat controls
+    console.log("🌊 ANIMATE: Before updateShipMovement - Boat position:",
+        { x: boat.position.x.toFixed(2), y: boat.position.y.toFixed(2), z: boat.position.z.toFixed(2) });
+
     updateShipMovement(deltaTime);
-    // Reuse direction vector for compatibility with following code
-    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(boat.quaternion);
+
+    // Create direction vector based on boat's current rotation
+    const direction = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), boat.rotation.y);
     let newPosition = boat.position.clone().add(boatVelocity);
+
+    console.log("🌊 ANIMATE: After updateShipMovement - New calculated position:",
+        { x: newPosition.x.toFixed(2), y: newPosition.y.toFixed(2), z: newPosition.z.toFixed(2) });
 
     // Update boat rocking motion (this now handles boat height based on water surface)
     updateBoatRocking(deltaTime);
@@ -1155,8 +1186,6 @@ function animate() {
     // Apply speed-based tilt if it exists
     if (typeof boat.speedTilt === 'number') {
         // Apply a slight forward tilt at high speeds
-        // We don't want to directly set rotation.x as that would override the rocking
-        // Instead we adjust the target position slightly
         const tiltAdjustment = new THREE.Vector3(0, -boat.speedTilt, 0).applyQuaternion(boat.quaternion);
         newPosition.add(tiltAdjustment);
     }
@@ -1165,6 +1194,7 @@ function animate() {
     let collided = false;
     if (checkIslandCollision(newPosition)) {
         collided = true;
+        console.log("🌊 ANIMATE: Island collision detected - not updating position");
     }
 
     if (!collided) {
@@ -1172,6 +1202,9 @@ function animate() {
         const currentY = boat.position.y;
         boat.position.copy(newPosition);
         boat.position.y = currentY; // Restore Y position as it's managed by updateBoatRocking
+
+        console.log("🌊 ANIMATE: Final updated boat position:",
+            { x: boat.position.x.toFixed(2), y: boat.position.y.toFixed(2), z: boat.position.z.toFixed(2) });
 
         if (boat.position.distanceTo(lastChunkUpdatePosition) > chunkUpdateThreshold) {
             updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition);
