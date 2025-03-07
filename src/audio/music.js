@@ -26,6 +26,9 @@ const MusicSystem = (() => {
         setupUserInteractionListeners();
 
         console.log('Music system initialized with main track');
+
+        // Make MusicSystem available globally for UI components
+        window.MusicSystem = MusicSystem;
     };
 
     /**

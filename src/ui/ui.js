@@ -940,6 +940,67 @@ class GameUI {
         settingsButton.title = "Game Settings";
         document.body.appendChild(settingsButton);
 
+        // Create mute button with low-poly SVG icon
+        const muteButton = document.createElement('div');
+        muteButton.id = 'mute-button';
+
+        // Create SVG unmuted icon (simple sound waves)
+        const unmutedSVG = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white">
+            <polygon points="3,9 3,15 7,15 12,20 12,4 7,9" />
+            <path d="M16,7 L16,17 M20,4 L20,20" stroke="white" stroke-width="2" fill="none" />
+        </svg>`;
+
+        // Create SVG muted icon (speaker with X)
+        const mutedSVG = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white">
+            <polygon points="3,9 3,15 7,15 12,20 12,4 7,9" />
+            <path d="M16,8 L22,14 M22,8 L16,14" stroke="white" stroke-width="2" fill="none" />
+        </svg>`;
+
+        muteButton.innerHTML = unmutedSVG; // Default unmuted icon
+        muteButton.style.position = 'absolute';
+        muteButton.style.top = '55px'; // Move down a bit more from the gear
+        muteButton.style.right = '7px'; // Adjust to better center with the gear icon
+        muteButton.style.cursor = 'pointer';
+        muteButton.style.pointerEvents = 'auto';
+        muteButton.style.zIndex = '1000';
+        muteButton.style.backgroundColor = 'rgba(200, 50, 50, 0.8)'; // Red background
+        muteButton.style.borderRadius = '50%';
+        muteButton.style.width = '30px';
+        muteButton.style.height = '30px';
+        muteButton.style.display = 'flex';
+        muteButton.style.justifyContent = 'center';
+        muteButton.style.alignItems = 'center';
+        muteButton.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.3)';
+        muteButton.style.outline = 'none'; // Remove outline highlight
+        muteButton.title = "Toggle Music";
+        document.body.appendChild(muteButton);
+
+        // Add event listener to toggle mute state
+        muteButton.addEventListener('click', (e) => {
+            // Access the MusicSystem from window scope
+            const isMuted = window.MusicSystem.toggleMute();
+
+            // Update the icon based on mute state
+            muteButton.innerHTML = isMuted ? mutedSVG : unmutedSVG;
+            muteButton.title = isMuted ? "Unmute Music" : "Mute Music";
+
+            // Add visual feedback for the button - more subtle change
+            muteButton.style.backgroundColor = isMuted ? 'rgba(150, 50, 50, 0.8)' : 'rgba(200, 50, 50, 0.8)';
+
+            // Prevent any default browser highlight
+            e.preventDefault();
+        });
+
+        // Remove animation and use more subtle transition
+        muteButton.style.transition = 'background-color 0.2s ease';
+
+        // Prevent highlight on click
+        muteButton.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+        });
+
         // Create settings panel (initially hidden)
         const settingsPanel = document.createElement('div');
         settingsPanel.id = 'settings-panel';
