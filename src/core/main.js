@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectionShader.js';
 import * as Network from './network.js';
 import { gameUI } from '../ui/ui.js';
-import { scene, camera, renderer, updateTime, getTime, boat, getWindData, boatVelocity, boatSpeed, rotationSpeed, keys } from './gameState.js';
+import { scene, camera, renderer, updateTime, getTime, boat, getWindData, boatVelocity, boatSpeed, rotationSpeed, keys, updateShipMovement } from './gameState.js';
 import { setupSkybox, updateSkybox, setupSky, updateTimeOfDay, updateSunPosition, getTimeOfDay, toggleSkySystem, updateRealisticSky } from '../environment/skybox.js';
 import { setupClouds, updateClouds } from '../environment/clouds.js';
 import { setupBirds, updateBirds } from '../entities/birds.js';
@@ -1148,36 +1148,11 @@ function animate() {
     // Get the boat speed multiplier if it exists
     const speedMultiplier = window.boatSpeedMultiplier || 1.0;
 
-    // Boat movement - realistic turning that causes forward motion
-    if (keys.forward) boatVelocity.z -= boatSpeed * speedMultiplier;
-    if (keys.backward) boatVelocity.z += boatSpeed * 0.5 * speedMultiplier; // Slower in reverse
-
-    // Initialize turn-induced forward motion
-    let turnInducedMotion = 0;
-
-    // When turning, add forward momentum
-    if (keys.left || keys.right) {
-        // Turning automatically applies some forward momentum
-        turnInducedMotion = -boatSpeed * 0.4 * speedMultiplier; // Forward motion from turning
-
-        // Apply turn (more effective with existing forward speed)
-        const forwardMotion = Math.abs(boatVelocity.z);
-        const turnEffectiveness = 0.3 + (forwardMotion * 0.7); // Min 30% effectiveness
-
-        if (keys.left) boat.rotation.y += rotationSpeed * turnEffectiveness;
-        if (keys.right) boat.rotation.y -= rotationSpeed * turnEffectiveness;
-    } else {
-        // Not turning, no turn-induced motion
-        turnInducedMotion = 0;
-    }
-
-    // Combine regular forward momentum with turn-induced momentum
-    boatVelocity.z += turnInducedMotion;
-
-    // Apply velocity and friction
-    boatVelocity.multiplyScalar(0.5);
+    // Use the new updateShipMovement function for boat controls
+    updateShipMovement(deltaTime);
+    // Reuse direction vector for compatibility with following code
     const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(boat.quaternion);
-    let newPosition = boat.position.clone().add(direction.multiplyScalar(boatVelocity.z));
+    let newPosition = boat.position.clone().add(boatVelocity);
 
     // Update boat rocking motion (this now handles boat height based on water surface)
     updateBoatRocking(deltaTime);
@@ -1303,6 +1278,8 @@ function animate() {
 
     // Use consolidated island colliders for collision detection
     const allIslandColliders = getAllIslandColliders();
+
+    // After updateShipMovement:
 }
 
 // Calculate boat speed based on velocity
@@ -1375,6 +1352,8 @@ window.addEventListener('keydown', (event) => {
         toggleSkySystem();
     }
 });
+
+
 
 animate();
 
@@ -1523,11 +1502,7 @@ function hexToRgb(hex) {
     return { r, g, b };
 }
 
-// Start the game initialization when ready
 document.addEventListener('DOMContentLoaded', () => {
-    // Set up the game environment (scene, camera, etc.)
-    setupEnvironment();
-
     // Initialize the game with proper UI sequence
     initializeGame();
 
