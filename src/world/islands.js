@@ -9,7 +9,7 @@ import {
     setMassiveIslandVisibility
 } from './massiveIslands.js';
 // import { createCoastalCliffScene } from './coastalCliff.js';
-import { spawnBlockCave, createBlockCave } from './blockCave.js';
+import { createBlockCave } from './blockCave.js';
 import { createPirateTavern2 } from './pirateTavern2.js';
 import { createTreehouseTavern } from './treehouseTavern.js';
 
@@ -1467,7 +1467,7 @@ export function updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpd
  * @param {THREE.Vector3} position - Position to place the cave (optional)
  * @returns {Object} - References to the cave system
  */
-export function spawnBlockCave(scene, position = new THREE.Vector3(0, 0, 0)) {
+export function spawnBlockCaveFromIsland(scene, position = new THREE.Vector3(0, 0, 0)) {
     console.log("Spawning massive block-based cave system at:", position);
     return createBlockCave(scene, position);
 }
@@ -1490,7 +1490,7 @@ export function spawnIslands(scene, position) {
     // ONLY spawn the block cave - everything else is disabled
     try {
         console.log("DEBUG: Only spawning block cave, all other features disabled");
-        spawnBlockCave(scene, position);
+        spawnBlockCaveFromIsland(scene, position);
     } catch (error) {
         console.error("Error spawning block cave:", error);
     }
