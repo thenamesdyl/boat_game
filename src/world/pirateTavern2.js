@@ -65,7 +65,7 @@ export function createPirateTavern2(params) {
     const waterLevel = -0.5 * scale;
 
     // Create individual stalls spread out more (no platforms)
-    const stallCount = 5 + Math.floor(random() * 3); // 5-7 stalls
+    const stallCount = 2 + Math.floor(random() * 3); // 5-7 stalls
 
     for (let i = 0; i < stallCount; i++) {
         // Position stalls in a wider circle
