@@ -10,6 +10,7 @@ import {
 } from './massiveIslands.js';
 // import { createCoastalCliffScene } from './coastalCliff.js';
 import { spawnBlockCave, createBlockCave } from './blockCave.js';
+import { createSmugglersHideout } from './smugglerHideout.js';
 
 // Island generation variables
 let islandColliders = [];
@@ -406,6 +407,30 @@ function createIsland(x, z, seed, scene) {
     if (areShoreEffectsEnabled() && scene) {
         const shore = createShoreEffect(island, collider, scene);
         islandEntry.shore = shore;
+    }
+
+    // Add the Smuggler's Hideout (with a certain probability or on specific islands)
+    if (random() < 1.0) {
+        console.log("Adding Smuggler's Hideout to island");
+
+        // Find a good spot on the island perimeter (preferably on a cliff or hillside)
+        const angle = random() * Math.PI * 2;
+        const distance = island.userData.radius * 0.7; // Position toward the edge
+
+        const hideoutPosition = new THREE.Vector3(
+            Math.cos(angle) * distance,
+            0, // At ground level
+            Math.sin(angle) * distance
+        );
+
+        // Create the hideout, facing outward from the island center
+        createSmugglersHideout({
+            parent: island,
+            random: random,
+            position: hideoutPosition,
+            cliffFace: angle + Math.PI, // Face away from island center
+            scale: 1.0 // Adjust scale as needed
+        });
     }
 
     return islandEntry;
