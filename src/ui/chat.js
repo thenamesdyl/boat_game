@@ -435,7 +435,8 @@ export class ChatSystem {
     }
 
     addMessage(message, shouldScroll = true) {
-        console.log('Adding message to UI:', message);
+        console.log('CHAT UI: Adding message to UI:', message);
+        console.log('CHAT UI: Message type:', typeof message);
 
         // Create message element with quill-written appearance
         const messageEl = document.createElement('div');
@@ -449,21 +450,30 @@ export class ChatSystem {
         // Format timestamp
         let timeStr = '';
         if (typeof message === 'string') {
+            console.log('CHAT UI: Processing string message:', message);
             // Handle simple string messages (backward compatibility)
             timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             messageEl.innerHTML = `
                 <span style="color: #8B4513; font-size: 10px; font-style: italic;">${timeStr}</span>
                 <span style="color: #3D1C00;">${message}</span>
             `;
-        } else {
+        } else if (message && typeof message === 'object') {
+            console.log('CHAT UI: Processing object message with keys:', Object.keys(message));
+
             // Handle object messages (new format)
             // Format timestamp if available
             if (message.timestamp) {
                 // Check if timestamp is a number (unix timestamp) or ISO string
-                const date = typeof message.timestamp === 'number' ?
-                    new Date(message.timestamp * 1000) :
-                    new Date(message.timestamp);
-                timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                try {
+                    const date = typeof message.timestamp === 'number' ?
+                        new Date(message.timestamp) :
+                        new Date(message.timestamp);
+                    timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    console.log('CHAT UI: Parsed timestamp:', timeStr);
+                } catch (e) {
+                    console.error('CHAT UI: Error parsing timestamp:', e);
+                    timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
             } else {
                 timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
@@ -471,21 +481,64 @@ export class ChatSystem {
             // Format message color based on sender color
             let colorStyle = '#8B4513'; // Default dark brown ink
             if (message.sender_color) {
-                const r = Math.floor(message.sender_color.r * 255);
-                const g = Math.floor(message.sender_color.g * 255);
-                const b = Math.floor(message.sender_color.b * 255);
-                colorStyle = `rgb(${r}, ${g}, ${b})`;
+                try {
+                    const r = Math.floor(message.sender_color.r * 255);
+                    const g = Math.floor(message.sender_color.g * 255);
+                    const b = Math.floor(message.sender_color.b * 255);
+                    colorStyle = `rgb(${r}, ${g}, ${b})`;
+                    console.log('CHAT UI: Using sender color:', colorStyle);
+                } catch (e) {
+                    console.error('CHAT UI: Error applying sender color:', e);
+                }
             }
 
             // Default sender name if not provided
             const senderName = message.sender_name || "Unknown Sailor";
+            console.log('CHAT UI: Using sender name:', senderName);
+
+            // Add special styling for messages with clan tags (matching [Tag] format)
+            let formattedSenderName = senderName;
+
+            // Check if the sender name has a clan tag
+            try {
+                if (senderName.includes('[') && senderName.includes(']')) {
+                    // Apply special styling to clan tags
+                    const tagMatch = senderName.match(/^(\[.*?\])\s*(.*?)$/);
+                    console.log('CHAT UI: Clan tag regex match:', tagMatch);
+
+                    if (tagMatch && tagMatch[1] && tagMatch[2]) {
+                        const clanTag = tagMatch[1];
+                        const baseName = tagMatch[2];
+
+                        // Use gold color for clan tags
+                        formattedSenderName = `<span style="color: #DAA520; font-style: italic;">${clanTag}</span> <span style="color: ${colorStyle};">${baseName}</span>`;
+                        console.log('CHAT UI: Formatted sender name with clan tag styling');
+                    } else {
+                        // Fallback if regex doesn't match as expected
+                        formattedSenderName = `<span style="color: ${colorStyle};">${senderName}</span>`;
+                        console.log('CHAT UI: Clan tag detected but regex failed, using default formatting');
+                    }
+                } else {
+                    // No clan tag, use normal styling
+                    formattedSenderName = `<span style="color: ${colorStyle};">${senderName}</span>`;
+                    console.log('CHAT UI: No clan tag detected, using default formatting');
+                }
+            } catch (e) {
+                console.error('CHAT UI: Error formatting sender name:', e);
+                formattedSenderName = `<span style="color: ${colorStyle};">${senderName}</span>`;
+            }
 
             // Create message HTML with quill writing style
+            const messageContent = message.content || (typeof message === 'string' ? message : "");
             messageEl.innerHTML = `
                 <span style="color: #8B4513; font-size: 10px; font-style: italic;">${timeStr}</span>
-                <span style="color: ${colorStyle}; font-weight: bold;"> ${senderName}: </span>
-                <span style="color: #3D1C00;">${message.content || message}</span>
+                <span style="font-weight: bold;"> ${formattedSenderName}: </span>
+                <span style="color: #3D1C00;">${messageContent}</span>
             `;
+            console.log('CHAT UI: Final formatted message HTML created');
+        } else {
+            console.error('CHAT UI: Invalid message type received:', typeof message);
+            return; // Skip rendering invalid messages
         }
 
         // Add to messages area
@@ -493,15 +546,18 @@ export class ChatSystem {
         this.messages.push(message);
 
         // Limit number of displayed messages
-        while (this.messages.length > 100) {
-            this.messages.shift();
-            if (this.messagesArea.firstChild) {
-                this.messagesArea.removeChild(this.messagesArea.firstChild);
-            }
+        while (this.messagesArea.children.length > 100) {
+            this.messagesArea.removeChild(this.messagesArea.firstChild);
         }
 
-        // Scroll to bottom if needed
-        if (shouldScroll) {
+        // Update unread indicator if chat is minimized
+        if (!this.visible || this.minimized) {
+            this.unreadCount++;
+            this.updateUnreadIndicator();
+        }
+
+        // Scroll to bottom if requested (and if chat is visible)
+        if (shouldScroll && (this.visible && !this.minimized)) {
             this.scrollToBottom();
         }
     }

@@ -4,8 +4,8 @@ import { showLoginScreen } from './main';
 import { setPlayerStateFromDb } from './gameState';
 
 // Network configuration
-//const SERVER_URL = 'http://localhost:5001';
-const SERVER_URL = 'https://boat-game-python.onrender.com';
+const SERVER_URL = 'http://localhost:5001';
+//const SERVER_URL = 'https://boat-game-python.onrender.com';
 
 // Network state
 let socket;
@@ -34,6 +34,12 @@ let chatMessageCallback = null;
 let recentMessagesCallback = null;
 let messageHistory = [];
 const DEFAULT_MESSAGE_LIMIT = 50;
+
+// Export a getter for the player name
+export function getPlayerName() {
+    console.log("getPlayerName called, returning:", playerName);
+    return playerName;
+}
 
 // Initialize the network connection
 export async function initializeNetwork(
@@ -349,7 +355,63 @@ function setupSocketEvents() {
 
     // Chat events
     socket.on('new_message', (data) => {
-        console.log('Received new chat message:', data);
+        console.log('CHAT DEBUG: Received raw message data:', data);
+        console.log('CHAT DEBUG: Data type:', typeof data);
+
+        // Handle string messages (backwards compatibility)
+        if (typeof data === 'string') {
+            console.log('CHAT DEBUG: Received string message - converting to object');
+            data = {
+                content: data,
+                timestamp: Date.now(),
+                sender_name: 'Unknown Sailor'
+            };
+        } else if (data && typeof data === 'object') {
+            console.log('CHAT DEBUG: Received object message with fields:', Object.keys(data));
+
+            // Check if data has required fields
+            if (!data.content) {
+                console.error('CHAT DEBUG: Message missing content field!', data);
+            }
+
+            if (!data.sender_name) {
+                console.log('CHAT DEBUG: Message missing sender_name field');
+
+                // If this is our own message and it's missing the sender name
+                if (data.player_id === firebaseDocId) {
+                    console.log('CHAT DEBUG: This is our own message, using our name');
+                    data.sender_name = playerName;
+                }
+                // If it's from another player, try to get their name from our local cache
+                else if (data.player_id && otherPlayers.has(data.player_id)) {
+                    const otherPlayer = otherPlayers.get(data.player_id);
+                    if (otherPlayer && otherPlayer.name) {
+                        data.sender_name = otherPlayer.name;
+                        console.log('CHAT DEBUG: Using name from other players cache:', data.sender_name);
+                    } else {
+                        data.sender_name = 'Unknown Sailor';
+                        console.log('CHAT DEBUG: Other player found but no name available, using default');
+                    }
+                }
+                // Last resort - use default name
+                else {
+                    data.sender_name = 'Unknown Sailor';
+                    console.log('CHAT DEBUG: No sender information available, using default name');
+                }
+            } else {
+                console.log('CHAT DEBUG: Message has sender_name:', data.sender_name);
+            }
+        } else {
+            console.error('CHAT DEBUG: Received invalid message data type:', data);
+            return; // Skip processing invalid data
+        }
+
+        // Ensure timestamp exists
+        if (!data.timestamp) {
+            data.timestamp = Date.now();
+        }
+
+        console.log('CHAT DEBUG: Final processed message:', data);
 
         // Add to message history
         messageHistory.push(data);
@@ -361,7 +423,10 @@ function setupSocketEvents() {
 
         // Notify UI if callback is registered
         if (chatMessageCallback) {
+            console.log('CHAT DEBUG: Calling UI callback with message data');
             chatMessageCallback(data);
+        } else {
+            console.log('CHAT DEBUG: No UI callback registered for messages');
         }
     });
 
@@ -397,10 +462,23 @@ export function updatePlayerPosition() {
 
 // Set the player's name
 export function setPlayerName(name) {
+    console.log("setPlayerName called with new name:", name);
+    console.log("Previous player name was:", playerName);
+
+    // Safety check - don't allow empty names
+    if (!name || name.trim() === '') {
+        console.error("ERROR: Attempted to set empty player name. Ignoring request.");
+        return;
+    }
+
     playerName = name;
+    console.log("Player name updated to:", playerName);
 
     if (isConnected && socket) {
+        console.log("Sending update_player_name to server with:", { name: playerName, player_id: firebaseDocId });
         socket.emit('update_player_name', { name: playerName, player_id: firebaseDocId });
+    } else {
+        console.warn("Not connected to server, player name update not sent");
     }
 }
 
@@ -798,6 +876,7 @@ export function sendChatMessage(content, messageType = 'global') {
     console.log('Connection status:', isConnected ? 'Connected' : 'Disconnected');
     console.log('Current player ID:', playerId);
     console.log('Current Firebase doc ID:', firebaseDocId);
+    console.log('Current player name:', playerName);
 
     // Ensure we have a valid player ID
     // Try to get it from different sources if not available
@@ -827,16 +906,30 @@ export function sendChatMessage(content, messageType = 'global') {
         console.log('Fixed Firebase doc ID format:', firebaseDocId);
     }
 
-    console.log('Sending chat message with player_id:', firebaseDocId);
+    // For safety, make sure we have a player name
+    if (!playerName || playerName.trim() === '') {
+        console.warn('No player name set, using default name');
+        playerName = `Sailor_${Math.floor(Math.random() * 1000)}`;
+    }
 
-    // Now send the message with the properly formatted ID
-    socket.emit('send_message', {
+    console.log('Sending chat message with player_id:', firebaseDocId);
+    console.log('Sending chat message with player_name:', playerName);
+
+    // Create the message object
+    const messageObj = {
         content: content,
         type: messageType,
         player_id: firebaseDocId,
         player_name: playerName  // Add the player's name to the message
-    });
+    };
 
+    // Log the complete message object being sent
+    console.log('Sending complete message object:', messageObj);
+
+    // Now send the message
+    socket.emit('send_message', messageObj);
+
+    console.log('Message emitted with player name:', playerName);
     console.log('Message emitted successfully');
     return true;
 }

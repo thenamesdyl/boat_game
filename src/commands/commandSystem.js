@@ -6,6 +6,7 @@ import { fireCommands, updateFireballs } from './fireCommands.js';
 import { shipCommands } from './shipCommands.js';
 import { monsterCommands } from './monsterCommands.js';
 import { teleportCommands } from './teleportCommands.js';
+import { clanCommands } from './clanCommands.js';
 
 // Create a global variable to track fly mode state
 // This will be checked by the updateCameraPosition function
@@ -80,6 +81,11 @@ export function initCommandSystem() {
 
     // Register teleport commands from the teleportCommands module
     teleportCommands.forEach(cmd => {
+        registerCommand(cmd.name, cmd.handler, cmd.description);
+    });
+
+    // Register clan commands from the clanCommands module
+    clanCommands.forEach(cmd => {
         registerCommand(cmd.name, cmd.handler, cmd.description);
     });
 
