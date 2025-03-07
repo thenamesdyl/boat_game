@@ -34,22 +34,17 @@ import {
     activeIslands,
     activeWaterChunks,
     updateIslandEffects,
-    areShoreEffectsEnabled
-} from '../world/islands.js';
-import { createTestRockyIsland, createTestRockyIslandCluster } from '../world/testRockyIslands.js';
-import {
-    spawnMassiveIsland,
-    checkAllIslandCollisions,
     findNearestAnyIsland,
-    updateAllIslandEffects,
     updateAllIslandVisibility,
     spawnCoastalCliffScene,
-    spawnBlockCave
+    spawnMassiveIsland,
 } from '../world/islands.js';
+import { createTestRockyIsland, createTestRockyIslandCluster } from '../world/testRockyIslands.js';
 import { showMessageOfDay, shouldShowMessageOfDay, forceShowMessageOfDay } from '../ui/motd.js';
 import { startScreenSequence, resetScreenSequence } from '../ui/messages.js';
 import { getCurrentUser } from '../ui/auth.js';
 import { getPlayerInfo } from '../ui/login.js';
+import { spawnBlockCave } from '../world/blockCave.js';
 
 
 // Initialize water with explicit realistic style as default

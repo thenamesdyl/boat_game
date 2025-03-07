@@ -146,7 +146,7 @@ const SPAWN_CONTROLS = {
     smugglersHideout: false,
     pirateTavern: false,
     pirateTavern2: false,
-    treehouseTavern: true,
+    treehouseTavern: false,
     blockCave: false,
 };
 
@@ -447,7 +447,7 @@ function createIsland(x, z, seed, scene) {
         });
     }
 
-    if (random() < 1.0) {  // 40% chance to spawn a treehouse tavern
+    if (SPAWN_CONTROLS.treehouseTavern && random() < 0.4) {  // Only spawn if enabled, with 40% chance
         console.log("Adding Treehouse Tavern to island");
 
         // Find a spot with trees on the island
