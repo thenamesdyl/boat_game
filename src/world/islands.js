@@ -203,7 +203,7 @@ function createIsland(x, z, seed, scene) {
             case 1: // Lighthouse
                 createLighthouse(island, random);
                 break;
-            case 2: // Giant Statue
+            case 2: // Roman Obelisk
                 createGiantStatue(island, random);
                 break;
             case 3: // Ruined Tower
@@ -717,16 +717,16 @@ function createLighthouse(island, random) {
     island.add(pointLight);
 }
 
-// Function to create a giant statue mega structure
+// Function to create a Roman obelisk mega structure
 function createGiantStatue(island, random) {
-    // Create metal texture for statue
-    const goldTexture = createStoneTexture(new THREE.Color(0xd4af37), 0.3);
-    const stoneTexture = createStoneTexture(new THREE.Color(0x555555), 0.8);
+    // Create stone textures
+    const stoneTexture = createStoneTexture(new THREE.Color(0x999999), 0.8);
+    const graniteTexture = createStoneTexture(new THREE.Color(0x663333), 0.6);
 
-    // Base/pedestal
-    const baseGeometry = new THREE.BoxGeometry(20, 10, 20);
+    // Base/pedestal - rectangular marble platform
+    const baseGeometry = new THREE.BoxGeometry(25, 10, 25);
     const baseMaterial = new THREE.MeshPhongMaterial({
-        color: 0x555555,
+        color: 0xeeeeee,
         map: stoneTexture,
         bumpMap: stoneTexture,
         bumpScale: 0.05
@@ -735,46 +735,293 @@ function createGiantStatue(island, random) {
     base.position.y = 5;
     island.add(base);
 
-    // Statue body
-    const bodyGeometry = new THREE.CylinderGeometry(5, 8, 25, 16);
-    const bodyMaterial = new THREE.MeshPhongMaterial({
-        color: 0xd4af37, // Gold color
-        map: goldTexture,
-        bumpMap: goldTexture,
-        bumpScale: 0.02,
-        metalness: 0.8,
-        roughness: 0.2
+    // Create a fancy Roman inscription on the base
+    const inscriptionGeometry = new THREE.PlaneGeometry(18, 6);
+    const inscriptionCanvas = document.createElement('canvas');
+    inscriptionCanvas.width = 512;
+    inscriptionCanvas.height = 256;
+    const ctx = inscriptionCanvas.getContext('2d');
+
+    // Fill with marble-like texture
+    ctx.fillStyle = '#f5f5f5';
+    ctx.fillRect(0, 0, inscriptionCanvas.width, inscriptionCanvas.height);
+
+    // Add some marble veins
+    ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 10; i++) {
+        ctx.beginPath();
+        ctx.moveTo(random() * inscriptionCanvas.width, 0);
+        ctx.bezierCurveTo(
+            random() * inscriptionCanvas.width, random() * inscriptionCanvas.height / 3,
+            random() * inscriptionCanvas.width, random() * inscriptionCanvas.height / 3 * 2,
+            random() * inscriptionCanvas.width, inscriptionCanvas.height
+        );
+        ctx.stroke();
+    }
+
+    // Add Roman text
+    ctx.fillStyle = 'rgba(50, 50, 50, 0.8)';
+    ctx.font = '40px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('SOLIS GLORIA', inscriptionCanvas.width / 2, 80); // "Glory of the Sun"
+    ctx.font = '32px serif';
+    ctx.fillText('AETERNVM MONVMENTVM', inscriptionCanvas.width / 2, 150); // "Eternal Monument"
+
+    const inscriptionTexture = new THREE.CanvasTexture(inscriptionCanvas);
+    const inscriptionMaterial = new THREE.MeshPhongMaterial({
+        map: inscriptionTexture,
+        bumpMap: inscriptionTexture,
+        bumpScale: 0.2
     });
-    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.position.y = 22.5;
-    island.add(body);
 
-    // Head
-    const headGeometry = new THREE.SphereGeometry(6, 16, 16);
-    const head = new THREE.Mesh(headGeometry, bodyMaterial);
-    head.position.y = 38;
-    island.add(head);
+    // Add inscription to each side of the base
+    const sides = [
+        { pos: [0, 5, 12.6], rot: [0, 0, 0] },      // Front
+        { pos: [0, 5, -12.6], rot: [0, Math.PI, 0] }, // Back
+        { pos: [12.6, 5, 0], rot: [0, -Math.PI / 2, 0] }, // Right
+        { pos: [-12.6, 5, 0], rot: [0, Math.PI / 2, 0] }  // Left
+    ];
 
-    // Arms
-    const armGeometry = new THREE.CylinderGeometry(2, 2, 20, 8);
+    sides.forEach(side => {
+        const inscription = new THREE.Mesh(inscriptionGeometry, inscriptionMaterial);
+        inscription.position.set(side.pos[0], side.pos[1], side.pos[2]);
+        inscription.rotation.set(side.rot[0], side.rot[1], side.rot[2]);
+        island.add(inscription);
+    });
 
-    // Left arm
-    const leftArm = new THREE.Mesh(armGeometry, bodyMaterial);
-    leftArm.position.set(-8, 30, 0);
-    leftArm.rotation.z = Math.PI / 4; // 45 degrees up
-    island.add(leftArm);
+    // Create obelisk material
+    const obeliskCanvas = document.createElement('canvas');
+    obeliskCanvas.width = 512;
+    obeliskCanvas.height = 1024;
+    const obCtx = obeliskCanvas.getContext('2d');
 
-    // Right arm
-    const rightArm = new THREE.Mesh(armGeometry, bodyMaterial);
-    rightArm.position.set(8, 30, 0);
-    rightArm.rotation.z = -Math.PI / 4; // 45 degrees up
-    island.add(rightArm);
+    // Create red granite texture for obelisk
+    obCtx.fillStyle = '#7d2e2e';
+    obCtx.fillRect(0, 0, obeliskCanvas.width, obeliskCanvas.height);
 
-    // Crown/headdress
-    const crownGeometry = new THREE.ConeGeometry(6, 8, 16);
-    const crown = new THREE.Mesh(crownGeometry, bodyMaterial);
-    crown.position.y = 45;
-    island.add(crown);
+    // Add granite speckles
+    for (let i = 0; i < 10000; i++) {
+        const x = Math.random() * obeliskCanvas.width;
+        const y = Math.random() * obeliskCanvas.height;
+        const size = 1 + Math.random() * 2;
+        const shade = 0.8 + Math.random() * 0.4;
+
+        obCtx.fillStyle = `rgba(${Math.floor(125 * shade)}, ${Math.floor(46 * shade)}, ${Math.floor(46 * shade)}, 0.8)`;
+        obCtx.fillRect(x, y, size, size);
+    }
+
+    // Add simplified "hieroglyphic" patterns
+    obCtx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    obCtx.lineWidth = 2;
+
+    // Create patterns on different parts of the obelisk
+    const patternCount = 20;
+    const patternHeight = obeliskCanvas.height / patternCount;
+
+    for (let i = 0; i < patternCount; i++) {
+        const y = i * patternHeight + patternHeight / 2;
+
+        // Each row has a different pattern
+        if (i % 5 === 0) {
+            // Horizontal line with dots
+            obCtx.beginPath();
+            obCtx.moveTo(100, y);
+            obCtx.lineTo(obeliskCanvas.width - 100, y);
+            obCtx.stroke();
+
+            for (let x = 150; x < obeliskCanvas.width - 150; x += 50) {
+                obCtx.beginPath();
+                obCtx.arc(x, y - 20, 8, 0, Math.PI * 2);
+                obCtx.fill();
+            }
+        } else if (i % 5 === 1) {
+            // Eagle/falcon symbol
+            obCtx.beginPath();
+            obCtx.moveTo(obeliskCanvas.width / 2, y - 15);
+            obCtx.lineTo(obeliskCanvas.width / 2 - 50, y + 15);
+            obCtx.lineTo(obeliskCanvas.width / 2 + 50, y + 15);
+            obCtx.closePath();
+            obCtx.stroke();
+
+            // Eye
+            obCtx.beginPath();
+            obCtx.arc(obeliskCanvas.width / 2, y, 5, 0, Math.PI * 2);
+            obCtx.fill();
+        } else if (i % 5 === 2) {
+            // Wavy line (water symbol)
+            obCtx.beginPath();
+            obCtx.moveTo(100, y);
+
+            for (let x = 150; x < obeliskCanvas.width - 100; x += 30) {
+                obCtx.lineTo(x, y + ((x % 60 === 0) ? 10 : -10));
+            }
+
+            obCtx.lineTo(obeliskCanvas.width - 100, y);
+            obCtx.stroke();
+        } else if (i % 5 === 3) {
+            // Square pattern
+            for (let j = 0; j < 5; j++) {
+                const x = obeliskCanvas.width / 2 - 100 + j * 50;
+                obCtx.strokeRect(x - 15, y - 15, 30, 30);
+            }
+        } else {
+            // Sun symbol
+            obCtx.beginPath();
+            obCtx.arc(obeliskCanvas.width / 2, y, 20, 0, Math.PI * 2);
+            obCtx.stroke();
+
+            // Sun rays
+            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 6) {
+                obCtx.beginPath();
+                obCtx.moveTo(
+                    obeliskCanvas.width / 2 + Math.cos(angle) * 20,
+                    y + Math.sin(angle) * 20
+                );
+                obCtx.lineTo(
+                    obeliskCanvas.width / 2 + Math.cos(angle) * 35,
+                    y + Math.sin(angle) * 35
+                );
+                obCtx.stroke();
+            }
+        }
+    }
+
+    // Create obelisk texture
+    const obeliskTexture = new THREE.CanvasTexture(obeliskCanvas);
+    obeliskTexture.wrapS = THREE.RepeatWrapping;
+    obeliskTexture.wrapT = THREE.RepeatWrapping;
+
+    const obeliskMaterial = new THREE.MeshPhongMaterial({
+        color: 0x7d2e2e, // Reddish granite color
+        map: obeliskTexture,
+        bumpMap: obeliskTexture,
+        bumpScale: 0.1,
+        shininess: 20
+    });
+
+    // Create sub-base for obelisk
+    const subBaseGeometry = new THREE.BoxGeometry(15, 5, 15);
+    const subBase = new THREE.Mesh(subBaseGeometry, obeliskMaterial);
+    subBase.position.y = 12.5;
+    island.add(subBase);
+
+    // Create main obelisk shaft (tapered rectangular prism)
+    // Since THREE.js doesn't have a built-in tapered box, we'll create a custom geometry
+    const obeliskHeight = 50;
+    const bottomWidth = 8;
+    const topWidth = 4;
+
+    const obeliskGeometry = new THREE.BufferGeometry();
+
+    // Create vertices for the tapered prism
+    const vertices = [];
+
+    // Bottom vertices
+    vertices.push(-bottomWidth / 2, 0, -bottomWidth / 2);  // 0: bottom left back
+    vertices.push(bottomWidth / 2, 0, -bottomWidth / 2);   // 1: bottom right back
+    vertices.push(bottomWidth / 2, 0, bottomWidth / 2);    // 2: bottom right front
+    vertices.push(-bottomWidth / 2, 0, bottomWidth / 2);   // 3: bottom left front
+
+    // Top vertices
+    vertices.push(-topWidth / 2, obeliskHeight, -topWidth / 2);  // 4: top left back
+    vertices.push(topWidth / 2, obeliskHeight, -topWidth / 2);   // 5: top right back
+    vertices.push(topWidth / 2, obeliskHeight, topWidth / 2);    // 6: top right front
+    vertices.push(-topWidth / 2, obeliskHeight, topWidth / 2);   // 7: top left front
+
+    // Create faces (triangles)
+    const indices = [
+        // Bottom face
+        0, 2, 1,
+        0, 3, 2,
+
+        // Top face
+        4, 5, 6,
+        4, 6, 7,
+
+        // Side faces
+        0, 1, 5,
+        0, 5, 4,
+
+        1, 2, 6,
+        1, 6, 5,
+
+        2, 3, 7,
+        2, 7, 6,
+
+        3, 0, 4,
+        3, 4, 7
+    ];
+
+    // Calculate UVs for texture mapping
+    const uvs = [];
+
+    // Bottom face UVs
+    uvs.push(0, 0);
+    uvs.push(1, 0);
+    uvs.push(1, 1);
+    uvs.push(0, 1);
+
+    // Top face UVs
+    uvs.push(0, 0);
+    uvs.push(1, 0);
+    uvs.push(1, 1);
+    uvs.push(0, 1);
+
+    // Set attributes
+    obeliskGeometry.setIndex(indices);
+    obeliskGeometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    obeliskGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    obeliskGeometry.computeVertexNormals();
+
+    // Create the obelisk mesh
+    const obeliskShaft = new THREE.Mesh(obeliskGeometry, obeliskMaterial);
+    obeliskShaft.position.y = 15; // Position on top of sub-base
+    island.add(obeliskShaft);
+
+    // Create pyramid cap for obelisk
+    const pyramidHeight = 10;
+    const pyramidGeometry = new THREE.ConeGeometry(topWidth * 0.8, pyramidHeight, 4);
+
+    // Create special material for the cap - gold plated
+    const pyramidMaterial = new THREE.MeshPhongMaterial({
+        color: 0xffdb8a,
+        metalness: 0.8,
+        roughness: 0.2,
+        shininess: 100
+    });
+
+    const pyramidCap = new THREE.Mesh(pyramidGeometry, pyramidMaterial);
+    pyramidCap.position.y = 15 + obeliskHeight + pyramidHeight / 2;
+    pyramidCap.rotation.y = Math.PI / 4; // Rotate 45 degrees for alignment
+    island.add(pyramidCap);
+
+    // Add dramatic lighting effect
+    const statueLight = new THREE.PointLight(0xffffaa, 1, 70);
+    statueLight.position.set(0, 40, 0);
+    island.add(statueLight);
+
+    // Add a subtle pulsing glow from the gold cap
+    const capLight = new THREE.PointLight(0xffdd66, 0.8, 50);
+    capLight.position.y = 15 + obeliskHeight + pyramidHeight;
+    island.add(capLight);
+
+    // Animate the cap light (subtle pulsing effect)
+    const pulseAnimation = () => {
+        const pulsate = () => {
+            const time = Date.now() * 0.001; // Convert to seconds
+            capLight.intensity = 0.5 + Math.sin(time) * 0.3;
+            requestAnimationFrame(pulsate);
+        };
+        pulsate();
+    };
+
+    // Start the pulsing animation
+    pulseAnimation();
+
+    console.log("Created Roman obelisk monument");
+
+    return island;
 }
 
 // Function to create a ruined tower mega structure
