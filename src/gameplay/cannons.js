@@ -474,7 +474,7 @@ function createHitEffect(position) {
 }
 
 // Add this new function for monster death effect
-function createMonsterDeathEffect(position) {
+export function createMonsterDeathEffect(position) {
     // Create explosion effect
     const explosionGeometry = new THREE.SphereGeometry(2, 16, 16);
     const explosionMaterial = new THREE.MeshBasicMaterial({

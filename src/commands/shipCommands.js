@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { boat } from '../core/gameState.js';
+import { boat, boatVelocity } from '../core/gameState.js';
+import { getAllIslandColliders } from '../world/islandManager.js';
 
 // Store the default boat speed for reference
 const DEFAULT_BOAT_SPEED = 0.2;
@@ -126,12 +127,77 @@ function showSpeedCommandHelp(chatSystem) {
     );
 }
 
-// Export a list of all commands in this module with their descriptions
+/**
+ * Wild command implementation - teleports the ship to a random location on the map
+ * @param {Array<string>} args - Command arguments
+ * @param {object} chatSystem - Reference to the chat system
+ */
+export function wildCommand(args, chatSystem) {
+    chatSystem.addSystemMessage("🌊 Teleporting to a random location...");
+
+    // Map boundaries - 10,000 x 10,000 area
+    const MAP_SIZE = 10000;
+    const HALF_MAP = MAP_SIZE / 2;
+
+    // Maximum attempts to find a valid location
+    const MAX_ATTEMPTS = 50;
+    let attempts = 0;
+    let foundValidPosition = false;
+    let newX, newZ;
+
+    // Get all island colliders for collision checking
+    const allColliders = getAllIslandColliders();
+
+    // Try to find a valid position away from islands
+    while (!foundValidPosition && attempts < MAX_ATTEMPTS) {
+        // Generate random coordinates within map boundaries
+        newX = (Math.random() * MAP_SIZE) - HALF_MAP;
+        newZ = (Math.random() * MAP_SIZE) - HALF_MAP;
+
+        // Check position against all island colliders
+        const testPosition = new THREE.Vector3(newX, 0, newZ);
+        foundValidPosition = true;
+
+        // Extra safety margin around islands (larger than default)
+        const SAFETY_MARGIN = 8;
+
+        // Check against all island colliders
+        for (const collider of allColliders) {
+            const distance = testPosition.distanceTo(collider.center);
+            if (distance < collider.radius + SAFETY_MARGIN) {
+                foundValidPosition = false;
+                break;
+            }
+        }
+
+        attempts++;
+    }
+
+    if (!foundValidPosition) {
+        chatSystem.addSystemMessage("❌ Couldn't find a safe location after multiple attempts. Try again!");
+        return;
+    }
+
+    // Teleport the boat to the new position
+    boat.position.x = newX;
+    boat.position.z = newZ;
+
+    // Reset any velocity
+    boatVelocity.set(0, 0, 0);
+
+    chatSystem.addSystemMessage(`🌊 Teleported to coordinates: X: ${Math.round(newX)}, Z: ${Math.round(newZ)}`);
+}
+
+// Export all ship commands
 export const shipCommands = [
     {
         name: 'speed',
         handler: speedCommand,
-        description: 'Adjust ship movement speed - /speed [multiplier]'
+        description: 'Change ship speed (usage: /speed [value|slow|normal|fast|turbo|reset])'
+    },
+    {
+        name: 'wild',
+        handler: wildCommand,
+        description: 'Teleport to a random location on the map'
     }
-    // Add more ship-related commands here in the future
 ]; 
