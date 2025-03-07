@@ -1,6 +1,47 @@
 import { setPlayerName, getPlayerName } from '../core/network.js';
 
 /**
+ * Sanitize a player name to prevent XSS and ensure valid formatting
+ * @param {string} name - The raw name input
+ * @returns {string} - The sanitized name
+ */
+function sanitizePlayerName(name) {
+    if (!name) return '';
+
+    console.log("Sanitizing player name:", name);
+
+    // Step 1: Remove HTML tags and special characters that could be used for script injection
+    let sanitized = name
+        .replace(/</g, '') // Remove < to prevent HTML tags
+        .replace(/>/g, '') // Remove > to prevent HTML tags
+        .replace(/&/g, '') // Remove & to prevent HTML entities
+        .replace(/"/g, '') // Remove double quotes
+        .replace(/'/g, '') // Remove single quotes
+        .replace(/\\/g, '') // Remove backslashes
+        .replace(/\//g, '') // Remove forward slashes
+        .replace(/\[/g, '') // Remove square brackets (clan tags only)
+        .replace(/\]/g, ''); // Remove square brackets (clan tags only)
+
+    // Step 2: Trim whitespace and limit length
+    sanitized = sanitized.trim();
+
+    // Step 3: Ensure a minimum length after sanitization
+    if (sanitized.length < 2) {
+        console.log("Player name too short after sanitization:", sanitized);
+        return '';
+    }
+
+    // Step 4: Limit maximum length
+    if (sanitized.length > 20) {
+        sanitized = sanitized.substring(0, 20);
+        console.log("Player name truncated to 20 characters:", sanitized);
+    }
+
+    console.log("Sanitized player name:", sanitized);
+    return sanitized;
+}
+
+/**
  * Sanitize a clan name to prevent XSS and ensure valid formatting
  * @param {string} clanName - The raw clan name input
  * @returns {string} - The sanitized clan name
@@ -39,6 +80,48 @@ function sanitizeClanName(clanName) {
 
     console.log("Sanitized clan name:", sanitized);
     return sanitized;
+}
+
+/**
+ * Extract the clan tag from a player name if present
+ * @param {string} playerName - The full player name
+ * @returns {string|null} - The clan tag with brackets or null if not found
+ */
+function extractClanTag(playerName) {
+    if (!playerName) return null;
+
+    // Check if name has clan tag format: [ClanName] PlayerName
+    if (playerName.includes('[') && playerName.includes(']')) {
+        const matches = playerName.match(/^(\[.*?\])/);
+        if (matches && matches[1]) {
+            return matches[1]; // Return just the clan tag with brackets
+        }
+    }
+
+    return null; // No clan tag found
+}
+
+/**
+ * Extract the base player name without clan tag
+ * @param {string} playerName - The full player name
+ * @returns {string} - The player name without the clan tag
+ */
+function extractBaseName(playerName) {
+    if (!playerName) return '';
+
+    // Check if player already has a clan tag
+    if (playerName.includes('[') && playerName.includes(']')) {
+        // Match everything after the last closing bracket
+        const matches = playerName.match(/\](.*?)$/);
+
+        if (matches && matches[1] && matches[1].trim().length > 0) {
+            // Return the name part after the clan tag
+            return matches[1].trim();
+        }
+    }
+
+    // If no clan tag or couldn't extract, return the original name
+    return playerName;
 }
 
 /**
@@ -156,11 +239,68 @@ function showClanCommandHelp(chatSystem) {
     `);
 }
 
+/**
+ * Nickname command implementation - Allows changing your display name while preserving clan tag
+ * @param {Array<string>} args - Command arguments
+ * @param {object} chatSystem - Reference to the chat system
+ */
+export function nickCommand(args, chatSystem) {
+    console.log("NICK COMMAND EXECUTED with args:", args);
+
+    // Check if a new nickname was provided
+    if (args.length === 0) {
+        chatSystem.addSystemMessage('Please provide a new nickname: /nick [new name]');
+        return;
+    }
+
+    // Join all arguments to form the new nickname
+    const rawNickname = args.join(' ').trim();
+    console.log("Raw nickname input:", rawNickname);
+
+    // Sanitize the nickname to prevent XSS and ensure valid formatting
+    const newNickname = sanitizePlayerName(rawNickname);
+
+    // Validate sanitized nickname
+    if (!newNickname || newNickname.length < 2) {
+        chatSystem.addSystemMessage('Invalid nickname. Please use at least 2 alphanumeric characters and avoid special characters.');
+        return;
+    }
+
+    // Get the current player name
+    const currentPlayerName = getPlayerName();
+    console.log("Current player name:", currentPlayerName);
+
+    // Check for clan tag in the current name and preserve it
+    const clanTag = extractClanTag(currentPlayerName);
+    console.log("Extracted clan tag:", clanTag);
+
+    // Format the new player name, preserving clan tag if it exists
+    let updatedPlayerName;
+    if (clanTag) {
+        updatedPlayerName = `${clanTag} ${newNickname}`;
+        console.log("New name with preserved clan tag:", updatedPlayerName);
+    } else {
+        updatedPlayerName = newNickname;
+        console.log("New name without clan tag:", updatedPlayerName);
+    }
+
+    // Update the player's name
+    setPlayerName(updatedPlayerName);
+
+    // Notify the player of the change
+    chatSystem.addSystemMessage(`Your nickname has been changed to "${updatedPlayerName}".`);
+}
+
 // Export a list of all commands in this module with their descriptions
 export const clanCommands = [
     {
         name: 'clan',
         handler: clanCommand,
         description: 'Create and manage clans'
+    },
+    {
+        name: 'nick',
+        handler: nickCommand,
+        description: 'Change your nickname while preserving clan tag'
     }
 ]; 

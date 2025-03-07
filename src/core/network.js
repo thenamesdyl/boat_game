@@ -4,8 +4,8 @@ import { showLoginScreen } from './main';
 import { setPlayerStateFromDb, getPlayerStateFromDb } from './gameState';
 
 // Network configuration
-//const SERVER_URL = 'http://localhost:5001';
-const SERVER_URL = 'https://boat-game-python.onrender.com';
+const SERVER_URL = 'http://localhost:5001';
+//const SERVER_URL = 'https://boat-game-python.onrender.com';
 
 // Network state
 let socket;
@@ -911,39 +911,18 @@ export function sendChatMessage(content, messageType = 'global') {
             console.log('Fixed Firebase doc ID format:', firebaseDocId);
         }
 
-        // Safely retrieve player data if available
-        let finalPlayerName = playerName;
-        try {
-            // Try to get player data from server (including clan tag)
-            const playerDataFromServer = getPlayerStateFromDb();
-            if (playerDataFromServer && playerDataFromServer.name) {
-                // Use the name from server data, which will include clan tag
-                if (finalPlayerName !== playerDataFromServer.name) {
-                    console.log('Using player name from server data:', playerDataFromServer.name);
-                    console.log('(This preserves clan tags after page reload)');
-                    finalPlayerName = playerDataFromServer.name;
-                }
-            }
-        } catch (e) {
-            console.warn('Error retrieving player data:', e);
-            // Continue with the existing player name
-        }
-
-        // For safety, make sure we have a player name
-        if (!finalPlayerName || finalPlayerName.trim() === '') {
-            console.warn('No player name set, using default name');
-            finalPlayerName = `Sailor_${Math.floor(Math.random() * 1000)}`;
-        }
-
+        // IMPORTANT: DON'T send a player_name field at all
+        // Let the server use what it has in its cache
+        // This ensures consistency between nick changes and chat
         console.log('Sending chat message with player_id:', firebaseDocId);
-        console.log('Sending chat message with player_name:', finalPlayerName);
+        console.log('NOT sending player_name - using server cache instead');
 
-        // Create the message object
+        // Create the message object WITHOUT the player_name field
         const messageObj = {
             content: content,
             type: messageType,
-            player_id: firebaseDocId,
-            player_name: finalPlayerName  // Add the player's name to the message
+            player_id: firebaseDocId
+            // Removed player_name field to let server use its cached value
         };
 
         // Log the complete message object being sent
@@ -952,7 +931,7 @@ export function sendChatMessage(content, messageType = 'global') {
         // Now send the message
         socket.emit('send_message', messageObj);
 
-        console.log('Message emitted with player name:', finalPlayerName);
+        console.log('Message emitted without player_name to ensure server cache is used');
         console.log('Message emitted successfully');
         return true;
     } catch (error) {
