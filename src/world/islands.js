@@ -5,8 +5,8 @@ import { createShoreEffect, updateShores, setShoreVisibility, removeShore, clear
 let islandColliders = [];
 const visibleDistance = 2000; // Distance to see islands from
 const chunkSize = 600; // Size of each "chunk" of ocean
-const islandsPerChunk = 3; // Islands per chunk
-const maxViewDistance = 5; // How far to render islands
+const islandsPerChunk = 1; // Reduced from 3 to 1 island per chunk
+const maxViewDistance = 3; // Reduced from 5 to 3 chunks view distance
 
 // Store generated chunks
 const generatedChunks = new Set();
@@ -160,7 +160,14 @@ function createIsland(x, z, seed, scene) {
     // Beach
     const beachGeometry = new THREE.CylinderGeometry(50, 55, 5, 64);
     const beachColor = new THREE.Color().setHSL(0.12 + random() * 0.05, 0.9, 0.7);
-    const beachMaterial = new THREE.MeshPhongMaterial({ color: beachColor });
+    const sandTexture = createSandTexture(beachColor);
+    const beachMaterial = new THREE.MeshPhongMaterial({
+        color: beachColor,
+        map: sandTexture,
+        bumpMap: sandTexture,
+        bumpScale: 0.2,
+        shininess: 2
+    });
     const beach = new THREE.Mesh(beachGeometry, beachMaterial);
     beach.position.y = 0;
     island.add(beach);
@@ -388,6 +395,80 @@ function createIsland(x, z, seed, scene) {
     }
 
     return islandEntry;
+}
+
+// Function to create and cache a sand texture with grainy appearance
+function createSandTexture(baseColor) {
+    // Use cached texture if available
+    const cacheKey = `sand_${baseColor.getHexString()}`;
+    if (structureTextureCache[cacheKey]) {
+        return structureTextureCache[cacheKey];
+    }
+
+    // Create canvas for texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // Base color (warm sand)
+    const sandColor = baseColor.clone();
+    ctx.fillStyle = `#${sandColor.getHexString()}`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Create a lighter variant for contrast
+    const lighterColor = sandColor.clone().multiplyScalar(1.1);
+
+    // Add a subtle noise pattern that looks like sand
+    for (let i = 0; i < 5000; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const size = 1 + Math.random() * 2;
+
+        // Simple dots in varying shades for a cartoony sand look
+        if (Math.random() > 0.7) {
+            // Darker dots (30% of dots)
+            const dotColor = sandColor.clone().multiplyScalar(0.9);
+            ctx.fillStyle = `#${dotColor.getHexString()}`;
+        } else {
+            // Lighter dots (70% of dots)
+            ctx.fillStyle = `#${lighterColor.getHexString()}`;
+        }
+
+        ctx.fillRect(x, y, size, size);
+    }
+
+    // Add very subtle directional "brushed" lines for some texture variation
+    ctx.strokeStyle = `rgba(0, 0, 0, 0.03)`;
+    ctx.lineWidth = 1;
+
+    // Horizontal gentle waves suggesting sand
+    for (let y = 10; y < canvas.height; y += 20) {
+        ctx.beginPath();
+
+        for (let x = 0; x < canvas.width; x += 5) {
+            const yOffset = Math.sin(x / 30) * 3;
+
+            if (x === 0) {
+                ctx.moveTo(x, y + yOffset);
+            } else {
+                ctx.lineTo(x, y + yOffset);
+            }
+        }
+
+        ctx.stroke();
+    }
+
+    // Create texture
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(3, 3); // Repeat texture for more detail
+
+    // Cache the texture
+    structureTextureCache[cacheKey] = texture;
+
+    return texture;
 }
 
 // Function to create and cache a stone texture with imperfections

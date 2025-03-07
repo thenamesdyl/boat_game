@@ -19,20 +19,24 @@ import { initLeaderboard, updateLeaderboardData } from '../ui/leaderboard.js';
 import { requestLeaderboard, setPlayerName, setPlayerColor } from './network.js';
 import { updateVillagers } from '../entities/villagers.js';
 import {
-    islandColliders,
-    activeIslands,
-    activeWaterChunks,
-    updateVisibleChunks,
+    updateVisibleIslands,
+    getAllIslandColliders,
     findNearestIsland,
-    checkIslandCollision,
-    updateIslandEffects,
-    areShoreEffectsEnabled
-} from '../world/islands.js';
+    checkIslandCollision
+} from '../world/islandManager.js';
 import MusicSystem from '../audio/music.js';
 import { initCameraControls, updateCameraPosition } from '../controls/cameraControls.js';
 import { setupWater, updateWater } from '../environment/water.js';
 import { initDiagnostics, updateDiagnosticsDisplay, ENABLE_DIAGNOSTICS } from '../ui/diagnostics.js';
 import * as Firebase from './firebase.js';
+import {
+    islandColliders,
+    activeIslands,
+    activeWaterChunks,
+    updateIslandEffects,
+    areShoreEffectsEnabled
+} from '../world/islands.js';
+import { createTestRockyIsland, createTestRockyIslandCluster } from '../world/testRockyIslands.js';
 
 
 // Initialize water with explicit realistic style as default
@@ -140,6 +144,13 @@ requestLeaderboard();
 MusicSystem.playMusic();
 MusicSystem.setVolume(0.1); // 30% volume
 
+// Test Rocky Islands - set to true to create test islands
+const TEST_ROCKY_ISLANDS = true;
+if (TEST_ROCKY_ISLANDS) {
+    console.log("Testing rocky islands - creating test islands");
+    // Create a single test rocky island further from the starting position
+    createTestRockyIslandCluster(scene, 4, 800, new THREE.Vector3(boat.position.x, 0, boat.position.z));
+}
 
 // Expanded Water with Slower Shader
 const waterGeometry = new THREE.PlaneGeometry(1000, 1000, 256, 256);
@@ -332,7 +343,7 @@ function initializeNetworkWithPlayerInfo(firebaseUser = null) {
         scene,
         playerState,
         boat,
-        islandColliders,
+        getAllIslandColliders(),
         activeIslands,
         playerName,
         rgbColor,
@@ -351,10 +362,11 @@ setTimeout(() => {
 // Island generation variables
 const visibleDistance = 2000; // Increased to see islands from even further away
 const chunkSize = 600; // Size of each "chunk" of ocean
-const islandsPerChunk = 3; // Increased from 2 to have more islands per chunk
-const maxViewDistance = 5; // Increased to render islands further away
+const islandsPerChunk = 1; // Reduced from 3 to 1 island per chunk
+const maxViewDistance = 3; // Reduced from 5 to 3 chunks view distance
 
 // Store generated chunks
+const generatedRockyChunks = new Set(); // Set to track rocky chunks that have been generated
 
 // Function to generate a chunk key based on coordinates
 function getChunkKey(chunkX, chunkZ) {
@@ -1094,7 +1106,10 @@ function animate() {
         boat.position.y = currentY; // Restore Y position as it's managed by updateBoatRocking
 
         if (boat.position.distanceTo(lastChunkUpdatePosition) > chunkUpdateThreshold) {
-            updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
+            updateVisibleIslands(boat, scene, waterShader, lastChunkUpdatePosition, {
+                generatedRockyChunks,
+                maxViewDistance
+            });
             // Add this line to update villagers whenever chunks update
             if (activeIslands && activeIslands.size > 0) {
                 //updateVillagers(activeIslands);
@@ -1187,6 +1202,15 @@ function animate() {
 
     // Update diagnostics with current FPS (only does something if diagnostics is enabled)
     updateDiagnosticsDisplay(currentFps);
+
+    // Update island visibility using the new islandManager
+    updateVisibleIslands(boat, scene, waterShader, lastChunkUpdatePosition, {
+        generatedRockyChunks,
+        maxViewDistance
+    });
+
+    // Use consolidated island colliders for collision detection
+    const allIslandColliders = getAllIslandColliders();
 }
 
 // Calculate boat speed based on velocity
@@ -1206,7 +1230,7 @@ function updateGameUI() {
     // Import at the top of your file: import { gameUI } from './ui.js';
 
     const windData = getWindData();
-    const nearestIsland = findNearestIsland();
+    const nearestIsland = findNearestIsland(boat);
     const monsters = getMonsters(); // Get current monsters
 
     // Update UI with all available data
@@ -1237,7 +1261,10 @@ function updateGameUI() {
 
 // Initialize by generating the starting chunks
 lastChunkUpdatePosition.copy(boat.position);
-updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
+updateVisibleIslands(boat, scene, waterShader, lastChunkUpdatePosition, {
+    generatedRockyChunks,
+    maxViewDistance
+});
 
 // Force an initial update to ensure islands are generated
 setTimeout(() => {
