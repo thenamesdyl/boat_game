@@ -198,7 +198,7 @@ class PlayerList {
         this.refreshPlayerList();
     }
 
-    // Updated to use gameState's allPlayers if available
+    // Updated to create interactive player entries with teleport functionality
     updatePlayerList(players) {
         console.log("📋 PLAYERLIST: Updating player list");
 
@@ -228,6 +228,9 @@ class PlayerList {
 
         // Create a player entry for each player
         sortedPlayers.forEach(player => {
+            // Skip current player for teleport options
+            const isCurrentPlayer = player.id === (playerData.id || '');
+
             const playerEntry = document.createElement('div');
             playerEntry.style.padding = '10px';
             playerEntry.style.marginBottom = '5px';
@@ -235,6 +238,25 @@ class PlayerList {
             playerEntry.style.borderRadius = '4px';
             playerEntry.style.display = 'flex';
             playerEntry.style.justifyContent = 'space-between';
+            playerEntry.style.position = 'relative'; // For popup positioning
+
+            // Make it look interactive if not current player
+            if (!isCurrentPlayer) {
+                playerEntry.style.cursor = 'pointer';
+                playerEntry.style.transition = 'background-color 0.2s';
+                playerEntry.addEventListener('mouseover', () => {
+                    playerEntry.style.backgroundColor = 'rgba(80, 60, 30, 0.6)';
+                });
+                playerEntry.addEventListener('mouseout', () => {
+                    playerEntry.style.backgroundColor = 'rgba(60, 40, 20, 0.5)';
+                });
+
+                // Add click listener to show teleport popup
+                playerEntry.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent bubbling
+                    this.showTeleportPopup(player, playerEntry);
+                });
+            }
 
             const nameEl = document.createElement('div');
             nameEl.textContent = player.name || 'Unknown Sailor';
@@ -256,6 +278,15 @@ class PlayerList {
 
             nameEl.style.fontWeight = 'bold';
 
+            // Add "(You)" indicator for current player
+            if (isCurrentPlayer) {
+                const youIndicator = document.createElement('span');
+                youIndicator.textContent = ' (You)';
+                youIndicator.style.color = '#aaa';
+                youIndicator.style.fontStyle = 'italic';
+                nameEl.appendChild(youIndicator);
+            }
+
             const statsEl = document.createElement('div');
             statsEl.textContent = `Fish: ${player.fishCount || 0} | Gold: ${player.money || 0}`;
             statsEl.style.color = '#ddd';
@@ -274,6 +305,211 @@ class PlayerList {
         playerCount.style.textAlign = 'center';
         playerCount.style.marginTop = '5px';
         this.content.appendChild(playerCount);
+
+        // Add event listener to hide any open popups when clicking elsewhere
+        document.addEventListener('click', () => {
+            this.hideAllPopups();
+        });
+    }
+
+    // Add this new method to create and show the teleport popup
+    showTeleportPopup(targetPlayer, parentElement) {
+        // First, hide any other open popups
+        this.hideAllPopups();
+
+        // Create popup container
+        const popup = document.createElement('div');
+        popup.className = 'player-teleport-popup';
+        popup.style.position = 'absolute';
+        popup.style.top = '100%';
+        popup.style.left = '0';
+        popup.style.zIndex = '2100'; // Higher than player list
+        popup.style.backgroundColor = 'rgba(30, 20, 5, 0.95)';
+        popup.style.border = '2px solid #B8860B';
+        popup.style.borderRadius = '6px';
+        popup.style.padding = '10px';
+        popup.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.5)';
+        popup.style.minWidth = '150px';
+
+        // Create teleport option
+        const teleportOption = document.createElement('div');
+        teleportOption.textContent = '🧭 Teleport to Player';
+        teleportOption.style.color = '#FFD700';
+        teleportOption.style.padding = '6px 8px';
+        teleportOption.style.cursor = 'pointer';
+        teleportOption.style.borderRadius = '4px';
+        teleportOption.style.transition = 'background-color 0.2s';
+
+        // Add hover effect
+        teleportOption.addEventListener('mouseover', () => {
+            teleportOption.style.backgroundColor = 'rgba(100, 80, 20, 0.5)';
+        });
+        teleportOption.addEventListener('mouseout', () => {
+            teleportOption.style.backgroundColor = 'transparent';
+        });
+
+        // Add click handler for teleport functionality
+        teleportOption.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent bubbling
+            this.teleportToPlayer(targetPlayer);
+            this.hideAllPopups();
+        });
+
+        popup.appendChild(teleportOption);
+
+        // Add the popup to the parent element
+        parentElement.appendChild(popup);
+
+        // Save reference to the current popup for easy removal
+        this.currentPopup = popup;
+
+        // Add click handler to prevent closing when clicking inside the popup
+        popup.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
+
+    // Helper method to hide all open popups
+    hideAllPopups() {
+        if (this.currentPopup) {
+            if (this.currentPopup.parentNode) {
+                this.currentPopup.parentNode.removeChild(this.currentPopup);
+            }
+            this.currentPopup = null;
+        }
+    }
+
+    // Implement the teleport functionality
+    teleportToPlayer(targetPlayer) {
+        console.log("🧭 PLAYERLIST: Teleporting to player:", targetPlayer.name);
+
+        // Check if the target player has position data
+        if (!targetPlayer.position) {
+            console.warn("🧭 PLAYERLIST: Cannot teleport - target player has no position data");
+
+            // Show error message
+            const errorMsg = document.createElement('div');
+            errorMsg.textContent = `Cannot teleport to ${targetPlayer.name} - Position data unavailable`;
+            errorMsg.style.position = 'fixed';
+            errorMsg.style.top = '50%';
+            errorMsg.style.left = '50%';
+            errorMsg.style.transform = 'translate(-50%, -50%)';
+            errorMsg.style.backgroundColor = 'rgba(100, 0, 0, 0.8)';
+            errorMsg.style.color = 'white';
+            errorMsg.style.padding = '15px 20px';
+            errorMsg.style.borderRadius = '8px';
+            errorMsg.style.zIndex = '3000';
+            document.body.appendChild(errorMsg);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                if (errorMsg.parentNode) {
+                    errorMsg.parentNode.removeChild(errorMsg);
+                }
+            }, 3000);
+
+            return;
+        }
+
+        // Import boat and camera from gameState
+        import('../core/gameState.js').then(gameState => {
+            // Set player boat position to target player position
+            if (gameState.boat && gameState.boat.position && targetPlayer.position) {
+                // Store original position values before teleport (for animation or effects)
+                const originalX = gameState.boat.position.x;
+                const originalZ = gameState.boat.position.z;
+
+                // Set the boat position
+                gameState.boat.position.x = targetPlayer.position.x;
+                gameState.boat.position.z = targetPlayer.position.z;
+
+                // If you want to implement a teleport effect
+                this.showTeleportEffect(originalX, originalZ, targetPlayer.position.x, targetPlayer.position.z);
+
+                // Reset velocity to prevent momentum carrying over
+                if (gameState.boatVelocity) {
+                    gameState.boatVelocity.set(0, 0, 0);
+                }
+
+                // Also move the camera to follow the boat
+                if (gameState.camera) {
+                    // Adjust camera position to maintain same relative position to boat
+                    const offsetX = gameState.camera.position.x - originalX;
+                    const offsetZ = gameState.camera.position.z - originalZ;
+
+                    gameState.camera.position.x = targetPlayer.position.x + offsetX;
+                    gameState.camera.position.z = targetPlayer.position.z + offsetZ;
+                }
+
+                console.log("🧭 PLAYERLIST: Teleport successful", {
+                    from: { x: originalX, z: originalZ },
+                    to: { x: targetPlayer.position.x, z: targetPlayer.position.z }
+                });
+
+                // Show success message
+                this.showTeleportSuccessMessage(targetPlayer.name);
+            } else {
+                console.error("🧭 PLAYERLIST: Failed to teleport - boat or position is undefined");
+            }
+        }).catch(err => {
+            console.error("🧭 PLAYERLIST: Error during teleport:", err);
+        });
+    }
+
+    // Show a simple teleport success message
+    showTeleportSuccessMessage(playerName) {
+        const msg = document.createElement('div');
+        msg.textContent = `Teleported to ${playerName}`;
+        msg.style.position = 'fixed';
+        msg.style.bottom = '20px';
+        msg.style.left = '50%';
+        msg.style.transform = 'translateX(-50%)';
+        msg.style.backgroundColor = 'rgba(0, 80, 0, 0.8)';
+        msg.style.color = 'white';
+        msg.style.padding = '10px 20px';
+        msg.style.borderRadius = '20px';
+        msg.style.zIndex = '3000';
+        document.body.appendChild(msg);
+
+        // Remove after 3 seconds
+        setTimeout(() => {
+            if (msg.parentNode) {
+                msg.parentNode.removeChild(msg);
+            }
+        }, 3000);
+    }
+
+    // Optional teleport visual effect
+    showTeleportEffect(fromX, fromZ, toX, toZ) {
+        // This is a placeholder for a visual effect you might want to add
+        // For example, you could create particles, a flash, or an animation
+        console.log("🧭 PLAYERLIST: Teleport effect triggered");
+
+        // You might want to add a simple flash effect to indicate teleportation
+        const flash = document.createElement('div');
+        flash.style.position = 'fixed';
+        flash.style.top = '0';
+        flash.style.left = '0';
+        flash.style.width = '100%';
+        flash.style.height = '100%';
+        flash.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+        flash.style.zIndex = '2500';
+        flash.style.pointerEvents = 'none';
+        document.body.appendChild(flash);
+
+        // Fade out the flash
+        let opacity = 0.3;
+        const fadeInterval = setInterval(() => {
+            opacity -= 0.05;
+            if (opacity <= 0) {
+                clearInterval(fadeInterval);
+                if (flash.parentNode) {
+                    flash.parentNode.removeChild(flash);
+                }
+            } else {
+                flash.style.backgroundColor = `rgba(255, 255, 255, ${opacity})`;
+            }
+        }, 50);
     }
 
     // Fallback function when socket isn't available - now uses gameState's allPlayers
