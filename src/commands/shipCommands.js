@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { boat, boatVelocity } from '../core/gameState.js';
+import { boat, boatVelocity, shipSpeedConfig } from '../core/gameState.js';
 import { getAllIslandColliders } from '../world/islandManager.js';
 
 // Store the default boat speed for reference
@@ -14,52 +14,51 @@ let speedMultiplier = 1.0;
  * @param {object} chatSystem - Reference to the chat system
  */
 export function speedCommand(args, chatSystem) {
-    // If no arguments, show current speed
+    // Get the speed multiplier from args
     if (args.length === 0) {
-        chatSystem.addSystemMessage(`Current ship speed is ${speedMultiplier.toFixed(1)}x (${(DEFAULT_BOAT_SPEED * speedMultiplier).toFixed(3)})`);
+        // Report current speed
+        chatSystem.addSystemMessage(`🚢 SPEED STATUS: Multiplier is currently ${shipSpeedConfig.speedMultiplier.toFixed(2)}x`);
+
+        if (shipSpeedConfig.speedMultiplier > 1.0) {
+            chatSystem.addSystemMessage(`⚡ BOOSTED MODE ACTIVE! Player max speed: ${(shipSpeedConfig.basePlayerSpeed * shipSpeedConfig.speedMultiplier).toFixed(2)}`);
+        } else if (shipSpeedConfig.speedMultiplier < 1.0) {
+            chatSystem.addSystemMessage(`🐌 REDUCED SPEED MODE! Player max speed: ${(shipSpeedConfig.basePlayerSpeed * shipSpeedConfig.speedMultiplier).toFixed(2)}`);
+        } else {
+            chatSystem.addSystemMessage(`Normal speed mode. Player max speed: ${shipSpeedConfig.basePlayerSpeed.toFixed(2)}`);
+        }
         return;
     }
 
-    const subcommand = args[0].toLowerCase();
-
-    // Handle different speed settings
-    switch (subcommand) {
-        case 'reset':
-            setSpeedMultiplier(1.0, chatSystem);
-            break;
-
-        case 'slow':
-            setSpeedMultiplier(0.5, chatSystem);
-            break;
-
-        case 'normal':
-            setSpeedMultiplier(1.0, chatSystem);
-            break;
-
-        case 'fast':
-            setSpeedMultiplier(2.0, chatSystem);
-            break;
-
-        case 'turbo':
-            setSpeedMultiplier(4.0, chatSystem);
-            break;
-
-        default:
-            // Try to parse as a numeric multiplier
-            const multiplier = parseFloat(subcommand);
-
-            if (!isNaN(multiplier)) {
-                // Limit the speed range to prevent extreme values
-                if (multiplier >= 0.1 && multiplier <= 10.0) {
-                    setSpeedMultiplier(multiplier, chatSystem);
-                } else {
-                    chatSystem.addSystemMessage('Speed multiplier must be between 0.1 and 10.0');
-                }
-            } else {
-                // Show usage help
-                showSpeedCommandHelp(chatSystem);
-            }
+    const speedValue = parseFloat(args[0]);
+    if (isNaN(speedValue) || speedValue <= 0) {
+        chatSystem.addSystemMessage("Invalid speed value. Please enter a positive number.");
+        return;
     }
+
+    // Set the speed multiplier with more dramatic feedback
+    const previousMultiplier = shipSpeedConfig.speedMultiplier;
+    shipSpeedConfig.speedMultiplier = speedValue;
+
+    // Provide dramatic feedback
+    if (speedValue > 2.0) {
+        chatSystem.addSystemMessage(`🔥🔥🔥 EXTREME SPEED BOOST ACTIVATED: ${speedValue.toFixed(2)}x 🔥🔥🔥`);
+        chatSystem.addSystemMessage(`New max player speed: ${(shipSpeedConfig.basePlayerSpeed * shipSpeedConfig.speedMultiplier).toFixed(2)} units/sec!`);
+    } else if (speedValue > 1.0) {
+        chatSystem.addSystemMessage(`⚡ SPEED BOOST ACTIVATED: ${speedValue.toFixed(2)}x ⚡`);
+        chatSystem.addSystemMessage(`New max player speed: ${(shipSpeedConfig.basePlayerSpeed * shipSpeedConfig.speedMultiplier).toFixed(2)} units/sec`);
+    } else if (speedValue < 0.5) {
+        chatSystem.addSystemMessage(`🐌 SLOW MODE ACTIVATED: ${speedValue.toFixed(2)}x 🐌`);
+        chatSystem.addSystemMessage(`Reduced max player speed: ${(shipSpeedConfig.basePlayerSpeed * shipSpeedConfig.speedMultiplier).toFixed(2)} units/sec`);
+    } else {
+        chatSystem.addSystemMessage(`Speed set to ${speedValue.toFixed(2)}x`);
+        chatSystem.addSystemMessage(`New max player speed: ${(shipSpeedConfig.basePlayerSpeed * shipSpeedConfig.speedMultiplier).toFixed(2)} units/sec`);
+    }
+
+    // Display comparison
+    const changeMsg = previousMultiplier < speedValue ?
+        `Speed increased by ${((speedValue / previousMultiplier - 1) * 100).toFixed(0)}%!` :
+        `Speed decreased by ${((1 - speedValue / previousMultiplier) * 100).toFixed(0)}%`;
+    chatSystem.addSystemMessage(changeMsg);
 }
 
 /**

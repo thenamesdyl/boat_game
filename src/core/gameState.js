@@ -19,6 +19,13 @@ export const keys = { forward: false, backward: false, left: false, right: false
 export const boat = createBoat(scene);
 let time = 0;
 
+// Add these variables near the top with other exports
+export const shipSpeedConfig = {
+    basePlayerSpeed: 0.55,     // Normal max speed when player is controlling
+    baseKnockbackSpeed: 8.5,   // Max speed when not player-controlled (like knockbacks)
+    speedMultiplier: 1.0       // Multiplier that can be adjusted by /speed command
+};
+
 // Player name and color functions that login.js is trying to import
 export function setPlayerName(name) {
     console.log(`Setting player name to: ${name}`);
@@ -132,7 +139,7 @@ export function updateShipMovement(deltaTime) {
 
     // Ship physical properties - MODERATELY INCREASED POWER
     const shipMass = 5000; // More reasonable mass (was 2000 in extreme version, 5000 in original)
-    const sailPower = 18; // Moderate increase in power (was 50 in extreme, 12 in original)
+    const sailPower = 18 * Math.sqrt(shipSpeedConfig.speedMultiplier); // Apply square root of multiplier to sail power
     const rudderPower = 1.0; // Moderate turning (was 1.5 in extreme, 0.8 in original)
     const waterResistance = 0.3; // Balanced resistance (was 0.1 in extreme, 0.3 in original)
 
@@ -164,9 +171,8 @@ export function updateShipMovement(deltaTime) {
     if (keys.forward) {
         console.log("🚢 FORWARD KEY ACTIVE - Calculating forward force");
         // Moderately increased forward force for noticeable movement
-        const sailForce = sailPower * 1.2; // Reduced from 2.0
-        accelerationForce.add(shipHeading.clone().multiplyScalar(sailForce));
-        console.log("🚢 Applied forward force:", sailForce.toFixed(2));
+        accelerationForce.add(shipHeading.clone().multiplyScalar(sailPower));
+        console.log("🚢 Applied forward force:", sailPower.toFixed(2));
     }
 
     // MODERATELY INCREASED BACKWARD MOVEMENT
@@ -214,16 +220,34 @@ export function updateShipMovement(deltaTime) {
     const acceleration = accelerationForce.divideScalar(shipMass);
 
     // Apply acceleration with force multiplier
-    boatVelocity.add(acceleration.multiplyScalar(deltaTime * 60));
+    boatVelocity.add(acceleration.multiplyScalar(deltaTime * 60 *
+        (shipSpeedConfig.speedMultiplier > 1.0 ? Math.sqrt(shipSpeedConfig.speedMultiplier) : 1.0)));
 
     // Limit maximum speed
-    const maxSpeed = keys.forward ? 0.55 * (keys.forward ? 1 : 0.5) : 8.5;
+    const playerMaxSpeed = shipSpeedConfig.basePlayerSpeed * shipSpeedConfig.speedMultiplier;
+    const knockbackMaxSpeed = shipSpeedConfig.baseKnockbackSpeed * shipSpeedConfig.speedMultiplier;
+    const maxSpeed = keys.forward ? playerMaxSpeed * (keys.forward ? 1 : 0.5) : knockbackMaxSpeed;
+
     const currentSpeedValue = boatVelocity.length();
     if (currentSpeedValue > maxSpeed) {
         // Hard cap at maximum speed
         boatVelocity.normalize().multiplyScalar(maxSpeed);
+
+        // Add visual/console feedback when speed limit is reached
         console.log("🚨 MAXIMUM SPEED REACHED:", maxSpeed.toFixed(2),
-            "Current:", currentSpeedValue.toFixed(2));
+            "Current:", currentSpeedValue.toFixed(2),
+            "Speed Multiplier:", shipSpeedConfig.speedMultiplier.toFixed(2));
+
+        // Add temporary visual effect when reaching max speed with custom multiplier
+        if (shipSpeedConfig.speedMultiplier > 1.0) {
+            // We could trigger a visual effect here like wake particles
+            console.log("💨 BOOSTED SPEED ACTIVE! 💨");
+
+            // If you have a way to add temporary visual effects, do it here
+            if (window.showSpeedBoostEffect) {
+                window.showSpeedBoostEffect(shipSpeedConfig.speedMultiplier);
+            }
+        }
     }
 
     // Almost eliminated wind drift
