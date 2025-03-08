@@ -294,38 +294,83 @@ export function showLoginScreen(onComplete) {
     loginContainer.style.left = '0';
     loginContainer.style.width = '100%';
     loginContainer.style.height = '100%';
-    loginContainer.style.backgroundColor = 'rgba(0,0,0,0.7)';
+    loginContainer.style.backgroundColor = 'rgba(0,0,0,0.85)';
     loginContainer.style.display = 'flex';
     loginContainer.style.justifyContent = 'center';
     loginContainer.style.alignItems = 'center';
-    loginContainer.style.zIndex = '1000';
+    loginContainer.style.zIndex = '9999';
 
     // Create form
     const form = document.createElement('div');
-    form.style.backgroundColor = 'white';
-    form.style.padding = '20px';
-    form.style.borderRadius = '5px';
-    form.style.width = '300px';
+    form.style.backgroundColor = '#0f1626';
+    form.style.padding = '30px';
+    form.style.borderRadius = '10px';
+    form.style.boxShadow = '0 0 30px rgba(50, 130, 240, 0.4)';
+    form.style.width = '400px';
+    form.style.maxWidth = '90%';
+    form.style.border = '1px solid rgba(50, 130, 240, 0.5)';
+
+    // Add title
+    const title = document.createElement('h2');
+    title.textContent = 'Captain Profile';
+    title.style.textAlign = 'center';
+    title.style.color = '#fff';
+    title.style.marginBottom = '5px';
+    title.style.fontWeight = '800';
+    title.style.letterSpacing = '1px';
+    title.style.textTransform = 'uppercase';
+    title.style.textShadow = '0 0 10px rgba(66, 133, 244, 0.7)';
+    title.style.fontSize = '28px';
+    form.appendChild(title);
+
+    // Add decorative divider
+    const divider = document.createElement('div');
+    divider.style.height = '3px';
+    divider.style.width = '60px';
+    divider.style.background = 'linear-gradient(to right, #4285f4, #34a853)';
+    divider.style.margin = '0 auto 20px';
+    form.appendChild(divider);
+
+    // Add container for inputs
+    const profileContainer = document.createElement('div');
+    profileContainer.style.background = 'linear-gradient(135deg, rgba(10, 37, 64, 0.9), rgba(32, 58, 96, 0.9))';
+    profileContainer.style.borderRadius = '8px';
+    profileContainer.style.padding = '20px';
+    profileContainer.style.marginBottom = '20px';
+    profileContainer.style.borderLeft = '3px solid #4285f4';
+    form.appendChild(profileContainer);
 
     // Name input
     const nameLabel = document.createElement('div');
     nameLabel.textContent = 'Your Name:';
+    nameLabel.style.display = 'block';
+    nameLabel.style.color = '#ccc';
     nameLabel.style.marginBottom = '5px';
-    form.appendChild(nameLabel);
+    nameLabel.style.fontWeight = '500';
+    profileContainer.appendChild(nameLabel);
 
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.style.width = '100%';
     nameInput.style.marginBottom = '15px';
-    nameInput.style.padding = '5px';
+    nameInput.style.padding = '10px';
+    nameInput.style.borderRadius = '5px';
+    nameInput.style.border = '1px solid #4285f4';
+    nameInput.style.backgroundColor = '#1a2639';
+    nameInput.style.color = '#fff';
+    nameInput.style.outline = 'none';
+    nameInput.style.boxSizing = 'border-box';
     nameInput.value = 'Sailor ' + Math.floor(Math.random() * 1000);
-    form.appendChild(nameInput);
+    profileContainer.appendChild(nameInput);
 
     // Color selection
     const colorLabel = document.createElement('div');
     colorLabel.textContent = 'Choose Color:';
+    colorLabel.style.display = 'block';
+    colorLabel.style.color = '#ccc';
     colorLabel.style.marginBottom = '5px';
-    form.appendChild(colorLabel);
+    colorLabel.style.fontWeight = '500';
+    profileContainer.appendChild(colorLabel);
 
     const colorInput = document.createElement('input');
     colorInput.type = 'color';
@@ -333,21 +378,35 @@ export function showLoginScreen(onComplete) {
     colorInput.style.width = '100%';
     colorInput.style.marginBottom = '15px';
     colorInput.style.height = '40px';
-    form.appendChild(colorInput);
+    colorInput.style.border = 'none';
+    colorInput.style.borderRadius = '5px';
+    colorInput.style.cursor = 'pointer';
+    profileContainer.appendChild(colorInput);
 
     // Submit button
     const submitButton = document.createElement('button');
     submitButton.textContent = 'Start Sailing';
     submitButton.style.width = '100%';
-    submitButton.style.padding = '10px';
-    submitButton.style.backgroundColor = '#3498db';
+    submitButton.style.padding = '12px';
+    submitButton.style.backgroundColor = '#4285f4';
     submitButton.style.color = 'white';
     submitButton.style.border = 'none';
     submitButton.style.borderRadius = '5px';
+    submitButton.style.fontSize = '16px';
     submitButton.style.cursor = 'pointer';
+    submitButton.style.fontWeight = 'bold';
+    submitButton.style.transition = 'background-color 0.2s';
     form.appendChild(submitButton);
 
-    // Handle form submission
+    // Hover effect
+    submitButton.addEventListener('mouseover', () => {
+        submitButton.style.backgroundColor = '#5294ff';
+    });
+    submitButton.addEventListener('mouseout', () => {
+        submitButton.style.backgroundColor = '#4285f4';
+    });
+
+    // Handle form submission - KEEPING ORIGINAL FUNCTIONALITY
     submitButton.addEventListener('click', () => {
         playerName = nameInput.value.trim() || nameInput.value;
         playerColor = colorInput.value;
@@ -413,9 +472,9 @@ setTimeout(() => {
 */
 
 // Island generation variables
-const visibleDistance = 2000; // Increased to see islands from even further away
-const chunkSize = 600; // Size of each "chunk" of ocean
-const islandsPerChunk = 1; // Reduced from 3 to 1 island per chunk
+const visibleDistance = 1000; // Increased to see islands from even further away
+const chunkSize = 10; // Size of each "chunk" of ocean
+const islandsPerChunk = 10; // Reduced from 3 to 1 island per chunk
 const maxViewDistance = 3; // Reduced from 5 to 3 chunks view distance
 
 // Store generated chunks
@@ -1168,17 +1227,12 @@ function animate() {
     const speedMultiplier = window.boatSpeedMultiplier || 1.0;
 
     // Use the new updateShipMovement function for boat controls
-    console.log("🌊 ANIMATE: Before updateShipMovement - Boat position:",
-        { x: boat.position.x.toFixed(2), y: boat.position.y.toFixed(2), z: boat.position.z.toFixed(2) });
 
     updateShipMovement(deltaTime);
 
     // Create direction vector based on boat's current rotation
     const direction = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), boat.rotation.y);
     let newPosition = boat.position.clone().add(boatVelocity);
-
-    console.log("🌊 ANIMATE: After updateShipMovement - New calculated position:",
-        { x: newPosition.x.toFixed(2), y: newPosition.y.toFixed(2), z: newPosition.z.toFixed(2) });
 
     // Update boat rocking motion (this now handles boat height based on water surface)
     updateBoatRocking(deltaTime);
@@ -1194,7 +1248,6 @@ function animate() {
     let collided = false;
     if (checkIslandCollision(newPosition)) {
         collided = true;
-        console.log("🌊 ANIMATE: Island collision detected - not updating position");
     }
 
     if (!collided) {
@@ -1203,8 +1256,6 @@ function animate() {
         boat.position.copy(newPosition);
         boat.position.y = currentY; // Restore Y position as it's managed by updateBoatRocking
 
-        console.log("🌊 ANIMATE: Final updated boat position:",
-            { x: boat.position.x.toFixed(2), y: boat.position.y.toFixed(2), z: boat.position.z.toFixed(2) });
 
         if (boat.position.distanceTo(lastChunkUpdatePosition) > chunkUpdateThreshold) {
             updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition);

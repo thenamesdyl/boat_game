@@ -28,7 +28,6 @@ export const shipSpeedConfig = {
 
 // Player name and color functions that login.js is trying to import
 export function setPlayerName(name) {
-    console.log(`Setting player name to: ${name}`);
 
     // Initialize playerData if it doesn't exist
     if (!playerData) {
@@ -45,7 +44,6 @@ export function setPlayerName(name) {
 }
 
 export function setPlayerColor(color) {
-    console.log(`Setting player color to:`, color);
 
     // Initialize playerData if it doesn't exist
     if (!playerData) {
@@ -132,10 +130,7 @@ export function getPlayerInfo() {
 
 // Export the updateShipMovement function with moderately increased movement
 export function updateShipMovement(deltaTime) {
-    console.log("🚢 UPDATE SHIP MOVEMENT - Current keys state:",
-        { forward: keys.forward, backward: keys.backward, left: keys.left, right: keys.right });
-    console.log("🚢 Current velocity:",
-        { x: boatVelocity.x.toFixed(3), y: boatVelocity.y.toFixed(3), z: boatVelocity.z.toFixed(3) });
+
 
     // Ship physical properties - MODERATELY INCREASED POWER
     const shipMass = 5000; // More reasonable mass (was 2000 in extreme version, 5000 in original)
@@ -152,8 +147,7 @@ export function updateShipMovement(deltaTime) {
     const currentSpeed = boatVelocity.length();
     const shipHeading = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), boat.rotation.y);
 
-    console.log("🚢 Ship heading vector:",
-        { x: shipHeading.x.toFixed(3), y: shipHeading.y.toFixed(3), z: shipHeading.z.toFixed(3) });
+
 
     // Calculate sailing efficiency based on wind angle
     const windVector = new THREE.Vector3(Math.cos(windDirection), 0, Math.sin(windDirection));
@@ -161,7 +155,6 @@ export function updateShipMovement(deltaTime) {
 
     // Wind efficiency - More realistic than extreme version
     const windEfficiency = 0.1 + 0.9 * (1 - Math.abs(windAngleToShip - Math.PI) / Math.PI);
-    console.log("🚢 Wind data:", { direction: windDirection.toFixed(2), speed: windSpeed.toFixed(2), efficiency: windEfficiency.toFixed(2) });
 
     // SAILING MECHANICS
     // Calculate forces acting on the ship
@@ -169,19 +162,15 @@ export function updateShipMovement(deltaTime) {
 
     // MODERATELY INCREASED FORWARD MOVEMENT
     if (keys.forward) {
-        console.log("🚢 FORWARD KEY ACTIVE - Calculating forward force");
         // Moderately increased forward force for noticeable movement
         accelerationForce.add(shipHeading.clone().multiplyScalar(sailPower));
-        console.log("🚢 Applied forward force:", sailPower.toFixed(2));
     }
 
     // MODERATELY INCREASED BACKWARD MOVEMENT
     if (keys.backward) {
-        console.log("🚢 BACKWARD KEY ACTIVE - Calculating backward force");
         // Moderately increased backward force for noticeable movement
         const backwardForce = -sailPower * 0.8; // Reduced from 1.5
         accelerationForce.add(shipHeading.clone().multiplyScalar(backwardForce));
-        console.log("🚢 Applied backward force:", backwardForce.toFixed(2));
     }
 
     // TURNING MECHANICS - MODERATELY RESPONSIVE
@@ -191,10 +180,8 @@ export function updateShipMovement(deltaTime) {
 
     if (keys.left) {
         turnEffect = turnPower;
-        console.log("🚢 LEFT KEY ACTIVE - Turn effect:", turnEffect.toFixed(2));
     } else if (keys.right) {
         turnEffect = -turnPower;
-        console.log("🚢 RIGHT KEY ACTIVE - Turn effect:", turnEffect.toFixed(2));
     }
 
     const rotationSpeedMultiplier = 0.5; // Reduce turning speed by 50%
@@ -208,7 +195,6 @@ export function updateShipMovement(deltaTime) {
         const driftDirection = new THREE.Vector3(shipHeading.z, 0, -shipHeading.x);
         driftDirection.normalize().multiplyScalar(turnEffect * currentSpeed * 0.25); // Reduced from 0.3
         accelerationForce.add(driftDirection);
-        console.log("🚢 Added turning drift force");
     }
 
     // PHYSICS UPDATE
@@ -241,7 +227,6 @@ export function updateShipMovement(deltaTime) {
         // Add temporary visual effect when reaching max speed with custom multiplier
         if (shipSpeedConfig.speedMultiplier > 1.0) {
             // We could trigger a visual effect here like wake particles
-            console.log("💨 BOOSTED SPEED ACTIVE! 💨");
 
             // If you have a way to add temporary visual effects, do it here
             if (window.showSpeedBoostEffect) {
@@ -260,18 +245,15 @@ export function updateShipMovement(deltaTime) {
         // Moderate damping - slower deceleration than original but faster than extreme
         const dampingFactor = 0.975; // Between original (0.95) and extreme (0.99)
         boatVelocity.multiplyScalar(dampingFactor);
-        console.log("🚢 Applied idle damping factor:", dampingFactor);
 
         // Only apply stronger damping at low speeds
         if (currentSpeed < 0.08) { // Higher threshold than extreme (0.05)
             const lowSpeedDampingFactor = 0.85; // Between original (0.7) and extreme (0.9)
             boatVelocity.multiplyScalar(lowSpeedDampingFactor);
-            console.log("🚢 Applied low-speed damping factor:", lowSpeedDampingFactor);
         }
     }
 
-    console.log("🚢 FINAL velocity:",
-        { x: boatVelocity.x.toFixed(3), y: boatVelocity.y.toFixed(3), z: boatVelocity.z.toFixed(3) });
+
 
     // Return calculated velocity
     return boatVelocity;
