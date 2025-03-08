@@ -323,7 +323,7 @@ class PlayerList {
         popup.style.position = 'absolute';
         popup.style.top = '100%';
         popup.style.left = '0';
-        popup.style.zIndex = '2100'; // Higher than player list
+        popup.style.zIndex = '1000000000'; // Increased from 2100 to be above everything
         popup.style.backgroundColor = 'rgba(30, 20, 5, 0.95)';
         popup.style.border = '2px solid #B8860B';
         popup.style.borderRadius = '6px';
@@ -398,7 +398,7 @@ class PlayerList {
             errorMsg.style.color = 'white';
             errorMsg.style.padding = '15px 20px';
             errorMsg.style.borderRadius = '8px';
-            errorMsg.style.zIndex = '3000';
+            errorMsg.style.zIndex = '9800'; // Increased from 3000 to be above everything
             document.body.appendChild(errorMsg);
 
             // Remove after 3 seconds
@@ -468,7 +468,7 @@ class PlayerList {
         msg.style.color = 'white';
         msg.style.padding = '10px 20px';
         msg.style.borderRadius = '20px';
-        msg.style.zIndex = '3000';
+        msg.style.zIndex = '9800'; // Increased from 3000 to be above everything
         document.body.appendChild(msg);
 
         // Remove after 3 seconds
@@ -493,7 +493,7 @@ class PlayerList {
         flash.style.width = '100%';
         flash.style.height = '100%';
         flash.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-        flash.style.zIndex = '2500';
+        flash.style.zIndex = '9700'; // Increased from 2500 to be above everything
         flash.style.pointerEvents = 'none';
         document.body.appendChild(flash);
 
