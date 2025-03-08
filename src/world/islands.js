@@ -12,6 +12,7 @@ import {
 import { createBlockCave } from './blockCave.js';
 import { createPirateTavern2 } from './pirateTavern2.js';
 import { createTreehouseTavern } from './treehouseTavern.js';
+import { adjustFogToViewDistance } from '../environment/fog.js';
 
 // Island generation variables
 let islandColliders = [];
@@ -1457,6 +1458,9 @@ export function updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpd
             }
         }
     }
+
+    // Adjust fog to match current view distance and chunk size
+    adjustFogToViewDistance(chunkSize, maxViewDistance);
 
     return chunksUpdated;
 }

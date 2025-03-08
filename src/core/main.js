@@ -45,6 +45,7 @@ import { startScreenSequence, resetScreenSequence } from '../ui/messages.js';
 import { getCurrentUser } from '../ui/auth.js';
 import { getPlayerInfo } from '../ui/login.js';
 import { spawnBlockCave } from '../world/blockCave.js';
+import { setupFog, updateFog, toggleFog, setFogColor } from '../environment/fog.js';
 
 
 // Initialize water with explicit realistic style as default
@@ -1125,6 +1126,12 @@ const keydownHandler = (event) => {
             console.log("Toggling sky system...");
             toggleSkySystem();
             break;
+        // Press 'F' to toggle fog system
+        case 'f': case 'F':
+            console.log("Toggling fog system...");
+            const fogEnabled = toggleFog(scene);
+            console.log(`Fog system: ${fogEnabled ? 'ENABLED' : 'DISABLED'}`);
+            break;
     }
 };
 
@@ -1341,6 +1348,24 @@ function animate() {
 
     //water2.update(deltaTime);
 
+    // Update fog based on boat position and time of day
+    // Get time of day (0-24)
+    const timeOfDay = getTimeOfDay();
+    // Adjust fog color based on time of day - using more subdued colors
+    let fogTimeColor;
+    if (timeOfDay < 5 || timeOfDay > 21) {
+        // Night - darker blue-gray fog
+        fogTimeColor = 0x101820;
+    } else if (timeOfDay < 8 || timeOfDay > 18) {
+        // Dawn/Dusk - subdued purplish-gray fog
+        fogTimeColor = 0x454959;
+    } else {
+        // Day - muted blue-gray fog
+        fogTimeColor = 0x445566;
+    }
+    setFogColor(fogTimeColor);
+    updateFog(boat.position, deltaTime, getWindData());
+
     // Rendering
     //renderer.render(scene, camera);  // Comment out the standard renderer
     requestAnimationFrame(animate);
@@ -1357,8 +1382,6 @@ function animate() {
 
     // Use consolidated island colliders for collision detection
     const allIslandColliders = getAllIslandColliders();
-
-    // After updateShipMovement:
 }
 
 // Calculate boat speed based on velocity
@@ -1648,5 +1671,15 @@ function initializeWorld() {
 
     // ... rest of initialization ...
 }
+
+// Initialize fog system with reduced glow settings
+console.log("Initializing fog system...");
+const fog = setupFog(scene, {
+    color: 0x445566,       // Darker, more neutral blue-gray
+    near: 300,             // Start of fog (closer than chunk size)
+    far: 1000,             // Complete fog (2x chunk size)
+    density: 0.0008,       // Lower density (was 0.0015)
+    useExponentialFog: false // Use linear fog instead of exponential for less glow
+});
 
 
