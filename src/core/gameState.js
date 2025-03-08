@@ -143,7 +143,7 @@ const SHIP_CONFIG = {
     // TURNING
     baseRudderPower: 1.8,           // Modest turning - focused on speed
     turnSpeedMultiplier: 0.5,       // Slower rotation - not for cornering
-    turnConsistencyFactor: 6,       // Poor turning at high speeds
+    turnConsistencyFactor: 50,       // Poor turning at high speeds
 
     // RESISTANCE & FRICTION
     waterResistance: 0.3,           // Low resistance for speed
