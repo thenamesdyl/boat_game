@@ -47,6 +47,7 @@ import { getPlayerInfo } from '../ui/login.js';
 import { spawnBlockCave } from '../world/blockCave.js';
 import { setupFog, updateFog, toggleFog, setFogColor } from '../environment/fog.js';
 import { getTimeOfDay } from '../environment/skybox.js';
+import { initCollisionResponse, updateCollisionResponse, isBoatAirborne } from '../controls/islandCollisionResponse.js';
 
 // Define these variables at the file level scope (outside any functions)
 // so they're accessible throughout the file
@@ -261,19 +262,36 @@ async function initializeFirebaseAuth() {
     // Show Firebase auth popup
     Firebase.showAuthPopup((user) => {
         console.log("🔍 MAIN DEBUG: Firebase auth completed, user:", user?.uid || 'No user');
+        console.log("🔍 MAIN DEBUG: User name:", user);
 
-        if (user && !user.displayName) {
+        // Check if user has already completed login process
+        if (localStorage.getItem('hasCompletedLogin') === 'true') {
+            console.log('🔍 MAIN DEBUG: User has already completed login, skipping login screen');
+            onAuthAndLoginComplete(user);
+            return;
+        }
+
+        // Check both Firebase displayName AND localStorage
+        if ((user && !user.name) || !localStorage.getItem('playerName')) {
             console.log('🔍 MAIN DEBUG: User needs to set name, showing login screen');
+
+            // If there's a name in localStorage, use it as default in the login screen
+            const savedName = localStorage.getItem('playerName');
+            if (savedName) {
+                playerName = savedName;
+            }
 
             // Your showLoginScreen function
             showLoginScreen(() => {
                 console.log('🔍 MAIN DEBUG: Login screen complete, now showing MOTD');
-                // This is the ONLY place we call onAuthAndLoginComplete
                 onAuthAndLoginComplete(user);
             });
         } else {
             console.log('🔍 MAIN DEBUG: User already has name, going to MOTD');
-            // User already has a name, go straight to MOTD
+            // If there's a saved name, make sure to use it
+            if (localStorage.getItem('playerName')) {
+                playerName = localStorage.getItem('playerName');
+            }
             onAuthAndLoginComplete(user);
         }
     });
@@ -432,9 +450,17 @@ export function showLoginScreen(onComplete) {
         playerName = nameInput.value.trim() || nameInput.value;
         playerColor = colorInput.value;
 
+        // Save directly to localStorage here
+        localStorage.setItem('playerName', playerName);
+        localStorage.setItem('playerColor', playerColor);
+        // Add the completion flag
+        localStorage.setItem('hasCompletedLogin', 'true');
+
+        // Now call the network setPlayerName (which will send to server)
+        setPlayerName(playerName);
+
         // Remove login screen
         document.body.removeChild(loginContainer);
-        setPlayerName(playerName);
 
         // Call the completion callback directly
         if (onComplete && typeof onComplete === 'function') {
@@ -1256,32 +1282,60 @@ function animate() {
 
     updateShipMovement(deltaTime);
 
+    // Call our collision response system
+    updateCollisionResponse(deltaTime);
+
     // Create direction vector based on boat's current rotation
     const direction = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), boat.rotation.y);
     let newPosition = boat.position.clone().add(boatVelocity);
 
-    // Update boat rocking motion (this now handles boat height based on water surface)
-    updateBoatRocking(deltaTime);
-
-    // Apply speed-based tilt if it exists
-    if (typeof boat.speedTilt === 'number') {
-        // Apply a slight forward tilt at high speeds
-        const tiltAdjustment = new THREE.Vector3(0, -boat.speedTilt, 0).applyQuaternion(boat.quaternion);
-        newPosition.add(tiltAdjustment);
+    // Only apply rocking and water interaction if NOT in parabolic flight
+    if (!window.boatInParabolicFlight) {
+        updateBoatRocking(deltaTime);
     }
 
-    // Check for island collisions
+    // Check for island collisions - skip if in parabolic flight
     let collided = false;
-    if (checkIslandCollision(newPosition)) {
+    if (!window.boatInParabolicFlight && checkIslandCollision(newPosition)) {
         collided = true;
+        // Our collision system will handle the response
+    }
+
+    // Right before updating position, add this logging
+    if (window.collisionDebugActive && window.boatInParabolicFlight) {
+        console.log("%c📌 MAIN: Position update during flight", "color:purple; font-weight:bold;");
+        console.log("   Current position:", boat.position.x.toFixed(2), boat.position.y.toFixed(2), boat.position.z.toFixed(2));
+        console.log("   New position:", newPosition.x.toFixed(2), newPosition.y.toFixed(2), newPosition.z.toFixed(2));
+        console.log("   Velocity:", boatVelocity.x.toFixed(2), boatVelocity.y.toFixed(2), boatVelocity.z.toFixed(2));
+        console.log("   Y will be preserved:", boat.position.y.toFixed(2));
     }
 
     if (!collided) {
-        // Only update X and Z position here, Y position is updated in updateBoatRocking
-        const currentY = boat.position.y;
-        boat.position.copy(newPosition);
-        boat.position.y = currentY; // Restore Y position as it's managed by updateBoatRocking
+        // Only update X and Z position - Y is controlled by collision system when in flight
+        if (window.boatInParabolicFlight) {
+            // Debug logging before position change
+            if (window.collisionDebugActive) {
+                console.log("%c🔄 MAIN: Applying flight-safe position update", "color:purple;");
+                console.log("   Y before:", boat.position.y.toFixed(2));
+            }
 
+            // Only apply X and Z changes, Y is controlled by the collision system
+            const currentY = boat.position.y;
+            boat.position.x = newPosition.x;
+            boat.position.z = newPosition.z;
+
+            // Check if something modified Y incorrectly
+            if (window.collisionDebugActive && Math.abs(boat.position.y - currentY) > 0.001) {
+                console.warn("%c⚠️ Y-position was modified by something! Expected:",
+                    currentY.toFixed(2), "Actual:", boat.position.y.toFixed(2),
+                    "background:red; color:white;");
+            }
+        } else {
+            // Normal update for all components
+            const currentY = boat.position.y;
+            boat.position.copy(newPosition);
+            boat.position.y = currentY; // Restore Y position
+        }
 
         if (boat.position.distanceTo(lastChunkUpdatePosition) > chunkUpdateThreshold) {
             updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition);
@@ -1739,4 +1793,8 @@ function desaturateColor(color) {
 }
 
 toggleFog(scene);
+
+// Initialize collision response system near other initialization code
+const collisionResponseSystem = initCollisionResponse();
+console.log("Island collision response system initialized");
 
