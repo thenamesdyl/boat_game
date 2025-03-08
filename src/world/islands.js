@@ -146,7 +146,7 @@ const SPAWN_CONTROLS = {
     smugglersHideout: false,
     pirateTavern: false,
     pirateTavern2: false,
-    treehouseTavern: false,
+    treehouseTavern: true,
     blockCave: false,
 };
 
