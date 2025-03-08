@@ -3,7 +3,7 @@ import { gameUI } from './ui.js';
 import { renderer } from '../core/gameState.js';
 
 // Configuration flag - set to true to enable diagnostics
-export const ENABLE_DIAGNOSTICS = true;
+export const ENABLE_DIAGNOSTICS = false;
 
 // Diagnostics state
 let diagnosticsContainer = null;

@@ -346,7 +346,7 @@ function calculateAlignmentForce(bird, index) {
 // Export bird commands
 export const birdCommands = [
     {
-        name: 'birds',
+        name: 'birdsworm',
         handler: spawnBirdSwarm,
         description: 'Spawn a swarm of birds at your location. Usage: /birds [count]'
     }

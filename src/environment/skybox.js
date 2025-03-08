@@ -969,7 +969,7 @@ export function toggleSkySystem() {
 
 // Create a small on-screen indicator for sky mode
 function updateSkyModeIndicator() {
-    let indicator = document.getElementById('sky-mode-indicator');
+    /*let indicator = document.getElementById('sky-mode-indicator');
 
     if (!indicator) {
         indicator = document.createElement('div');
@@ -1018,7 +1018,7 @@ function updateSkyModeIndicator() {
 
     debugBtn.onclick = showSkyDebugMenu;
 
-    indicator.appendChild(debugBtn);
+    indicator.appendChild(debugBtn);*/
 }
 
 // Debug menu to help troubleshoot sky visibility
