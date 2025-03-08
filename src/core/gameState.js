@@ -131,16 +131,37 @@ export function getPlayerInfo() {
     };
 }
 
-// Export the updateShipMovement function with moderately increased movement
+// SHIP CONFIGURATION OBJECT - All tunable parameters in one place
+const SHIP_CONFIG = {
+    // PHYSICAL PROPERTIES
+    mass: 1200,                     // Ultra light
+
+    // POWER & SPEED
+    baseSailPower: 100,             // Maximum power
+    backwardPowerRatio: 0.6,        // Moderate backwards
+
+    // TURNING
+    baseRudderPower: 1.8,           // Modest turning - focused on speed
+    turnSpeedMultiplier: 0.5,       // Slower rotation - not for cornering
+    turnConsistencyFactor: 6,       // Poor turning at high speeds
+
+    // RESISTANCE & FRICTION
+    waterResistance: 0.3,           // Low resistance for speed
+
+    // DAMPING (DECELERATION WHEN NOT ACCELERATING)
+    normalDampingFactor: 0.98,      // Very slow deceleration
+    lowSpeedDampingFactor: 0.8,     // Still slow to stop
+    lowSpeedThreshold: 0.1,         // Low threshold - built for speed
+
+    // DRIFTING
+    turnDriftAmount: 0.2,           // Significant drift
+    minTurnDriftSpeed: 0.4,         // Drifts easily
+
+    // WIND EFFECTS
+    windDriftStrength: 0.00003      // Affected by wind due to light weight
+};
+
 export function updateShipMovement(deltaTime) {
-
-
-    // Ship physical properties - MODERATELY INCREASED POWER
-    const shipMass = 5000; // More reasonable mass (was 2000 in extreme version, 5000 in original)
-    const sailPower = 18 * Math.sqrt(shipSpeedConfig.speedMultiplier); // Apply square root of multiplier to sail power
-    const rudderPower = 1.0; // Moderate turning (was 1.5 in extreme, 0.8 in original)
-    const waterResistance = 0.3; // Balanced resistance (was 0.1 in extreme, 0.3 in original)
-
     // Get wind info for sailing mechanics
     const windData = getWindData();
     const windDirection = windData.direction;
@@ -150,36 +171,37 @@ export function updateShipMovement(deltaTime) {
     const currentSpeed = boatVelocity.length();
     const shipHeading = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), boat.rotation.y);
 
-
-
     // Calculate sailing efficiency based on wind angle
     const windVector = new THREE.Vector3(Math.cos(windDirection), 0, Math.sin(windDirection));
     const windAngleToShip = shipHeading.angleTo(windVector);
 
-    // Wind efficiency - More realistic than extreme version
+    // Wind efficiency calculation
     const windEfficiency = 0.1 + 0.9 * (1 - Math.abs(windAngleToShip - Math.PI) / Math.PI);
 
     // SAILING MECHANICS
     // Calculate forces acting on the ship
     let accelerationForce = new THREE.Vector3();
 
-    // MODERATELY INCREASED FORWARD MOVEMENT
+    // Apply sail power with wind efficiency
+    const effectiveSailPower = SHIP_CONFIG.baseSailPower * Math.sqrt(shipSpeedConfig.speedMultiplier);
+
     if (keys.forward) {
-        // Moderately increased forward force for noticeable movement
-        accelerationForce.add(shipHeading.clone().multiplyScalar(sailPower));
+        // DRAMATICALLY IMPROVED FORWARD ACCELERATION
+        accelerationForce.add(shipHeading.clone().multiplyScalar(effectiveSailPower));
     }
 
-    // MODERATELY INCREASED BACKWARD MOVEMENT
     if (keys.backward) {
-        // Moderately increased backward force for noticeable movement
-        const backwardForce = -sailPower * 0.8; // Reduced from 1.5
+        // DRAMATICALLY IMPROVED BACKWARD ACCELERATION
+        const backwardForce = -effectiveSailPower * SHIP_CONFIG.backwardPowerRatio;
         accelerationForce.add(shipHeading.clone().multiplyScalar(backwardForce));
     }
 
-    // TURNING MECHANICS - MODERATELY RESPONSIVE
+    // DRAMATICALLY IMPROVED TURNING MECHANICS
     let turnEffect = 0;
-    const speedFactor = Math.max(0.2, Math.min(1, currentSpeed / 8)); // Adjusted from 10
-    const turnPower = rudderPower / speedFactor;
+
+    // More consistent turning at all speeds
+    const speedFactor = Math.max(0.2, Math.min(1, currentSpeed / SHIP_CONFIG.turnConsistencyFactor));
+    const turnPower = SHIP_CONFIG.baseRudderPower / speedFactor;
 
     if (keys.left) {
         turnEffect = turnPower;
@@ -187,32 +209,30 @@ export function updateShipMovement(deltaTime) {
         turnEffect = -turnPower;
     }
 
-    const rotationSpeedMultiplier = 0.5; // Reduce turning speed by 50%
+    // DRAMATICALLY INCREASED ROTATION SPEED
+    boat.rotation.y += turnEffect * deltaTime * SHIP_CONFIG.turnSpeedMultiplier;
 
-
-    // Apply turn effect based on current speed
-    boat.rotation.y += turnEffect * deltaTime * rotationSpeedMultiplier;
-
-    // Add drift when turning hard at speed
-    if (Math.abs(turnEffect) > 0.1 && currentSpeed > 1) {
+    // DRAMATICALLY REDUCED DRIFT for more arcade-like handling
+    if (Math.abs(turnEffect) > 0.1 && currentSpeed > SHIP_CONFIG.minTurnDriftSpeed) {
         const driftDirection = new THREE.Vector3(shipHeading.z, 0, -shipHeading.x);
-        driftDirection.normalize().multiplyScalar(turnEffect * currentSpeed * 0.25); // Reduced from 0.3
+        driftDirection.normalize().multiplyScalar(turnEffect * currentSpeed * SHIP_CONFIG.turnDriftAmount);
         accelerationForce.add(driftDirection);
     }
 
-    // PHYSICS UPDATE
-    // Balanced water resistance
-    const resistanceForce = boatVelocity.clone().normalize().multiplyScalar(-waterResistance * currentSpeed * currentSpeed);
+    // DRAMATICALLY INCREASED WATER RESISTANCE for less "icy" feel
+    const resistanceForce = boatVelocity.clone().normalize().multiplyScalar(
+        -SHIP_CONFIG.waterResistance * currentSpeed * currentSpeed
+    );
     accelerationForce.add(resistanceForce);
 
     // Calculate acceleration (F = ma)
-    const acceleration = accelerationForce.divideScalar(shipMass);
+    const acceleration = accelerationForce.divideScalar(SHIP_CONFIG.mass);
 
     // Apply acceleration with force multiplier
     boatVelocity.add(acceleration.multiplyScalar(deltaTime * 60 *
         (shipSpeedConfig.speedMultiplier > 1.0 ? Math.sqrt(shipSpeedConfig.speedMultiplier) : 1.0)));
 
-    // Limit maximum speed
+    // Maximum speed logic
     const playerMaxSpeed = shipSpeedConfig.basePlayerSpeed * shipSpeedConfig.speedMultiplier;
     const knockbackMaxSpeed = shipSpeedConfig.baseKnockbackSpeed * shipSpeedConfig.speedMultiplier;
     const maxSpeed = keys.forward ? playerMaxSpeed * (keys.forward ? 1 : 0.5) : knockbackMaxSpeed;
@@ -222,41 +242,31 @@ export function updateShipMovement(deltaTime) {
         // Hard cap at maximum speed
         boatVelocity.normalize().multiplyScalar(maxSpeed);
 
-        // Add visual/console feedback when speed limit is reached
+        // Visual feedback for max speed
         console.log("🚨 MAXIMUM SPEED REACHED:", maxSpeed.toFixed(2),
             "Current:", currentSpeedValue.toFixed(2),
             "Speed Multiplier:", shipSpeedConfig.speedMultiplier.toFixed(2));
 
-        // Add temporary visual effect when reaching max speed with custom multiplier
-        if (shipSpeedConfig.speedMultiplier > 1.0) {
-            // We could trigger a visual effect here like wake particles
-
-            // If you have a way to add temporary visual effects, do it here
-            if (window.showSpeedBoostEffect) {
-                window.showSpeedBoostEffect(shipSpeedConfig.speedMultiplier);
-            }
+        if (shipSpeedConfig.speedMultiplier > 1.0 && window.showSpeedBoostEffect) {
+            window.showSpeedBoostEffect(shipSpeedConfig.speedMultiplier);
         }
     }
 
-    // Almost eliminated wind drift
-    const windDriftAmount = 0.00005 * deltaTime; // Small but noticeable drift
+    // Minimal wind drift
+    const windDriftAmount = SHIP_CONFIG.windDriftStrength * deltaTime;
     const windDrift = windVector.clone().multiplyScalar(windDriftAmount);
     boatVelocity.add(windDrift);
 
-    // MODERATELY LOWER DAMPING
+    // DRAMATICALLY IMPROVED DECELERATION when not accelerating
     if (!keys.forward && !keys.backward) {
-        // Moderate damping - slower deceleration than original but faster than extreme
-        const dampingFactor = 0.975; // Between original (0.95) and extreme (0.99)
-        boatVelocity.multiplyScalar(dampingFactor);
+        // Much stronger damping for quick deceleration
+        boatVelocity.multiplyScalar(SHIP_CONFIG.normalDampingFactor);
 
-        // Only apply stronger damping at low speeds
-        if (currentSpeed < 0.08) { // Higher threshold than extreme (0.05)
-            const lowSpeedDampingFactor = 0.85; // Between original (0.7) and extreme (0.9)
-            boatVelocity.multiplyScalar(lowSpeedDampingFactor);
+        // Even stronger damping at low speeds for quick stopping
+        if (currentSpeed < SHIP_CONFIG.lowSpeedThreshold) {
+            boatVelocity.multiplyScalar(SHIP_CONFIG.lowSpeedDampingFactor);
         }
     }
-
-
 
     // Return calculated velocity
     return boatVelocity;
