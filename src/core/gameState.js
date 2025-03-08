@@ -26,6 +26,9 @@ export const shipSpeedConfig = {
     speedMultiplier: 1.0       // Multiplier that can be adjusted by /speed command
 };
 
+// Add this near the top with other exports
+export let allPlayers = [];
+
 // Player name and color functions that login.js is trying to import
 export function setPlayerName(name) {
 
@@ -257,4 +260,16 @@ export function updateShipMovement(deltaTime) {
 
     // Return calculated velocity
     return boatVelocity;
+}
+
+// Add this function to update the allPlayers array
+export function updateAllPlayers(players) {
+    allPlayers = players;
+    console.log("🌍 GAME STATE: All players updated:", allPlayers);
+    return allPlayers;
+}
+
+// Add a getter function for the allPlayers array
+export function getAllPlayers() {
+    return allPlayers;
 }

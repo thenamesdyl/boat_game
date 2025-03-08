@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectionShader.js';
 import * as Network from './network.js';
 import { gameUI } from '../ui/ui.js';
-import { scene, camera, renderer, updateTime, getTime, boat, getWindData, boatVelocity, boatSpeed, rotationSpeed, keys, updateShipMovement } from './gameState.js';
+import { scene, camera, renderer, updateTime, getTime, boat, getWindData, boatVelocity, boatSpeed, rotationSpeed, keys, updateShipMovement, updateAllPlayers } from './gameState.js';
 import { setupSkybox, updateSkybox, setupSky, updateTimeOfDay, updateSunPosition, toggleSkySystem, updateRealisticSky } from '../environment/skybox.js';
 import { setupClouds, updateClouds } from '../environment/clouds.js';
 import { setupBirds, updateBirds } from '../entities/birds.js';
@@ -1550,8 +1550,6 @@ window.addEventListener('keydown', (event) => {
     }
 });
 
-
-
 animate();
 
 // Resize
@@ -1798,3 +1796,31 @@ toggleFog(scene);
 const collisionResponseSystem = initCollisionResponse();
 console.log("Island collision response system initialized");
 
+export function setupAllPlayersTracking() {
+    console.log("🎮 Setting up all players tracking...");
+
+    // Register for all_players updates
+    Network.onAllPlayers((players) => {
+        // Update our gameState variable
+        updateAllPlayers(players);
+        console.log("📊 All Players Updated:", players.length, "players found");
+
+        // Debug output the first few players
+        if (players.length > 0) {
+            console.log("📊 Sample Player Data:", players.slice(0, 3));
+        }
+    });
+
+    // Request initial player list
+    const requestSent = Network.getAllPlayers();
+    console.log("🎮 Initial player list request sent:", requestSent);
+
+    // Set up a periodic refresh every 10 seconds
+    setInterval(() => {
+        Network.getAllPlayers();
+
+        // Print the current players from gameState
+        const currentPlayers = getGameStateAllPlayers();
+        console.log("⏱️ Periodic player check:", currentPlayers.length, "players in game state");
+    }, 10000);
+}

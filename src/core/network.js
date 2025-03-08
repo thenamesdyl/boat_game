@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import { getAuth } from 'firebase/auth';
 import { showLoginScreen } from './main';
 import { setPlayerStateFromDb, getPlayerStateFromDb } from './gameState';
+import { setupAllPlayersTracking } from './main';
 
 // Network configuration
 //const SERVER_URL = 'http://localhost:5001';
 const SERVER_URL = 'https://boat-game-python.onrender.com';
 
 // Network state
-let socket;
+export let socket;
 let playerId;
 let firebaseDocId = null; // Store Firebase User ID globally in the module
 let otherPlayers = new Map(); // Map to store other players' meshes
@@ -35,6 +36,50 @@ let character;
 let islandCollidersRef;
 let activeIslandsRef;
 
+// Callback for 'all_players' event
+let allPlayersCallback = null;
+
+// Register a callback for when player list is updated
+export function onAllPlayers(callback) {
+    allPlayersCallback = callback;
+
+    // Register the socket listener if it doesn't exist
+    console.log('Setting up all_players listener');
+
+    if (socket) {
+        console.log('Setting up all_players listener');
+        socket.on('all_players', (players) => {
+            console.log('Received all players list:', players.length);
+
+            // Add player stats if available
+            players.forEach(player => {
+                // Try to get stored stats for this player from cache
+                if (otherPlayers.has(player.id)) {
+                    const storedPlayer = otherPlayers.get(player.id);
+                    if (storedPlayer.data && storedPlayer.data.stats) {
+                        player.stats = storedPlayer.data.stats;
+                    }
+                }
+            });
+
+            // Call the registered callback
+            if (allPlayersCallback) {
+                allPlayersCallback(players);
+            }
+        });
+    }
+}
+
+// Request the player list from the server
+export function getAllPlayers() {
+    if (isConnected && socket) {
+        console.log('Requesting all players from server');
+        socket.emit('get_all_players');
+        return true;
+    }
+    return false;
+}
+
 // Export a getter for the player name
 export function getPlayerName() {
     console.log("getPlayerName called, returning:", playerName);
@@ -52,7 +97,6 @@ export async function initializeNetwork(
     color,
     userId = null // Firebase UID
 ) {
-
     console.log("NETWORK INIT STARTING");
 
     // Store references to game objects
@@ -74,6 +118,9 @@ export async function initializeNetwork(
 
     // Initialize Socket.IO connection
     socket = io(SERVER_URL);
+
+    // Add this line to make socket globally available
+    window.socket = socket;  // Make socket available on window for other components
 
     // Set up event handlers
     setupSocketEvents();
@@ -260,6 +307,8 @@ function setupSocketEvents() {
 
         console.log("setting player data ", data);
         setPlayerStateFromDb(data);
+
+        setupAllPlayersTracking();
 
         // IMPORTANT FIX: Update the playerName variable with the server-stored name
         // This ensures clan tags are maintained after page reload

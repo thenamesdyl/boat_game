@@ -7,6 +7,7 @@ import { getDiagnosticsData, ENABLE_DIAGNOSTICS, isBraveBrowser } from './diagno
 import { fireCannons } from '../gameplay/cannons.js';
 import { setWaterStyle } from '../environment/water.js';
 import { areShoreEffectsEnabled } from '../world/islands.js';
+import playerList from './playerList.js';
 
 // Create a UI class to manage all interface elements
 class GameUI {
@@ -79,8 +80,6 @@ class GameUI {
         this.miniMapContainer.appendChild(this.selfMarker);
 
         // Create player stats panel after elements is initialized
-        this.createPlayerStatsPanel();
-
         // Initialize the chat system
         this.chat = initChat();
 
@@ -105,6 +104,69 @@ class GameUI {
         element.style.border = '1px solid rgba(120, 80, 40, 0.8)';
         element.style.color = '#E6C68A';
         element.style.fontFamily = 'serif';
+
+        // If this is the player count element, make it look clearly clickable
+        if (text.startsWith('Players:')) {
+            // Make it look more like a button
+            element.style.backgroundColor = 'rgba(80, 50, 10, 0.85)'; // Slightly brighter by default
+            element.style.border = '1px solid #DAA520'; // Gold border
+            element.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.3)'; // Add shadow for depth
+            element.style.pointerEvents = 'auto'; // Enable clicking
+            element.style.cursor = 'pointer'; // Show pointer cursor
+            element.style.transition = 'all 0.2s ease'; // Smooth transitions
+            element.style.display = 'flex'; // For better alignment
+            element.style.alignItems = 'center'; // Center content vertically
+            element.style.justifyContent = 'space-between'; // Space between text and icon
+
+            // Create text container for the left side
+            const textContainer = document.createElement('div');
+            textContainer.textContent = text;
+            element.textContent = ''; // Clear the original text
+            element.appendChild(textContainer);
+
+            // Create right side with icon and text
+            const actionContainer = document.createElement('div');
+            actionContainer.style.display = 'flex';
+            actionContainer.style.alignItems = 'center';
+            actionContainer.style.color = '#FFD700'; // Gold color
+            actionContainer.style.fontSize = '13px';
+            actionContainer.style.fontWeight = 'bold';
+
+            // Add view text
+            const viewText = document.createElement('span');
+            viewText.textContent = 'VIEW';
+            viewText.style.marginRight = '4px';
+            actionContainer.appendChild(viewText);
+
+            // Add icon
+            const clickIcon = document.createElement('span');
+            clickIcon.textContent = '👁️';
+            clickIcon.style.fontSize = '14px';
+            actionContainer.appendChild(clickIcon);
+
+            element.appendChild(actionContainer);
+
+            // Enhanced hover effect
+            element.addEventListener('mouseover', () => {
+                element.style.backgroundColor = 'rgba(100, 60, 20, 0.9)';
+                element.style.borderColor = '#FFD700';
+                element.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.4)';
+                element.style.transform = 'translateY(-1px)';
+            });
+
+            element.addEventListener('mouseout', () => {
+                if (!element.classList.contains('active')) {
+                    element.style.backgroundColor = 'rgba(60, 30, 0, 0.7)';
+                }
+            });
+
+            // Add click event listener
+            element.addEventListener('click', () => {
+                console.log("👥 PLAYERCOUNT: Player count clicked, showing player list");
+                playerList.toggle();
+            });
+        }
+
         this.container.appendChild(element);
         return element;
     }
@@ -597,28 +659,6 @@ class GameUI {
     updateInventoryContent() {
         // This will be called from outside to update the inventory
         // Implementation will be added later
-    }
-
-    createPlayerStatsPanel() {
-        // Create a nautical-styled player stats panel
-        const panel = document.createElement('div');
-        panel.style.position = 'absolute';
-        panel.style.top = '10px';
-        panel.style.right = '10px';
-        panel.style.backgroundColor = 'rgba(60, 30, 0, 0.8)';
-        panel.style.padding = '10px';
-        panel.style.borderRadius = '5px';
-        panel.style.border = '2px solid rgba(120, 80, 40, 0.8)';
-        panel.style.color = '#E6C68A';
-        panel.style.fontFamily = 'serif';
-        panel.style.zIndex = '10';
-        panel.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.4)';
-
-
-        // Add placeholders for various stats
-        this.elements.playerStats = {};
-
-        this.elements.playerStatsPanel = panel;
     }
 
     // Method to update player stats - can be called directly from fishing.js
@@ -1219,6 +1259,59 @@ class GameUI {
                 }
             }
         });
+
+        // Add player list button
+        const playerListSection = document.createElement('div');
+        playerListSection.style.marginBottom = '15px';
+        settingsPanel.appendChild(playerListSection);
+
+        // Add section header
+        const playerListHeader = document.createElement('div');
+        playerListHeader.textContent = 'Players';
+        playerListHeader.style.fontWeight = 'bold';
+        playerListHeader.style.marginBottom = '8px';
+        playerListHeader.style.color = '#ffffff';
+        playerListSection.appendChild(playerListHeader);
+
+        // Create button
+        const playerListButton = document.createElement('button');
+        playerListButton.textContent = 'Show Active Sailors';
+        playerListButton.style.width = '100%';
+        playerListButton.style.padding = '8px 10px';
+        playerListButton.style.backgroundColor = '#5A3D27';
+        playerListButton.style.backgroundImage = 'linear-gradient(to bottom, #6A4D37, #5A3D27)';
+        playerListButton.style.border = '1px solid #DAA520';
+        playerListButton.style.borderRadius = '5px';
+        playerListButton.style.color = '#FFD700';
+        playerListButton.style.fontWeight = 'bold';
+        playerListButton.style.cursor = 'pointer';
+        playerListButton.style.fontFamily = 'serif';
+        playerListButton.style.fontSize = '14px';
+        playerListButton.style.textShadow = '0 1px 2px rgba(0,0,0,0.8)';
+        playerListButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)';
+
+        // Add hover effect
+        playerListButton.addEventListener('mouseover', () => {
+            playerListButton.style.backgroundImage = 'linear-gradient(to bottom, #7A5D47, #6A4D37)';
+        });
+        playerListButton.addEventListener('mouseout', () => {
+            playerListButton.style.backgroundImage = 'linear-gradient(to bottom, #6A4D37, #5A3D27)';
+        });
+
+        // Click handler to open player list
+        playerListButton.addEventListener('click', () => {
+            console.log("📋 DEBUG: Settings panel 'Show Active Sailors' button clicked");
+            // Hide settings panel
+            settingsPanel.style.display = 'none';
+            console.log("📋 DEBUG: Settings panel hidden");
+
+            // Show player list
+            console.log("📋 DEBUG: Attempting to show player list...");
+            playerList.show();
+            console.log("📋 DEBUG: playerList.show() called");
+        });
+
+        playerListSection.appendChild(playerListButton);
 
         // Store references
         this.settingsButton = settingsButton;
