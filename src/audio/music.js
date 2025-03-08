@@ -22,6 +22,22 @@ const MusicSystem = (() => {
         // Preload the audio
         backgroundMusic.load();
 
+        // Check if mute state is saved in localStorage
+        if (localStorage.getItem('musicMuted') === 'true') {
+            isMuted = true;
+        }
+
+        // Apply initial mute state
+        if (backgroundMusic) {
+            backgroundMusic.volume = isMuted ? 0 : musicVolume;
+        }
+
+        // Also load volume if available
+        if (localStorage.getItem('musicVolume') !== null) {
+            musicVolume = parseFloat(localStorage.getItem('musicVolume'));
+            console.log(`Loaded music volume from localStorage: ${musicVolume}`);
+        }
+
         // Add user interaction listeners to start music
         setupUserInteractionListeners();
 
@@ -88,6 +104,10 @@ const MusicSystem = (() => {
         if (backgroundMusic && !isMuted) {
             backgroundMusic.volume = musicVolume;
         }
+
+        // Save volume to localStorage
+        localStorage.setItem('musicVolume', musicVolume);
+        console.log(`Saved music volume to localStorage: ${musicVolume}`);
     };
 
     /**
@@ -100,6 +120,10 @@ const MusicSystem = (() => {
         if (backgroundMusic) {
             backgroundMusic.volume = mute ? 0 : musicVolume;
         }
+
+        // Save mute state to localStorage
+        localStorage.setItem('musicMuted', isMuted);
+        console.log(`Saved music mute state to localStorage: ${isMuted}`);
     };
 
     /**
@@ -108,6 +132,8 @@ const MusicSystem = (() => {
      */
     const toggleMute = () => {
         setMute(!isMuted);
+        // Save mute state to localStorage
+        localStorage.setItem('musicMuted', isMuted);
         return isMuted;
     };
 
@@ -144,8 +170,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Uncomment to start music automatically
     // MusicSystem.playMusic();
+
+    // After other UI elements are initialized
+    initMusicIcon();
 });
 
+/**
+ * Initialize music icon state based on localStorage
+ * Call this when UI elements are being set up
+ */
+function initMusicIcon() {
+    // Get the music icon element (replace with your actual selector)
+    const musicIcon = document.querySelector('.music-icon'); // Update this selector
+
+    // Check localStorage for saved mute state
+    const isMuted = localStorage.getItem('musicMuted') === 'true';
+
+    // Update icon appearance based on mute state
+    if (musicIcon) {
+        if (isMuted) {
+            // Show muted icon
+            musicIcon.classList.add('muted');
+            musicIcon.classList.remove('unmuted');
+            // Optional: Update icon image/text if needed
+            // musicIcon.src = 'path/to/muted-icon.png';
+            // or musicIcon.innerHTML = '🔇'; 
+        } else {
+            // Show unmuted icon
+            musicIcon.classList.add('unmuted');
+            musicIcon.classList.remove('muted');
+            // Optional: Update icon image/text if needed
+            // musicIcon.src = 'path/to/unmuted-icon.png';
+            // or musicIcon.innerHTML = '🔊';
+        }
+    }
+
+    // Make sure MusicSystem state matches localStorage
+    if (MusicSystem && typeof MusicSystem.setMute === 'function') {
+        MusicSystem.setMute(isMuted);
+    }
+}
 
 // Export the music system
 export default MusicSystem; 
