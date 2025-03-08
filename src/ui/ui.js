@@ -51,15 +51,10 @@ class GameUI {
         this.elements.fpsCounter = this.createFPSCounter();
 
         // Create basic UI elements
-        this.elements.speed = this.createUIElement('Speed: 0 knots');
-        this.elements.heading = this.createUIElement('Heading: N 0°');
         this.elements.coordinates = this.createUIElement('Position: 0, 0');
-        this.elements.wind = this.createUIElement('Wind: Calm (0 knots)');
-        this.elements.time = this.createUIElement('Time: Dawn');
+        //this.elements.wind = this.createUIElement('Wind: Calm (0 knots)');
         this.elements.playerCount = this.createUIElement('Players: 0');
         this.elements.connectionStatus = this.createUIElement('Status: Connecting...');
-        this.elements.islandDistance = this.createUIElement('Nearest Island: None');
-        this.elements.compass = this.createCompass();
         this.elements.speedometer = this.createSpeedometer();
         this.elements.fishing = this.createFishingUI();
         this.elements.cannon = this.createCannonUI();
@@ -171,7 +166,7 @@ class GameUI {
         return element;
     }
 
-    createCompass() {
+    /*createCompass() {
         const compassContainer = document.createElement('div');
         compassContainer.style.width = '80px';
         compassContainer.style.height = '80px';
@@ -249,7 +244,7 @@ class GameUI {
         this.container.appendChild(compassContainer);
 
         return { container: compassContainer, needle: needle };
-    }
+    }*/
 
     createSpeedometer() {
         const speedContainer = document.createElement('div');
@@ -704,7 +699,6 @@ class GameUI {
     update(data) {
         // Update speed
         if (data.speed !== undefined) {
-            this.elements.speed.textContent = `Speed: ${data.speed.toFixed(1)} knots`;
             // Update speedometer (max speed of 10 knots)
             const speedPercent = Math.min(data.speed / 10 * 100, 100);
             this.elements.speedometer.bar.style.width = `${speedPercent}%`;
@@ -719,13 +713,6 @@ class GameUI {
             }
         }
 
-        // Update heading
-        if (data.heading !== undefined) {
-            const headingDegrees = (data.heading * 180 / Math.PI) % 360;
-            const cardinalDirection = this.getCardinalDirection(headingDegrees);
-            this.elements.heading.textContent = `Heading: ${cardinalDirection} (${Math.abs(headingDegrees).toFixed(0)}°)`;
-            this.elements.compass.needle.style.transform = `translateX(-50%) translateY(-100%) rotate(${headingDegrees}deg)`;
-        }
 
         // Update coordinates
         if (data.position) {
@@ -733,15 +720,13 @@ class GameUI {
         }
 
         // Update wind
-        if (data.windDirection !== undefined && data.windSpeed !== undefined) {
-            const windDescription = this.getWindDescription(data.windSpeed);
-            this.elements.wind.textContent = `Wind: ${windDescription} (${data.windSpeed.toFixed(1)} knots)`;
-        }
+        /* if (data.windDirection !== undefined && data.windSpeed !== undefined) {
+             const windDescription = this.getWindDescription(data.windSpeed);
+             this.elements.wind.textContent = `Wind: ${windDescription} (${data.windSpeed.toFixed(1)} knots)`;
+         }*/
 
         // Update time
-        if (data.timeOfDay !== undefined) {
-            this.elements.time.textContent = `Time: ${data.timeOfDay}`;
-        }
+
 
         // Update player count
         if (data.playerCount !== undefined) {
@@ -754,16 +739,6 @@ class GameUI {
                 'Status: Connected' : 'Status: Disconnected';
             this.elements.connectionStatus.style.color = data.isConnected ?
                 'rgba(100, 255, 100, 1)' : 'rgba(255, 100, 100, 1)';
-        }
-
-        // Update nearest island
-        if (data.nearestIsland !== undefined) {
-            if (data.nearestIsland.distance < 1000) {
-                this.elements.islandDistance.textContent =
-                    `Nearest Island: ${data.nearestIsland.name} (${data.nearestIsland.distance.toFixed(0)}m)`;
-            } else {
-                this.elements.islandDistance.textContent = 'Nearest Island: None in range';
-            }
         }
 
         // Update fish count
