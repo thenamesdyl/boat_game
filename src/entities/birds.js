@@ -469,7 +469,7 @@ function keepBirdInWorld(bird) {
 /**
  * Create a poop particle at the given position
  */
-function createBirdPoop(position) {
+export function createBirdPoop(position) {
     // Create geometry and material
     const geometry = new THREE.SphereGeometry(POOP_CONFIG.SIZE, 8, 8);
     const material = new THREE.MeshBasicMaterial({ color: POOP_CONFIG.COLOR });
