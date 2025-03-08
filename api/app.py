@@ -115,6 +115,13 @@ def verify_firebase_token(token):
         logger.exception("Token verification exception details:")  # This logs the full stack trace
         return None
 
+# Add these near your other global variables at the top of the file
+last_chat_update = defaultdict(float)  # Track last chat message time for each player
+last_action_update = defaultdict(float)  # Track last action time for each player
+last_color_update = defaultdict(float)  # Track last color update time for each player
+last_name_update = defaultdict(float)  # Track last name update time for each player
+last_inventory_update = defaultdict(float)  # Track last inventory update time for each player
+
 # Socket.IO event handlers
 @socketio.on('connect')
 def handle_connect():
@@ -358,6 +365,14 @@ def handle_player_action(data):
         logger.warning(f"Player ID {player_id} not found in cache. Ignoring action.")
         return
     
+    # Add throttling check
+    current_time = time.time()
+    if current_time - last_action_update.get(player_id, 0) < DB_UPDATE_INTERVAL:
+        logger.warning(f"Action from player {player_id} throttled (too frequent)")
+        return
+    
+    last_action_update[player_id] = current_time
+    
     if action_type == 'fish_caught':
         # Increment fish count
         if 'fishCount' not in players[player_id]:
@@ -478,6 +493,14 @@ def handle_chat_message(data):
     final_name = player_name or 'Unknown Sailor'
     print(f"CHAT DEBUG: FINAL NAME FOR CHAT: {final_name}")
     
+    # Add throttling check at the beginning of the function
+    current_time = time.time()
+    if current_time - last_chat_update.get(player_id, 0) < DB_UPDATE_INTERVAL:
+        logger.warning(f"Chat message from player {player_id} throttled (too frequent)")
+        return
+    
+    last_chat_update[player_id] = current_time
+    
     # Send message object with more info instead of just content
     message_obj = {
         'content': content,
@@ -521,6 +544,14 @@ def handle_update_player_color(data):
         logger.warning(f"Player ID {player_id} not found in cache. Ignoring color update.")
         return
     
+    # Add throttling check
+    current_time = time.time()
+    if current_time - last_color_update.get(player_id, 0) < DB_UPDATE_INTERVAL:
+        logger.warning(f"Color update from player {player_id} throttled (too frequent)")
+        return
+    
+    last_color_update[player_id] = current_time
+    
     # Update in-memory cache
     players[player_id]['color'] = color
     
@@ -554,6 +585,14 @@ def handle_update_player_name(data):
     if not name or not isinstance(name, str):
         logger.warning(f"Invalid name in update (empty or not a string): '{name}'. Ignoring.")
         return
+    
+    # Add throttling check
+    current_time = time.time()
+    if current_time - last_name_update.get(player_id, 0) < DB_UPDATE_INTERVAL:
+        logger.warning(f"Name update from player {player_id} throttled (too frequent)")
+        return
+    
+    last_name_update[player_id] = current_time
     
     # Apply server-side sanitization for extra security
     sanitized_name = sanitize_player_name(name)
@@ -689,6 +728,9 @@ def handle_add_to_inventory(data):
     Handle adding items to player's inventory
     Expects: { player_id, item_type (fish/treasure), item_name, item_data }
     """
+
+    print(f"DEBUG: Received inventory update: {data}")
+    logger.error(f"DEBUG: Received inventory update: {data}")
     player_id = data.get('player_id')
     if not player_id:
         logger.warning("Missing player ID in inventory update. Ignoring.")
@@ -708,6 +750,14 @@ def handle_add_to_inventory(data):
         return
     
     result = None
+    
+    # Add throttling check
+    current_time = time.time()
+    if current_time - last_inventory_update.get(player_id, 0) < DB_UPDATE_INTERVAL:
+        logger.warning(f"Inventory update from player {player_id} throttled (too frequent)")
+        return
+    
+    last_inventory_update[player_id] = current_time
     
     # Add to appropriate inventory type
     if item_type == 'fish':
@@ -735,5 +785,5 @@ def get_player_inventory(player_id):
 
 if __name__ == '__main__':
     # Run the Socket.IO server with debug and reloader enabled
-    socketio.run(app, host='0.0.0.0') 
-    # socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=True) 
+    # socketio.run(app, host='0.0.0.0') 
+    socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=True) 
