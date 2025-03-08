@@ -74,7 +74,6 @@ class GameUI {
         this.selfMarker.style.transform = 'translate(-50%, -50%)';
         this.miniMapContainer.appendChild(this.selfMarker);
 
-        // Create player stats panel after elements is initialized
         // Initialize the chat system
         this.chat = initChat();
 
@@ -87,6 +86,14 @@ class GameUI {
 
         // Connect the fire button to the fireCannons function
         this.elements.cannon.fireButton.addEventListener('click', fireCannons);
+
+        // Initialize cinematic mode
+        this.initCinematicMode();
+
+        // Register chat elements AFTER initialization is complete
+        if (this.chat && typeof this.chat.registerCinematicElements === 'function') {
+            this.chat.registerCinematicElements();
+        }
     }
 
     createUIElement(text) {
@@ -955,25 +962,24 @@ class GameUI {
         settingsButton.title = "Game Settings";
         document.body.appendChild(settingsButton);
 
-        // Create mute button with low-poly SVG icon
-        const muteButton = document.createElement('div');
-        muteButton.id = 'mute-button';
-
-        // Create SVG unmuted icon (simple sound waves)
-        const unmutedSVG = `
+        // Create SVG unmuted icon (simple sound waves) and store it as a class property
+        this.unmutedSVG = `
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white">
             <polygon points="3,9 3,15 7,15 12,20 12,4 7,9" />
             <path d="M16,7 L16,17 M20,4 L20,20" stroke="white" stroke-width="2" fill="none" />
         </svg>`;
 
-        // Create SVG muted icon (speaker with X)
-        const mutedSVG = `
+        // Create SVG muted icon (speaker with X) and store it as a class property
+        this.mutedSVG = `
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white">
             <polygon points="3,9 3,15 7,15 12,20 12,4 7,9" />
             <path d="M16,8 L22,14 M22,8 L16,14" stroke="white" stroke-width="2" fill="none" />
         </svg>`;
 
-        muteButton.innerHTML = unmutedSVG; // Default unmuted icon
+        // Create mute button with low-poly SVG icon
+        const muteButton = document.createElement('div');
+        muteButton.id = 'mute-button';
+        muteButton.innerHTML = this.unmutedSVG; // Default unmuted icon using class property
         muteButton.style.position = 'absolute';
         muteButton.style.top = '55px'; // Move down a bit more from the gear
         muteButton.style.right = '7px'; // Adjust to better center with the gear icon
@@ -994,18 +1000,27 @@ class GameUI {
 
         // Add event listener to toggle mute state
         muteButton.addEventListener('click', (e) => {
-            // Access the MusicSystem from window scope
-            const isMuted = window.MusicSystem.toggleMute();
+            try {
+                // Access the MusicSystem from window scope with error handling
+                if (!window.MusicSystem) {
+                    console.error("Music system not available");
+                    return;
+                }
 
-            // Update the icon based on mute state
-            muteButton.innerHTML = isMuted ? mutedSVG : unmutedSVG;
-            muteButton.title = isMuted ? "Unmute Music" : "Mute Music";
+                const isMuted = window.MusicSystem.toggleMute();
 
-            // Add visual feedback for the button - more subtle change
-            muteButton.style.backgroundColor = isMuted ? 'rgba(150, 50, 50, 0.8)' : 'rgba(200, 50, 50, 0.8)';
+                // Update the icon based on mute state
+                muteButton.innerHTML = isMuted ? this.mutedSVG : this.unmutedSVG;
+                muteButton.title = isMuted ? "Unmute Music" : "Mute Music";
 
-            // Prevent any default browser highlight
-            e.preventDefault();
+                // Add visual feedback for the button - more subtle change
+                muteButton.style.backgroundColor = isMuted ? 'rgba(150, 50, 50, 0.8)' : 'rgba(200, 50, 50, 0.8)';
+
+                // Prevent any default browser highlight
+                e.preventDefault();
+            } catch (e) {
+                console.error("Error toggling mute state:", e);
+            }
         });
 
         // Remove animation and use more subtle transition
@@ -1332,6 +1347,189 @@ class GameUI {
 
         return button;
     }
+
+    initCinematicMode() {
+        // Initialize cinematic mode state
+        this.cinematicMode = false;
+
+        // Create a notification element for cinematic mode
+        this.cinematicModeNotification = document.createElement('div');
+        this.cinematicModeNotification.style.position = 'absolute';
+        this.cinematicModeNotification.style.top = '50%';
+        this.cinematicModeNotification.style.left = '50%';
+        this.cinematicModeNotification.style.transform = 'translate(-50%, -50%)';
+        this.cinematicModeNotification.style.color = 'white';
+        this.cinematicModeNotification.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        this.cinematicModeNotification.style.padding = '10px 20px';
+        this.cinematicModeNotification.style.borderRadius = '5px';
+        this.cinematicModeNotification.style.fontFamily = 'serif';
+        this.cinematicModeNotification.style.fontSize = '18px';
+        this.cinematicModeNotification.style.textAlign = 'center';
+        this.cinematicModeNotification.style.opacity = '0';
+        this.cinematicModeNotification.style.transition = 'opacity 0.5s ease';
+        this.cinematicModeNotification.style.zIndex = '9999';
+        document.body.appendChild(this.cinematicModeNotification);
+
+        // Define UI elements to hide in cinematic mode from the main UI
+        this.uiElementsToHide = [
+            this.container,
+            this.miniMapContainer,
+            this.elements.fishing.container,
+            this.elements.cannon.container,
+            document.getElementById('settings-button'),
+            document.getElementById('mute-button')
+        ];
+
+        // Add inventory UI elements if they exist
+        if (window.inventoryUI && window.inventoryUI.elements) {
+            if (window.inventoryUI.elements.chest) {
+                this.uiElementsToHide.push(window.inventoryUI.elements.chest);
+            }
+            if (window.inventoryUI.elements.panel) {
+                this.uiElementsToHide.push(window.inventoryUI.elements.panel);
+            }
+        }
+
+        // Add leaderboard/diary elements if they exist
+        if (this.elements.leaderboard) {
+            if (this.elements.leaderboard.button) {
+                this.uiElementsToHide.push(this.elements.leaderboard.button);
+            }
+            if (this.elements.leaderboard.panel) {
+                this.uiElementsToHide.push(this.elements.leaderboard.panel);
+            }
+        }
+
+        // Add chat elements if they exist
+        /*const chatContainer = document.getElementById('chat-container');
+        if (chatContainer) {
+            this.uiElementsToHide.push(chatContainer);
+        }*/
+
+        // Add key event listener for toggle (using 'C' key)
+        document.addEventListener('keydown', (event) => {
+            // Use 'C' key for Cinematic mode
+            if (event.key === 'c' || event.key === 'C') {
+                this.toggleCinematicMode();
+            }
+        });
+
+        // Show initial cinematic mode info message
+        this.showCinematicModeHint();
+    }
+
+    toggleCinematicMode() {
+        //console.log('🎬 UIGS: toggleCinematicMode');
+        // Toggle the cinematic mode state
+        this.cinematicMode = !this.cinematicMode;
+
+        // Update UI elements visibility based on the current state
+        if (this.cinematicMode) {
+            // Entering cinematic mode - hide all registered UI elements
+            this.uiElementsToHide.forEach(element => {
+                if (element) {
+                    element.style.display = 'none';
+                }
+            });
+
+            // Show a temporary notification
+            // this.showCinematicModeNotification('Cinematic Mode Enabled');
+        } else {
+            // Exiting cinematic mode - show UI elements again but close any open panels
+            this.uiElementsToHide.forEach(element => {
+                if (element) {
+                    // Restore default display style
+                    element.style.display = '';
+                }
+            });
+
+            // IMPORTANT: Close any open UI panels when exiting cinematic mode
+
+            // Close inventory if it's open
+            /* console.log('🎬 UIGS: Closing inventory panel on cinematic mode exit');
+             console.log('🎬 UIGS: Checking inventoryUI');
+             console.log('🎬 UIGS: inventoryUI', window.inventoryUI);
+             console.log('🎬 UIGS: inventoryUI.isOpen', window.inventoryUI.isOpen);
+             console.log('🎬 UIGS: inventoryUI.toggleInventory', window.inventoryUI.toggleInventory);*/
+            if (window.inventoryUI && typeof window.inventoryUI.isOpen === 'boolean' && window.inventoryUI.isOpen) {
+                console.log('🎬 UIGS: Closing inventory panel on cinematic mode exit');
+                window.inventoryUI.toggleInventory(false);
+            }
+
+            // Close leaderboard if it's open
+            if (window.leaderboardUI && typeof window.leaderboardUI.isOpen === 'boolean' && window.leaderboardUI.isOpen) {
+                console.log('🎬 UIGS: Closing leaderboard panel on cinematic mode exit');
+                if (typeof window.leaderboardUI.toggleLeaderboard === 'function') {
+                    window.leaderboardUI.toggleLeaderboard(false);
+                }
+            }
+
+            // Restore music button state if MusicSystem is available
+            try {
+                if (window.MusicSystem && this.muteButton) {
+                    const isMuted = window.MusicSystem.isMuted();
+                    this.muteButton.innerHTML = isMuted ? this.mutedSVG : this.unmutedSVG;
+                }
+            } catch (e) {
+                console.error('Error updating mute button state:', e);
+            }
+
+            // Show a temporary notification
+            // this.showCinematicModeNotification('Cinematic Mode Disabled');
+        }
+
+        // Update the local storage setting
+        localStorage.setItem('cinematicMode', this.cinematicMode);
+    }
+
+    showCinematicModeHint() {
+        // Show a hint about cinematic mode after the game starts
+        setTimeout(() => {
+            this.cinematicModeNotification.textContent = 'Press C for Cinematic Mode';
+            this.cinematicModeNotification.style.opacity = '1';
+
+            setTimeout(() => {
+                this.cinematicModeNotification.style.opacity = '0';
+            }, 3000);
+        }, 5000); // Show 5 seconds after the game starts
+    }
+
+    registerForCinematicMode(element) {
+        // Initialize the array if it doesn't exist yet
+        this.cinematicModeElements = this.cinematicModeElements || [];
+
+        // Add the element to the tracking array if not already there
+        if (element && !this.cinematicModeElements.includes(element)) {
+            this.cinematicModeElements.push(element);
+            console.log(`Registered element for cinematic mode control`, element);
+
+            // If we're already in cinematic mode, hide it immediately
+            if (this.cinematicMode) {
+                try {
+                    element.style.display = 'none';
+                } catch (e) {
+                    console.warn('Error hiding element in cinematic mode:', e);
+                }
+            }
+        }
+
+        return true; // Return success
+    }
+
+    unregisterFromCinematicMode(element) {
+        // Make sure we have the array
+        if (!this.cinematicModeElements) return false;
+
+        // Find and remove the element
+        const index = this.cinematicModeElements.indexOf(element);
+        if (index !== -1) {
+            this.cinematicModeElements.splice(index, 1);
+            console.log(`Unregistered element from cinematic mode control`, element);
+            return true;
+        }
+
+        return false; // Element not found
+    }
 }
 
 // Create a global UI instance
@@ -1380,5 +1578,25 @@ export function unregisterOpenUI(uiElement) {
     }
 }
 
-// Export the UI instance
-export { gameUI }; 
+// Create explicit named export functions that forward to the GameUI methods
+export function registerForCinematicMode(element) {
+    return gameUI.registerForCinematicMode(element);
+}
+
+export function unregisterFromCinematicMode(element) {
+    return gameUI.unregisterFromCinematicMode(element);
+}
+
+// Export the cinematic mode functions to window so they can be called by anyone without imports
+window.registerForCinematicMode = function (element) {
+    return gameUI.registerForCinematicMode(element);
+}
+
+window.unregisterFromCinematicMode = function (element) {
+    return gameUI.unregisterFromCinematicMode(element);
+}
+
+// Export all required functions
+export {
+    gameUI
+}; 

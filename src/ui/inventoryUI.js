@@ -606,6 +606,9 @@ class InventoryUI {
         this.elements.treasureContent = treasureContent;
         this.elements.cargoContent = cargoContent;
 
+        // Register with cinematic mode
+        this.registerForCinematicMode();
+
         return inventoryChest;
     }
 
@@ -911,6 +914,44 @@ class InventoryUI {
                 this.unregisterOpenUI('inventory');
             }
         }
+    }
+
+    // Add this method to the InventoryUI class
+    registerForCinematicMode() {
+        console.log('📦 INVENTORY: Registering elements with cinematic mode...');
+
+        // Wait for everything to be properly initialized
+        setTimeout(() => {
+            // Use window.registerForCinematicMode to avoid circular dependency issues
+            if (typeof window.registerForCinematicMode === 'function') {
+                try {
+                    // Register the main inventory elements
+                    if (this.elements.panel) {
+                        window.registerForCinematicMode(this.elements.panel);
+                        console.log('📦 INVENTORY: Registered inventory panel');
+                    } else {
+                        console.warn('📦 INVENTORY: Panel element not available');
+                    }
+
+                    if (this.elements.chest) {
+                        window.registerForCinematicMode(this.elements.chest);
+                        console.log('📦 INVENTORY: Registered inventory chest');
+                    } else {
+                        console.warn('📦 INVENTORY: Chest element not available');
+                    }
+
+                    // Make isOpen property explicitly accessible
+                    if (typeof window.gameUI !== 'undefined') {
+                        window.gameUI.inventoryIsOpen = () => this.isOpen;
+                        console.log('📦 INVENTORY: Exposed isOpen status to gameUI');
+                    }
+                } catch (e) {
+                    console.error('📦 INVENTORY: Error registering with cinematic mode:', e);
+                }
+            } else {
+                console.warn('📦 INVENTORY: registerForCinematicMode function not available on window');
+            }
+        }, 1000); // Delay to ensure gameUI is initialized
     }
 }
 

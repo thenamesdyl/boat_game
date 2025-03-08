@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { sendChatMessage, getRecentMessages, onChatMessage, onRecentMessages } from '../core/network.js';
 // Import the command system
 import { initCommandSystem, isCommand, processCommand } from '../commands/commandSystem.js';
+import { registerForCinematicMode, unregisterFromCinematicMode } from './ui.js';
 
 export class ChatSystem {
     constructor() {
@@ -18,6 +19,8 @@ export class ChatSystem {
 
         // Set up Socket.IO event listeners
         this.setupSocketEvents();
+
+        // Don't register immediately - this causes circular dependency
     }
 
     createChatUI() {
@@ -615,6 +618,31 @@ export class ChatSystem {
             this.unreadIndicator.style.display = 'none';
         }
     }
+
+    registerCinematicElements() {
+        // IMPORTANT FIX: Delay registration to avoid circular dependency
+        // Wait until the page is fully loaded and gameUI is initialized
+        setTimeout(() => {
+            console.log('📝 CHAT: Beginning cinematic mode registration (with delay to avoid circular dependency)...');
+
+            // Check if window.registerForCinematicMode is available (which doesn't use gameUI directly)
+            if (typeof window.registerForCinematicMode === 'function') {
+                try {
+                    // Just register the main control panel, which contains everything else
+                    if (this.controlPanel) {
+                        window.registerForCinematicMode(this.controlPanel);
+                        console.log('📝 CHAT: Successfully registered control panel with cinematic mode');
+                    } else {
+                        console.warn('📝 CHAT: Control panel not available for registration');
+                    }
+                } catch (e) {
+                    console.error('📝 CHAT: Error during registration:', e);
+                }
+            } else {
+                console.error('📝 CHAT: registerForCinematicMode function not available on window');
+            }
+        }, 1000); // 1 second delay to ensure gameUI is initialized
+    }
 }
 
 export class MiniMap {
@@ -918,6 +946,11 @@ export function initChat() {
 
     // Initialize the command system and attach it to the chat system
     chatSystem.commandSystem = initCommandSystem();
+
+    // Register with cinematic mode after a short delay
+    setTimeout(() => {
+        chatSystem.registerCinematicElements();
+    }, 1500); // Slightly longer delay than the internal delay
 
     return chatSystem;
 }

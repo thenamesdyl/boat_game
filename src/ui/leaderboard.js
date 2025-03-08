@@ -1,7 +1,7 @@
 import { getPlayerStateFromDb } from '../core/gameState.js';
 import { getPlayerStats, requestLeaderboard } from '../core/network.js';
 import { gameUI } from './ui.js';
-import { registerOpenUI, unregisterOpenUI } from './ui.js';
+import { registerOpenUI, unregisterOpenUI, registerForCinematicMode, unregisterFromCinematicMode } from './ui.js';
 
 // Sample leaderboard data (will be replaced with real data later)
 const sampleLeaderboardData = {
@@ -446,6 +446,9 @@ function createLeaderboardUI() {
     bookIcon.appendChild(bookSpine);
     document.body.appendChild(bookIcon);
 
+    // Register the book icon for cinematic mode
+    registerForCinematicMode(bookIcon);
+
     // Create book panel (hidden by default)
     const bookPanel = document.createElement('div');
     bookPanel.id = 'leaderboard-panel';
@@ -467,6 +470,9 @@ function createLeaderboardUI() {
     bookPanel.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.7), inset 0 0 50px rgba(0, 0, 0, 0.7)'; // Book shadow
 
     document.body.appendChild(bookPanel);
+
+    // Register the book panel for cinematic mode
+    registerForCinematicMode(bookPanel);
 
     // Create book binding (the middle line of the book)
     const bookBinding = document.createElement('div');
