@@ -7,6 +7,7 @@ import { shipCommands } from './shipCommands.js';
 import { monsterCommands } from './monsterCommands.js';
 import { teleportCommands } from './teleportCommands.js';
 import { clanCommands } from './clanCommands.js';
+import { birdCommands } from './birdCommands.js';
 
 // Create a global variable to track fly mode state
 // This will be checked by the updateCameraPosition function
@@ -86,6 +87,11 @@ export function initCommandSystem() {
 
     // Register clan commands from the clanCommands module
     clanCommands.forEach(cmd => {
+        registerCommand(cmd.name, cmd.handler, cmd.description);
+    });
+
+    // Register bird commands from the birdCommands module
+    birdCommands.forEach(cmd => {
         registerCommand(cmd.name, cmd.handler, cmd.description);
     });
 
