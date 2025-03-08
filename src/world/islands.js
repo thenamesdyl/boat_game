@@ -16,8 +16,8 @@ import { createTreehouseTavern } from './treehouseTavern.js';
 // Island generation variables
 let islandColliders = [];
 const visibleDistance = 2000; // Distance to see islands from
-const chunkSize = 500; // Size of each "chunk" of ocean
-const islandsPerChunk = 5; // Reduced from 3 to 1 island per chunk
+const chunkSize = 600; // Size of each "chunk" of ocean
+const islandsPerChunk = 2; // Reduced from 3 to 1 island per chunk
 const maxViewDistance = 1; // Reduced from 5 to 3 chunks view distance
 
 // Store generated chunks
