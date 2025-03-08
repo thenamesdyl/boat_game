@@ -6,7 +6,7 @@ const DEFAULT_FOG_CONFIG = {
     near: 300,              // Start of fog (closer than chunk size)
     far: 1000,              // Complete fog (2x chunk size)
     density: 0.0015,        // For exponential fog
-    useExponentialFog: true // Whether to use exp2 fog (more realistic)
+    useExponentialFog: false // Whether to use exp2 fog (more realistic)
 };
 
 // Fog object references

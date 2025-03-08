@@ -7,7 +7,7 @@ import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectio
 import * as Network from './network.js';
 import { gameUI } from '../ui/ui.js';
 import { scene, camera, renderer, updateTime, getTime, boat, getWindData, boatVelocity, boatSpeed, rotationSpeed, keys, updateShipMovement } from './gameState.js';
-import { setupSkybox, updateSkybox, setupSky, updateTimeOfDay, updateSunPosition, getTimeOfDay, toggleSkySystem, updateRealisticSky } from '../environment/skybox.js';
+import { setupSkybox, updateSkybox, setupSky, updateTimeOfDay, updateSunPosition, toggleSkySystem, updateRealisticSky } from '../environment/skybox.js';
 import { setupClouds, updateClouds } from '../environment/clouds.js';
 import { setupBirds, updateBirds } from '../entities/birds.js';
 import { setupSeaMonsters, updateSeaMonsters, getMonsters, updateLurkingMonster, updateHuntingMonster, updateSurfacingMonster, updateAttackingMonster, updateDivingMonster, updateDyingMonster, updateSpecialMonsterBehaviors } from '../entities/seaMonsters.js';
@@ -46,7 +46,27 @@ import { getCurrentUser } from '../ui/auth.js';
 import { getPlayerInfo } from '../ui/login.js';
 import { spawnBlockCave } from '../world/blockCave.js';
 import { setupFog, updateFog, toggleFog, setFogColor } from '../environment/fog.js';
+import { getTimeOfDay } from '../environment/skybox.js';
 
+// Define these variables at the file level scope (outside any functions)
+// so they're accessible throughout the file
+const fogColors = {
+    night: new THREE.Color(0x445566),  // Darker blue-gray
+    dawn: new THREE.Color(0x9999aa),   // Light purple-gray
+    day: new THREE.Color(0xaabbcc),    // Light blue-gray
+    afternoon: new THREE.Color(0xa3b5c7), // Slightly warmer blue-gray
+    dusk: new THREE.Color(0x9a8fa5)    // Warm purple-gray
+};
+
+// Define the keyframes at file level scope
+const fogColorKeyframes = [
+    { position: 0.0, color: new THREE.Color(0x121416) },  // Night (very dark gray with slight blue)
+    { position: 0.2, color: new THREE.Color(0xe11e21) },  // Dawn (dark gray)
+    { position: 0.4, color: new THREE.Color(0x4a4a4a) },  // Day (medium gray)
+    { position: 0.6, color: new THREE.Color(0x424242) },  // Afternoon (medium gray)
+    { position: 0.8, color: new THREE.Color(0x323232) },  // Dusk (darker gray)
+    { position: 1.0, color: new THREE.Color(0x121416) }   // Night (cycle end)
+];
 
 // Initialize water with explicit realistic style as default
 console.log("Initializing water in main.js");
@@ -1126,7 +1146,6 @@ const keydownHandler = (event) => {
             console.log("Toggling sky system...");
             toggleSkySystem();
             break;
-        // Press 'F' to toggle fog system
         case 'f': case 'F':
             console.log("Toggling fog system...");
             const fogEnabled = toggleFog(scene);
@@ -1348,24 +1367,6 @@ function animate() {
 
     //water2.update(deltaTime);
 
-    // Update fog based on boat position and time of day
-    // Get time of day (0-24)
-    const timeOfDay = getTimeOfDay();
-    // Adjust fog color based on time of day - using more subdued colors
-    let fogTimeColor;
-    if (timeOfDay < 5 || timeOfDay > 21) {
-        // Night - darker blue-gray fog
-        fogTimeColor = 0x101820;
-    } else if (timeOfDay < 8 || timeOfDay > 18) {
-        // Dawn/Dusk - subdued purplish-gray fog
-        fogTimeColor = 0x454959;
-    } else {
-        // Day - muted blue-gray fog
-        fogTimeColor = 0x445566;
-    }
-    setFogColor(fogTimeColor);
-    updateFog(boat.position, deltaTime, getWindData());
-
     // Rendering
     //renderer.render(scene, camera);  // Comment out the standard renderer
     requestAnimationFrame(animate);
@@ -1382,6 +1383,46 @@ function animate() {
 
     // Use consolidated island colliders for collision detection
     const allIslandColliders = getAllIslandColliders();
+
+    // After updateShipMovement:
+    // Update fog with continuous color gradient
+    const dayPhase = (getTime() * 0.005) % 1;
+
+    // Find the two keyframes this dayPhase sits between
+    let startKeyframe, endKeyframe;
+    for (let i = 0; i < fogColorKeyframes.length - 1; i++) {
+        if (dayPhase >= fogColorKeyframes[i].position && dayPhase < fogColorKeyframes[i + 1].position) {
+            startKeyframe = fogColorKeyframes[i];
+            endKeyframe = fogColorKeyframes[i + 1];
+            break;
+        }
+    }
+
+    // If we somehow didn't find keyframes, use the last and first (night transition)
+    if (!startKeyframe) {
+        startKeyframe = fogColorKeyframes[fogColorKeyframes.length - 1];
+        endKeyframe = fogColorKeyframes[0];
+    }
+
+    // Calculate how far we are between the two keyframes (0-1)
+    const keyframeRange = endKeyframe.position - startKeyframe.position;
+    const normalizedPosition = keyframeRange <= 0 ? 0 :
+        (dayPhase - startKeyframe.position) / keyframeRange;
+
+    // Create a new color by interpolating between keyframe colors
+    const interpolatedColor = new THREE.Color();
+    interpolatedColor.copy(startKeyframe.color).lerp(endKeyframe.color, normalizedPosition);
+
+    // Desaturate the color to remove luminosity
+    const nonLuminousColor = desaturateColor(interpolatedColor);
+
+    // Convert to hex and set fog color
+    const hexColor = nonLuminousColor.getHex();
+    setFogColor(hexColor);
+    updateFog(boat.position, deltaTime, getWindData());
+
+    // Optional: Log the changing colors (uncomment for debugging)
+    // console.log(`Fog color gradient: phase ${dayPhase.toFixed(2)}, color #${interpolatedColor.getHexString()}`);
 }
 
 // Calculate boat speed based on velocity
@@ -1672,14 +1713,30 @@ function initializeWorld() {
     // ... rest of initialization ...
 }
 
-// Initialize fog system with reduced glow settings
+// Initialize fog system with appropriate color
 console.log("Initializing fog system...");
 const fog = setupFog(scene, {
-    color: 0x445566,       // Darker, more neutral blue-gray
-    near: 300,             // Start of fog (closer than chunk size)
-    far: 1000,             // Complete fog (2x chunk size)
-    density: 0.0008,       // Lower density (was 0.0015)
-    useExponentialFog: false // Use linear fog instead of exponential for less glow
+    color: 0x3a3a3a,  // Neutral gray
+    near: 300,
+    far: 1200,
+    density: 0.0008,
+    useExponentialFog: false  // Linear fog is better for non-luminous fog
 });
 
+// Function to desaturate colors to prevent luminosity
+function desaturateColor(color) {
+    const hsl = {};
+    color.getHSL(hsl);
+
+    // Drastically reduce saturation
+    hsl.s = Math.min(hsl.s * 0.2, 0.1);
+
+    // Cap lightness to prevent bright fog
+    hsl.l = Math.min(hsl.l, 0.3);
+
+    // Return modified color
+    return new THREE.Color().setHSL(hsl.h, hsl.s, hsl.l);
+}
+
+toggleFog(scene);
 
