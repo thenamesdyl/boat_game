@@ -839,7 +839,6 @@ class GameUI {
         fpsElement.style.fontFamily = 'serif';
         fpsElement.style.borderRadius = '3px';
         fpsElement.style.border = '1px solid #B8860B';
-        fpsElement.style.opacity = ENABLE_DIAGNOSTICS ? '1' : '0';
         document.body.appendChild(fpsElement);
 
         this.frameCount = 0;
