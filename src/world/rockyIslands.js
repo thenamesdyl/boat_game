@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createShoreEffect } from './shores.js';
+import { applyOutline } from '../theme/outlineStyles.js';
 
 // Constants for island generation
 const ISLAND_SIZE_MULTIPLIER = 2.0; // Makes islands 2x bigger than regular islands
@@ -97,6 +98,9 @@ export function createRockyIsland(x, z, seed, scene) {
     const mainLand = new THREE.Mesh(mainLandGeometry, landMaterial);
     mainLand.position.y = 5; // Position above the shore base
     island.add(mainLand);
+
+    // Apply outline to main plateau
+    applyOutline(mainLand, { scale: 1.1 });
 
     // Create rocky terrain features
     addRockyTerrain(island, mainLandRadius, random);
@@ -262,6 +266,9 @@ function createGradualShoreBase(island, baseRadius, random) {
         const layer = new THREE.Mesh(layerGeometry, layerMaterial);
         layer.position.y = yPosition;
         island.add(layer);
+
+        // Apply outline to each shore layer
+        applyOutline(layer, { scale: 1.08 });
     }
 }
 
@@ -412,6 +419,9 @@ function addElevatedArea(island, islandRadius, random) {
         );
 
         island.add(hill);
+
+        // Apply outline to hill
+        applyOutline(hill, { scale: 1.1 });
     } catch (e) {
         console.error("Error creating elevated area:", e);
         // Continue without adding this feature
@@ -501,6 +511,9 @@ function addRidge(island, islandRadius, random) {
         ridge.rotation.y = random() * Math.PI;
 
         island.add(ridge);
+
+        // Apply outline to ridge
+        applyOutline(ridge, { scale: 1.12 });
     } catch (e) {
         console.error("Error creating ridge:", e);
         // Continue without adding this feature
@@ -587,6 +600,9 @@ function addDepression(island, islandRadius, random) {
         );
 
         island.add(depression);
+
+        // Apply subtle outline to depression
+        applyOutline(depression, { scale: 1.08 });
     } catch (e) {
         console.error("Error creating depression:", e);
         // Continue without adding this feature
@@ -735,6 +751,11 @@ function createRock(size, height, random) {
     const rock = new THREE.Mesh(baseGeometry, rockMaterial);
     rockGroup.add(rock);
 
+    // Apply outline to rock
+    applyOutline(rock, {
+        scale: 1.12 + (rockType === 0 ? 0.05 : 0) // More pronounced outline for angular rocks
+    });
+
     // For some rock types, add extra details
     if (rockType === 0 && random() < 0.6) {
         // Add cracks or seams for angular rocks
@@ -794,6 +815,8 @@ function addRockDetail(rock, size, height, random) {
 
         // Add to the parent rock
         rock.add(crack);
+
+        // We don't need to outline the crack as it's meant to be a dark indentation
     } catch (e) {
         console.error("Error adding rock detail:", e);
         // Continue without adding this detail
@@ -1176,6 +1199,11 @@ function addStructures(island, random) {
         island.add(base);
         island.add(mid);
         island.add(top);
+
+        // Apply outlines to all structure components
+        applyOutline(base, { scale: 1.12 });
+        applyOutline(mid, { scale: 1.12 });
+        applyOutline(top, { scale: 1.12 });
     }
 }
 
@@ -1218,6 +1246,9 @@ function addVegetation(island, random) {
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
         trunk.position.y = trunkHeight / 2;
         tree.add(trunk);
+
+        // Apply outline to trunk
+        applyOutline(trunk, { scale: 1.15 });
 
         // Create foliage based on tree type
         let foliageGeometry;
@@ -1267,6 +1298,9 @@ function addVegetation(island, random) {
                 frond.rotation.z = Math.PI / 6;
 
                 palmFronds.add(frond);
+
+                // Apply outline to each frond
+                applyOutline(frond, { scale: 1.12 });
             }
 
             palmFronds.position.y = trunkHeight;
@@ -1294,6 +1328,9 @@ function addVegetation(island, random) {
             }
 
             tree.add(foliage);
+
+            // Apply outline to foliage
+            applyOutline(foliage, { scale: 1.15 });
         }
 
         // Position the tree on the island

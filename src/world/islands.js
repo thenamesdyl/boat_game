@@ -13,6 +13,8 @@ import { createBlockCave } from './blockCave.js';
 import { createPirateTavern2 } from './pirateTavern2.js';
 import { createTreehouseTavern } from './treehouseTavern.js';
 import { adjustFogToViewDistance } from '../environment/fog.js';
+// Import the outline style system
+import { applyOutline } from '../theme/outlineStyles.js';
 
 // Island generation variables
 let islandColliders = [];
@@ -198,6 +200,9 @@ function createIsland(x, z, seed, scene) {
     beach.position.y = 0;
     island.add(beach);
 
+    // Apply outline to beach with subtle effect
+    applyOutline(beach, { scale: 1.1 });
+
     // Create a palette of vibrant colors for this island
     const islandPalette = [
         new THREE.Color().setHSL(random(), 0.85, 0.6),
@@ -263,6 +268,9 @@ function createIsland(x, z, seed, scene) {
                 const level = new THREE.Mesh(levelGeometry, levelMaterial);
                 level.position.y = i * levelHeight + levelHeight / 2;
                 temple.add(level);
+
+                // Apply outline to each temple level
+                applyOutline(level, { scale: 1.12 });
             }
 
             // Add a small shrine/structure on top for some variation
@@ -279,6 +287,10 @@ function createIsland(x, z, seed, scene) {
                     const dome = new THREE.Mesh(domeGeometry, domeMaterial);
                     dome.position.y = levels * levelHeight;
                     temple.add(dome);
+
+                    // Apply outline to dome
+                    applyOutline(dome, { scale: 1.12 });
+
                 } else if (topStructureType === 1) {
                     // Small pillars in a square
                     const pillarRadius = topWidth * 0.1;
@@ -302,6 +314,9 @@ function createIsland(x, z, seed, scene) {
                         const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
                         pillar.position.set(pos[0], levels * levelHeight + pillarHeight / 2, pos[2]);
                         temple.add(pillar);
+
+                        // Apply outline to each pillar
+                        applyOutline(pillar, { scale: 1.15 });
                     }
 
                     // Small roof
@@ -309,6 +324,10 @@ function createIsland(x, z, seed, scene) {
                     const roof = new THREE.Mesh(roofGeometry, pillarMaterial);
                     roof.position.y = levels * levelHeight + pillarHeight + levelHeight * 0.1;
                     temple.add(roof);
+
+                    // Apply outline to roof
+                    applyOutline(roof, { scale: 1.12 });
+
                 } else {
                     // Obelisk
                     const obeliskWidth = topWidth * 0.25;
@@ -321,6 +340,9 @@ function createIsland(x, z, seed, scene) {
                     const obelisk = new THREE.Mesh(obeliskGeometry, obeliskMaterial);
                     obelisk.position.y = levels * levelHeight + obeliskHeight / 2;
                     temple.add(obelisk);
+
+                    // Apply outline to obelisk
+                    applyOutline(obelisk, { scale: 1.15 });
                 }
             }
 
@@ -368,6 +390,9 @@ function createIsland(x, z, seed, scene) {
         trunk.position.y = trunkHeight / 2;
         tree.add(trunk);
 
+        // Apply outline to trunk
+        applyOutline(trunk, { scale: 1.12 });
+
         // Create foliage
         let foliageGeometry;
         if (treeType === 0) {
@@ -391,6 +416,9 @@ function createIsland(x, z, seed, scene) {
 
         tree.add(foliage);
 
+        // Apply outline to foliage
+        applyOutline(foliage, { scale: 1.15 });
+
         // Add some random rotation to the tree for variety
         tree.rotation.y = random() * Math.PI * 2;
         tree.rotation.x = (random() - 0.5) * 0.05; // Slight random tilt
@@ -407,7 +435,6 @@ function createIsland(x, z, seed, scene) {
 
         island.add(tree);
     }
-
 
     // Store the island with its ID and collider reference
     const islandEntry = {
@@ -635,11 +662,17 @@ function createAncientTemple(island, random) {
     base.position.y = 5;
     island.add(base);
 
+    // Apply outline to base
+    applyOutline(base, { scale: 1.1 });
+
     // Temple steps
     const stepsGeometry = new THREE.BoxGeometry(30, 5, 30);
     const steps = new THREE.Mesh(stepsGeometry, baseMaterial);
     steps.position.y = 12.5;
     island.add(steps);
+
+    // Apply outline to steps
+    applyOutline(steps, { scale: 1.1 });
 
     // Main temple structure
     const templeGeometry = new THREE.BoxGeometry(20, 15, 20);
@@ -655,6 +688,9 @@ function createAncientTemple(island, random) {
     temple.position.y = 22.5;
     island.add(temple);
 
+    // Apply outline to temple
+    applyOutline(temple, { scale: 1.12 });
+
     // Temple roof
     const roofGeometry = new THREE.ConeGeometry(15, 10, 4);
     const roofTexture = createStoneTexture(new THREE.Color(0xa52a2a), 0.4);
@@ -669,6 +705,9 @@ function createAncientTemple(island, random) {
     roof.rotation.y = Math.PI / 4; // Rotate 45 degrees
     island.add(roof);
 
+    // Apply outline to roof
+    applyOutline(roof, { scale: 1.15 });
+
     // Columns
     const columnPositions = [
         [-12, 0, -12], [12, 0, -12], [-12, 0, 12], [12, 0, 12]
@@ -679,6 +718,9 @@ function createAncientTemple(island, random) {
         const column = new THREE.Mesh(columnGeometry, baseMaterial);
         column.position.set(pos[0], 20, pos[2]);
         island.add(column);
+
+        // Apply outline to each column
+        applyOutline(column, { scale: 1.15 });
     });
 }
 
@@ -699,6 +741,9 @@ function createLighthouse(island, random) {
     const base = new THREE.Mesh(baseGeometry, baseMaterial);
     base.position.y = 5;
     island.add(base);
+
+    // Apply outline to base
+    applyOutline(base, { scale: 1.12 });
 
     // Tower
     const towerGeometry = new THREE.CylinderGeometry(8, 12, 40, 32);
@@ -749,6 +794,9 @@ function createLighthouse(island, random) {
     tower.position.y = 30;
     island.add(tower);
 
+    // Apply outline to tower
+    applyOutline(tower, { scale: 1.1 });
+
     // Lantern room
     const lanternGeometry = new THREE.CylinderGeometry(10, 10, 8, 16);
     const lanternMaterial = new THREE.MeshPhongMaterial({
@@ -763,7 +811,10 @@ function createLighthouse(island, random) {
     lantern.position.y = 54;
     island.add(lantern);
 
-    // Light source
+    // Apply outline to lantern room
+    applyOutline(lantern, { scale: 1.15 });
+
+    // Light source - don't outline this since it emits light
     const lightGeometry = new THREE.SphereGeometry(6, 16, 16);
     const lightMaterial = new THREE.MeshBasicMaterial({
         color: 0xffff00,
@@ -797,6 +848,9 @@ function createGiantStatue(island, random) {
     const base = new THREE.Mesh(baseGeometry, baseMaterial);
     base.position.y = 5;
     island.add(base);
+
+    // Apply outline to base
+    applyOutline(base, { scale: 1.1 });
 
     // Create a fancy Roman inscription on the base
     const inscriptionGeometry = new THREE.PlaneGeometry(18, 6);
@@ -851,6 +905,9 @@ function createGiantStatue(island, random) {
         inscription.position.set(side.pos[0], side.pos[1], side.pos[2]);
         inscription.rotation.set(side.rot[0], side.rot[1], side.rot[2]);
         island.add(inscription);
+
+        // Apply outline to inscription
+        applyOutline(inscription, { scale: 1.1 });
     });
 
     // Create obelisk material
@@ -969,6 +1026,9 @@ function createGiantStatue(island, random) {
     subBase.position.y = 12.5;
     island.add(subBase);
 
+    // Apply outline to sub-base
+    applyOutline(subBase, { scale: 1.1 });
+
     // Create main obelisk shaft (tapered rectangular prism)
     // Since THREE.js doesn't have a built-in tapered box, we'll create a custom geometry
     const obeliskHeight = 50;
@@ -1042,6 +1102,9 @@ function createGiantStatue(island, random) {
     obeliskShaft.position.y = 15; // Position on top of sub-base
     island.add(obeliskShaft);
 
+    // Apply outline to obelisk shaft
+    applyOutline(obeliskShaft, { scale: 1.1 });
+
     // Create pyramid cap for obelisk
     const pyramidHeight = 10;
     const pyramidGeometry = new THREE.ConeGeometry(topWidth * 0.8, pyramidHeight, 4);
@@ -1058,6 +1121,9 @@ function createGiantStatue(island, random) {
     pyramidCap.position.y = 15 + obeliskHeight + pyramidHeight / 2;
     pyramidCap.rotation.y = Math.PI / 4; // Rotate 45 degrees for alignment
     island.add(pyramidCap);
+
+    // Apply outline to pyramid cap
+    applyOutline(pyramidCap, { scale: 1.1 });
 
     // Add dramatic lighting effect
     const statueLight = new THREE.PointLight(0xffffaa, 1, 70);
@@ -1105,6 +1171,9 @@ function createRuinedTower(island, random) {
     base.position.y = 5;
     island.add(base);
 
+    // Apply outline to base
+    applyOutline(base, { scale: 1.12 });
+
     // Tower sections with progressive damage
     const sections = 5;
     const maxHeight = 50;
@@ -1131,6 +1200,9 @@ function createRuinedTower(island, random) {
         section.position.y = 10 + (i * sectionHeight) + sectionHeight / 2;
         section.rotation.y = random() * Math.PI * 2;
         island.add(section);
+
+        // Apply outline to each section
+        applyOutline(section, { scale: 1.15 });
 
         // Add some fallen debris around the base
         if (i > 1) { // More debris from higher sections
@@ -1220,7 +1292,7 @@ function createRuinedTower(island, random) {
         island.add(vine);
     }
 
-    // Add a mysterious glow at the top
+    // Add a mysterious glow at the top - don't outline since it glows
     const glowGeometry = new THREE.SphereGeometry(3, 16, 16);
     const glowMaterial = new THREE.MeshBasicMaterial({
         color: 0x66ccff,
