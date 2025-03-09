@@ -23,7 +23,7 @@ let time = 0;
 export const shipSpeedConfig = {
     basePlayerSpeed: 1.2,     // Normal max speed when player is controlling
     baseKnockbackSpeed: 8.5,   // Max speed when not player-controlled (like knockbacks)
-    speedMultiplier: 1.0       // Multiplier that can be adjusted by /speed command
+    speedMultiplier: 0.4       // Multiplier that can be adjusted by /speed command
 };
 
 // Add this near the top with other exports
@@ -141,7 +141,7 @@ const SHIP_CONFIG = {
     backwardPowerRatio: 0.6,        // Moderate backwards
 
     // TURNING
-    baseRudderPower: 1.8,           // Modest turning - focused on speed
+    baseRudderPower: 0.9,           // Modest turning - focused on speed
     turnSpeedMultiplier: 0.5,       // Slower rotation - not for cornering
     turnConsistencyFactor: 50,       // Poor turning at high speeds
 

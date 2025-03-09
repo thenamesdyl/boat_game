@@ -1,25 +1,24 @@
 import * as THREE from 'three';
 import { scene, getTime } from '../core/gameState.js';
 
-// Configuration for the targeting system
 const TARGETING_CONFIG = {
     // Targeting behavior
     TRACKING_SPEED: 0.6,            // How quickly cannons track targets (0-1, higher = faster)
     MAX_PREDICTION: 2.0,            // Maximum seconds to predict target movement
     CONVERGENCE_DISTANCE: 50,       // Distance at which cannons aim precisely at target
+    TARGET_PERSISTENCE: 1.0,        // How long to keep targeting after losing sight (seconds)
 
     // Visual appearance
     AIM_LINE_LENGTH: 75,            // Length of targeting lines
     LINE_SEGMENTS: 30,              // Number of segments in trajectory line
     ARC_HEIGHT: 15,                 // Height of the parabolic arc
-    LINE_WIDTH: 1000,                  // Width of the trajectory line
+    LINE_WIDTH: 1000,               // Width of the trajectory line
 
     // Colors
     COLOR_OUT_OF_RANGE: 0xff3333,   // Red when target is out of range
     COLOR_IN_RANGE: 0x33ff33,       // Green when target is in range
     COLOR_OPTIMAL: 0xffff33,        // Yellow when in optimal firing position
 };
-
 // Main system state
 let boat = null;
 let monsters = [];
@@ -59,7 +58,9 @@ Object.keys(cannonPositions).forEach(position => {
         currentTarget: null,
         aimDirection: new THREE.Vector3(0, 0, 0),
         aimPoint: new THREE.Vector3(0, 0, 0),
-        trajectory: null
+        trajectory: null,
+        lastTargetTime: 0,          // Track when we last had a valid target
+        lastMonsterY: null          // Track last monster Y position
     };
 });
 
@@ -202,11 +203,23 @@ function updateCannonTargeting(position, deltaTime) {
     // First, check if we should show any targeting at all
     let surfaceMonsterExists = false;
 
+    // Get current time for target persistence
+    const currentTime = getTime();
+
+    // Update targeting state
+    const targetData = targets[position];
+
     for (const monster of monsters) {
-        // Enhanced check for monsters at the surface
-        // Monsters should be in attacking or surfacing state AND be near water level
-        const isAtSurface = (monster.state === 'attacking' || monster.state === 'surfacing') &&
-            (monster.mesh.position.y >= -5 && monster.mesh.position.y <= 5);
+        // Check for monsters at the surface
+        // Use looser constraint if we were already tracking this monster
+        const wasTrackingThisMonster = targetData.currentTarget === monster;
+
+        // Normal surface check, but with hysteresis for already-tracked monsters
+        const normalSurfaceCheck = (monster.state === 'attacking' || monster.state === 'surfacing') &&
+            ((wasTrackingThisMonster && monster.mesh.position.y >= -2) || // More lenient if already tracking
+                (!wasTrackingThisMonster && monster.mesh.position.y >= 0));  // Stricter for new targets
+
+        const isAtSurface = normalSurfaceCheck;
 
         if (isAtSurface) {
             surfaceMonsterExists = true;
@@ -257,6 +270,12 @@ function updateCannonTargeting(position, deltaTime) {
                     closestDistance = distance;
                     activelyTargeting = true; // This cannon is now targeting a monster
 
+                    // Remember last monster Y position for smooth transitions
+                    targetData.lastMonsterY = monster.mesh.position.y;
+
+                    // Update the last target time
+                    targetData.lastTargetTime = currentTime;
+
                     // Check if cannon is in optimal firing position (perpendicular for broadsides)
                     if (position.includes('left') || position.includes('right')) {
                         // For broadsides, optimal is 90° to monster (dot product near 0)
@@ -269,19 +288,31 @@ function updateCannonTargeting(position, deltaTime) {
         }
     }
 
-    // Update targeting state
-    const targetData = targets[position];
+    // Check for target persistence - keep targeting for a short while after losing sight
+    const timeSinceLastTarget = currentTime - targetData.lastTargetTime;
 
-    // Hide targeting if no surface monsters exist or this cannon isn't targeting
-    if (!surfaceMonsterExists || !activelyTargeting) {
-        if (targetData.trajectory) {
-            targetData.trajectory.visible = false;
-        }
+    // Continue targeting if we recently had a valid target
+    if (!activelyTargeting && timeSinceLastTarget < TARGETING_CONFIG.TARGET_PERSISTENCE && targetData.currentTarget) {
+        // Use the last known target but with decaying influence
+        closestMonster = targetData.currentTarget;
+        activelyTargeting = true;
+    }
 
-        // If no monster exists, just return
-        if (!surfaceMonsterExists) {
-            return;
+    // If no surface monsters exist or this cannon isn't targeting, hide trajectory and return to default position
+    if (!surfaceMonsterExists && !activelyTargeting) {
+        // Only reset targeting if we've truly lost track
+        if (timeSinceLastTarget > TARGETING_CONFIG.TARGET_PERSISTENCE) {
+            targetData.currentTarget = null;
+
+            // Return to default aim direction gradually
+            targetData.aimDirection.lerp(defaultAimDirection, 0.1 * deltaTime * 60);
+
+            // Hide trajectory line
+            if (targetData.trajectory) {
+                targetData.trajectory.visible = false;
+            }
         }
+        return;
     }
 
     // If we have a target, update aiming
@@ -291,8 +322,10 @@ function updateCannonTargeting(position, deltaTime) {
 
         // Get monster position and velocity, ensuring we target the water-level point
         const monsterPosition = closestMonster.mesh.position.clone();
+
         // Adjust Y to water level for better targeting (cannons should aim at body, not above)
-        monsterPosition.y = 0;
+        // Use the higher of actual position or 0 (water level)
+        monsterPosition.y = Math.max(0, monsterPosition.y);
 
         const monsterVelocity = closestMonster.velocity ? closestMonster.velocity.clone() : new THREE.Vector3();
 
@@ -329,11 +362,6 @@ function updateCannonTargeting(position, deltaTime) {
         targetData.aimDirection.lerp(idealAimDirection, trackingSpeed * deltaTime * 60);
         targetData.aimDirection.normalize();
 
-        // Calculate how much the aim has changed - only show trajectory if actively moving
-        // Compare current aim direction with the ideal direction to see if we're still adjusting
-        const aimDifference = targetData.aimDirection.clone().sub(idealAimDirection).length();
-        const isAdjustingAim = aimDifference > 0.01; // Small threshold to detect movement
-
         // Update trajectory if this cannon is actively targeting and the visual should be shown
         if (targetData.trajectory && targetingVisualsActive && activelyTargeting) {
             // Show targeting trajectory only if this cannon is actively targeting
@@ -351,12 +379,15 @@ function updateCannonTargeting(position, deltaTime) {
             updateTrajectory(position, inOptimalPosition);
         }
     } else {
-        // No target, hide trajectory
-        targetData.currentTarget = null;
-        targetData.aimDirection.lerp(defaultAimDirection, 0.1 * deltaTime * 60);
+        // No valid target but we might still be in persistence mode
+        if (timeSinceLastTarget > TARGETING_CONFIG.TARGET_PERSISTENCE) {
+            // Truly no target, reset everything
+            targetData.currentTarget = null;
+            targetData.aimDirection.lerp(defaultAimDirection, 0.1 * deltaTime * 60);
 
-        if (targetData.trajectory) {
-            targetData.trajectory.visible = false;
+            if (targetData.trajectory) {
+                targetData.trajectory.visible = false;
+            }
         }
     }
 }
