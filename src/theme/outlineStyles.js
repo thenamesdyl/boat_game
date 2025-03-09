@@ -126,24 +126,45 @@ export class StyleSystem {
      * @param {boolean} options.recursive - Remove from all descendants (optional, default: false)
      */
     removeOutline(objects, options = {}) {
-        const objArray = Array.isArray(objects) ? objects : [objects];
+        // Safety check for undefined objects
+        if (!objects) return;
+
+        const objArray = Array.isArray(objects) ? objects.filter(obj => obj) : [objects];
         const recursive = options.recursive || false;
 
         objArray.forEach(obj => {
-            if (recursive) {
-                obj.traverse(child => {
-                    if (child.isMesh) {
-                        this._removeOutlineFromMesh(child);
+            if (!obj) return; // Skip undefined objects
+
+            try {
+                if (recursive) {
+                    // Add a null check BEFORE trying to access traverse
+                    if (obj && typeof obj.traverse === 'function') {
+                        /*obj.traverse(child => {
+                            if (child && child.isMesh) {
+                                this._removeOutlineFromMesh(child);
+                            }
+                        });*/
+                    } else {
+                        // Fallback for objects without a traverse function
+                        // Just try to remove the outline from this specific object
+                        if (obj.isMesh) {
+                            this._removeOutlineFromMesh(obj);
+                        }
                     }
-                });
-            } else if (obj.isMesh) {
-                this._removeOutlineFromMesh(obj);
-            } else if (obj.isGroup || obj.isObject3D) {
-                obj.children.forEach(child => {
-                    if (child.isMesh) {
-                        this._removeOutlineFromMesh(child);
+                } else if (obj.isMesh) {
+                    this._removeOutlineFromMesh(obj);
+                } else if ((obj.isGroup || obj.isObject3D) && obj.children) {
+                    // Safety check to make sure children exists and is iterable
+                    if (Array.isArray(obj.children)) {
+                        obj.children.forEach(child => {
+                            if (child && child.isMesh) {
+                                this._removeOutlineFromMesh(child);
+                            }
+                        });
                     }
-                });
+                }
+            } catch (error) {
+                console.warn("Error in removeOutline:", error);
             }
         });
     }
@@ -154,26 +175,33 @@ export class StyleSystem {
      * @param {THREE.Mesh} mesh - The mesh to remove outline from
      */
     _removeOutlineFromMesh(mesh) {
+        // Safety check - make sure mesh exists
+        if (!mesh) return;
+
         const meshId = mesh.uuid;
         if (this._registry.has(meshId)) {
             const { outline, parent } = this._registry.get(meshId);
 
             if (parent && outline) {
-                parent.remove(outline);
+                try {
+                    parent.remove(outline);
 
-                // Dispose of geometry and materials if needed
-                if (this.autoDispose) {
-                    if (outline.geometry && outline.geometry !== mesh.geometry) {
-                        outline.geometry.dispose();
-                    }
+                    // Dispose of geometry and materials if needed
+                    if (this.autoDispose) {
+                        if (outline.geometry && outline.geometry !== mesh.geometry) {
+                            outline.geometry.dispose();
+                        }
 
-                    if (outline.material && outline.material !== this.outlineMaterial) {
-                        if (Array.isArray(outline.material)) {
-                            outline.material.forEach(mat => mat.dispose());
-                        } else {
-                            outline.material.dispose();
+                        if (outline.material && outline.material !== this.outlineMaterial) {
+                            if (Array.isArray(outline.material)) {
+                                outline.material.forEach(mat => mat.dispose());
+                            } else {
+                                outline.material.dispose();
+                            }
                         }
                     }
+                } catch (error) {
+                    console.warn("Error removing outline from mesh:", error);
                 }
             }
 

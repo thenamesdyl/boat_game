@@ -4,6 +4,7 @@ import { getTimeOfDay } from '../environment/skybox.js'; // Import time of day f
 import { flashBoatDamage } from '../entities/character.js'; // Add this import
 import { getFishInventory } from '../gameplay/fishing.js'; // Import the fish inventory
 import { createTreasureDrop, updateTreasures, initTreasureSystem } from '../gameplay/treasure.js';
+import { applyOutline, removeOutline } from '../theme/outlineStyles.js';
 
 // Sea monster configuration
 const MONSTER_COUNT = 15;
@@ -712,6 +713,9 @@ function setupMonsterPosition(monster, tentacles, dorsalFin, leftFin, rightFin, 
         monsterType: monsterType,
         health: getMonsterHealth(monsterType)
     });
+
+    // Apply styling with outline
+    applyMonsterStyle(monsters[monsters.length - 1]);
 }
 
 function getMonsterHealth(monsterType) {
@@ -1384,4 +1388,60 @@ function getRandomSpawnPosition() {
 export function handleMonsterTreasureDrop(monster) {
     // Call the imported createTreasureDrop function from treasure.js
     createTreasureDrop(monster.mesh.position, monster.monsterType);
+}
+
+// Add this function to apply styling based on monster type
+function applyMonsterStyle(monster) {
+    const monsterType = monster.monsterType;
+
+    // Define style options based on monster type
+    const styleOptions = {
+        recursive: true,  // Apply to all meshes in the monster
+        scale: 1.07       // Default outline thickness
+    };
+
+    // Customize style per monster type
+    switch (monsterType) {
+        case MONSTER_TYPES.KRAKEN:
+            styleOptions.material = new THREE.MeshBasicMaterial({
+                color: 0x000000,  // Dark red outline for Kraken
+                side: THREE.BackSide
+            });
+            break;
+
+        case MONSTER_TYPES.PHANTOM_JELLYFISH:
+            styleOptions.material = new THREE.MeshBasicMaterial({
+                color: 0x000000,  // Purple outline for jellyfish
+                side: THREE.BackSide,
+                transparent: true
+            });
+            styleOptions.scale = 1.09;  // Slightly thicker outline
+            break;
+
+        case MONSTER_TYPES.SEA_SERPENT:
+            styleOptions.material = new THREE.MeshBasicMaterial({
+                color: 0x000000,  // Dark green outline for serpent
+                side: THREE.BackSide
+            });
+            break;
+
+        case MONSTER_TYPES.YELLOW_BEAST:
+        default:
+            styleOptions.material = new THREE.MeshBasicMaterial({
+                color: 0x000000,  // Black outline for yellow beast
+                side: THREE.BackSide
+            });
+            styleOptions.scale = 1.05;  // Slightly thinner outline
+            break;
+    }
+
+    // Apply the outline
+    applyOutline(monster.mesh, styleOptions);
+}
+
+// Export function to remove monster outline
+export function removeMonsterOutline(monster) {
+    if (monster && monster.mesh) {
+        removeOutline(monster.mesh, { recursive: true });
+    }
 } 

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { scene, getTime } from '../core/gameState.js';
 import { gameUI } from '../ui/ui.js';
 import { onMonsterKilled, addToInventory } from '../core/network.js';
-import { handleMonsterTreasureDrop } from '../entities/seaMonsters.js';
+import { handleMonsterTreasureDrop, removeMonsterOutline } from '../entities/seaMonsters.js';
 import { initCannonTargetingSystem, updateTargeting, isMonsterEffectivelyTargeted, isMonsterTargetedWithGreenLine } from './cannonautosystem.js';
 import { playCannonSound } from '../audio/soundEffects.js';
 
@@ -373,6 +373,9 @@ function hitMonster(monster, hasGreenLine = false) {
 
     // Check if monster is defeated
     if (monster.health <= 0) {
+        // Remove the outline first before death animation
+        removeMonsterOutline(monster);
+
         // Create treasure drop before monster disappears
         handleMonsterTreasureDrop(monster);
 
@@ -456,10 +459,28 @@ function flashMonsterRed(monster, hadGreenLine = false) {
     if (monster.mesh) {
         monster.mesh.traverse((child) => {
             if (child.isMesh && child.material) {
-                // Handle both single materials and material arrays
+                // Skip outline meshes - outlines use BackSide rendering
+                if (child.material.side === THREE.BackSide) {
+                    // Ensure outlines stay black
+                    if (child.material.color) {
+                        child.material.color.set(0x000000);
+                    }
+                    return; // Skip further processing for outline materials
+                }
+
+                // Handle both single materials and material arrays for non-outline meshes
                 const materials = Array.isArray(child.material) ? child.material : [child.material];
 
                 materials.forEach((material, index) => {
+                    // Skip any BackSide materials (outlines)
+                    if (material.side === THREE.BackSide) {
+                        // Keep outlines black
+                        if (material.color) {
+                            material.color.set(0x000000);
+                        }
+                        return;
+                    }
+
                     if (material && material.color) {
                         // Create a unique identifier for this material
                         const materialId = `${child.id}-${index}`;
