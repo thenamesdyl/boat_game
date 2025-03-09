@@ -18,12 +18,15 @@ const MONSTER_TYPE_WEIGHTS = {
     [MONSTER_TYPES.SEA_SERPENT]: 0.2,     // 20% chance 
     [MONSTER_TYPES.PHANTOM_JELLYFISH]: 0.2 // 20% chance
 };
-const MONSTER_SPEED = 0.3;
+const MONSTER_SPEED = 0.11;
 const MONSTER_DETECTION_RANGE = 200;
 const MONSTER_ATTACK_RANGE = 50;
 const MONSTER_DEPTH = -20;
 const MONSTER_SURFACE_TIME = 10; // seconds monster stays on surface
 const MONSTER_DIVE_TIME = 30; // seconds monster stays underwater before considering resurfacing
+
+// Add a new constant for surfacing speed - much faster than regular movement
+const MONSTER_SURFACING_SPEED = 0.4; // Significantly faster than MONSTER_SPEED (0.11)
 
 // Monster states
 const MONSTER_STATE = {
@@ -73,7 +76,7 @@ export function setupSeaMonsters(boat) {
                     createKrakenMonster();
                     break;
                 case MONSTER_TYPES.SEA_SERPENT:
-                    createSeaSerpentMonster();
+                    //createSeaSerpentMonster();
                     break;
                 case MONSTER_TYPES.PHANTOM_JELLYFISH:
                     createPhantomJellyfishMonster();
@@ -275,8 +278,8 @@ export function updateHuntingMonster(monster, deltaTime) {
 }
 
 export function updateSurfacingMonster(monster, deltaTime) {
-    // Move upward to surface
-    monster.velocity.y = MONSTER_SPEED;
+    // Move upward to surface at the dedicated surfacing speed - not tied to regular movement speed
+    monster.velocity.y = MONSTER_SURFACING_SPEED;
 
     // Continue moving toward player if in attack range
     const distanceToPlayer = monster.mesh.position.distanceTo(playerBoat.position);
@@ -285,7 +288,7 @@ export function updateSurfacingMonster(monster, deltaTime) {
             .subVectors(playerBoat.position, monster.mesh.position)
             .normalize();
 
-        // Keep y component for surfacing, but move toward player on xz plane
+        // Keep y component for surfacing using dedicated speed, but move toward player on xz plane with regular speed
         monster.velocity.x = directionToPlayer.x * MONSTER_SPEED;
         monster.velocity.z = directionToPlayer.z * MONSTER_SPEED;
     }
@@ -407,8 +410,8 @@ export function updateAttackingMonster(monster, deltaTime) {
 }
 
 export function updateDivingMonster(monster, deltaTime) {
-    // Move downward
-    monster.velocity.y = -MONSTER_SPEED;
+    // Move downward at a dedicated diving speed - faster than regular movement
+    monster.velocity.y = -MONSTER_SURFACING_SPEED; // Use same speed as surfacing for consistency
 
     // Slow down horizontal movement
     monster.velocity.x *= 0.95;
@@ -426,21 +429,31 @@ export function updateDivingMonster(monster, deltaTime) {
 export function updateDyingMonster(monster, deltaTime) {
     // Handle dying animation
     monster.mesh.position.y += monster.velocity.y;
-    monster.velocity.y -= 0.01; // Accelerate sinking
+    monster.velocity.y -= 0.06; // Double sinking acceleration again (was 0.03)
 
-    // Rotate as it sinks
-    monster.mesh.rotation.x += 0.02;
-    monster.mesh.rotation.z += 0.01;
+    // Rotate as it sinks - DOUBLED rotation speed
+    monster.mesh.rotation.x += 0.1;   // Double again (was 0.05)
+    monster.mesh.rotation.z += 0.06;  // Double again (was 0.03)
 
-    // Reduce opacity if materials support it
+    // Reduce opacity if materials support it - FASTER fade out
     monster.mesh.traverse((child) => {
         if (child.isMesh && child.material && child.material.transparent) {
-            child.material.opacity = Math.max(0, child.material.opacity - 0.01);
+            child.material.opacity = Math.max(0, child.material.opacity - 0.06); // Double again (was 0.03)
+        }
+        // Make all materials transparent if they aren't already
+        else if (child.isMesh && child.material) {
+            if (!child.material.transparent) {
+                child.material.transparent = true;
+                child.material.opacity = 1.0;
+                // Store original opacity for reference
+                child.material.userData.originalOpacity = 1.0;
+            }
+            child.material.opacity = Math.max(0, child.material.opacity - 0.06); // Double again (was 0.03)
         }
     });
 
-    // Update state timer
-    monster.stateTimer -= deltaTime;
+    // Update state timer - make the dying animation complete twice as fast
+    monster.stateTimer -= deltaTime * 3.0; // Double again (was 1.5)
     if (monster.stateTimer <= 0) {
         // Monster has completed dying animation
         // It will be removed by the timeout in hitMonster
@@ -482,17 +495,21 @@ function animateTentacles(monster, deltaTime) {
 function createSplashEffect(position) {
     // Create a simple splash effect with particles
     const splashGeometry = new THREE.SphereGeometry(0.5, 4, 4);
-    const splashMaterial = new THREE.MeshBasicMaterial({ color: 0x88ccff });
+    const splashMaterial = new THREE.MeshBasicMaterial({
+        color: 0x88ccff,
+        transparent: true,
+        opacity: 1.0
+    });
 
     for (let i = 0; i < 20; i++) {
         const splash = new THREE.Mesh(splashGeometry, splashMaterial);
         splash.position.copy(position);
 
-        // Random velocity
+        // Random velocity - INCREASED by 2x again for even faster effect
         const velocity = new THREE.Vector3(
-            (Math.random() - 0.5) * 2,
-            Math.random() * 2 + 1,
-            (Math.random() - 0.5) * 2
+            (Math.random() - 0.5) * 8,     // Double again (was 4)
+            Math.random() * 8 + 4,         // Double again (was 4+2)
+            (Math.random() - 0.5) * 8      // Double again (was 4)
         );
 
         scene.add(splash);
@@ -503,19 +520,20 @@ function createSplashEffect(position) {
         function animateSplash() {
             const elapsedTime = (getTime() - startTime) / 1000;
 
-            if (elapsedTime > 1) {
+            // Reduced duration from 0.6 to 0.3 seconds for 2x faster animation
+            if (elapsedTime > 0.3) {
                 scene.remove(splash);
                 return;
             }
 
-            // Apply gravity
-            velocity.y -= 0.1;
+            // Apply gravity - INCREASED for faster falling
+            velocity.y -= 0.5;  // Double again (was 0.25)
 
             // Move splash
             splash.position.add(velocity);
 
-            // Fade out
-            splash.material.opacity = 1 - elapsedTime;
+            // Faster fade out to match shorter duration
+            splash.material.opacity = 1 - (elapsedTime / 0.3);
 
             requestAnimationFrame(animateSplash);
         }
@@ -646,13 +664,13 @@ function createYellowBeastMonster() {
 }
 
 function setupMonsterPosition(monster, tentacles, dorsalFin, leftFin, rightFin, monsterType) {
-    // Position monster randomly around the player
+    // Position monster randomly around the player, but closer than normal
     const randomAngle = Math.random() * Math.PI * 2;
-    const randomRadius = 200 + Math.random() * 800;
+    const randomRadius = 100 + Math.random() * 300; // Reduced distance range (was 200-1000)
 
     monster.position.set(
         Math.cos(randomAngle) * randomRadius,
-        5, // Start above water
+        0, // Start at water level instead of below (was 5)
         Math.sin(randomAngle) * randomRadius
     );
 
@@ -674,7 +692,7 @@ function setupMonsterPosition(monster, tentacles, dorsalFin, leftFin, rightFin, 
         dorsalFin: dorsalFin,
         leftFin: leftFin,
         rightFin: rightFin,
-        state: MONSTER_STATE.ATTACKING, // Start in attacking state
+        state: MONSTER_STATE.ATTACKING, // Always start in attacking state
         stateTimer: MONSTER_SURFACE_TIME + Math.random() * 20, // Stay visible longer
         targetPosition: new THREE.Vector3(),
         eyeGlow: 0,
@@ -1304,7 +1322,7 @@ function createMonsterByType(monsterType, position = null) {
             createKrakenMonster(position);
             break;
         case MONSTER_TYPES.SEA_SERPENT:
-            createSeaSerpentMonster(position);
+            //createSeaSerpentMonster(position);
             break;
         case MONSTER_TYPES.PHANTOM_JELLYFISH:
             createPhantomJellyfishMonster(position);
