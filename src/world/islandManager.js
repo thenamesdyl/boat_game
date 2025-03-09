@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { createIsland, updateVisibleChunks as updateRegularIslands, islandColliders } from './islands.js';
+import { createIsland, islandColliders } from './islands.js';
+import { updateVisibleChunks as updateRegularIslands } from './chunkControl.js';
 import { createRockyIsland, getRockyIslandColliders } from './rockyIslands.js';
 import { createCoastalCliffScene } from './coastalCliff.js';
 

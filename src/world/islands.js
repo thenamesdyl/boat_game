@@ -1,32 +1,22 @@
 import * as THREE from 'three';
 import { createShoreEffect, updateShores, setShoreVisibility, removeShore, clearAllShores } from './shores.js';
 import {
-    createSingleMassiveIsland,
     checkMassiveIslandCollision,
-    getMassiveIslandColliders,
     updateMassiveIslandShores,
-    findNearestMassiveIsland,
-    setMassiveIslandVisibility
+    findNearestMassiveIsland
 } from './massiveIslands.js';
 // import { createCoastalCliffScene } from './coastalCliff.js';
 import { createBlockCave } from './blockCave.js';
 import { createPirateTavern2 } from './pirateTavern2.js';
 import { createTreehouseTavern } from './treehouseTavern.js';
-import { adjustFogToViewDistance } from '../environment/fog.js';
 // Import the outline style system
 import { applyOutline } from '../theme/outlineStyles.js';
 
 // Island generation variables
 let islandColliders = [];
-const visibleDistance = 2000; // Distance to see islands from
-const chunkSize = 600; // Size of each "chunk" of ocean
-const islandsPerChunk = 2; // Reduced from 3 to 1 island per chunk
-const maxViewDistance = 1; // Reduced from 5 to 3 chunks view distance
 
 // Store generated chunks
-const generatedChunks = new Set();
 const activeIslands = new Map(); // Maps island ID to island object
-const activeWaterChunks = new Map(); // Maps water chunk ID to water mesh
 
 // Default shore effects setting - will be overridden by window.gameSettings if available
 let enableShoreEffects = true;
@@ -53,95 +43,7 @@ function areShoreEffectsEnabled() {
 // Cache for structure textures to improve performance
 const structureTextureCache = {};
 
-// Function to generate a chunk key based on coordinates
-function getChunkKey(chunkX, chunkZ) {
-    return `${chunkX},${chunkZ}`;
-}
-
-// Function to determine which chunk coordinates contain a given position
-function getChunkCoords(x, z) {
-    return {
-        x: Math.floor(x / chunkSize),
-        z: Math.floor(z / chunkSize)
-    };
-}
-
-// Function to create a water chunk at specified coordinates
-function createWaterChunk(chunkX, chunkZ, scene, waterShader) {
-    const chunkKey = getChunkKey(chunkX, chunkZ);
-
-    // Skip if this water chunk already exists
-    if (activeWaterChunks.has(chunkKey)) {
-        return;
-    }
-
-    // Create water geometry for this chunk - using fewer segments for better performance
-    const waterGeometry = new THREE.PlaneGeometry(chunkSize, chunkSize, 16, 16);
-
-    // Create water material using the shader
-    const waterMaterial = new THREE.ShaderMaterial({
-        uniforms: waterShader.uniforms,
-        vertexShader: waterShader.vertexShader,
-        fragmentShader: waterShader.fragmentShader,
-        side: THREE.DoubleSide,
-    });
-
-    // Create water mesh
-    const water = new THREE.Mesh(waterGeometry, waterMaterial);
-    water.rotation.x = -Math.PI / 2;
-
-    // Position the water chunk correctly in the world
-    water.position.set(
-        chunkX * chunkSize + chunkSize / 2,
-        0,
-        chunkZ * chunkSize + chunkSize / 2
-    );
-
-    // Add to scene
-    //scene.add(water);
-
-    // Store in active water chunks
-    activeWaterChunks.set(chunkKey, water);
-
-    return water;
-}
-
 // Function to generate islands in a chunk based on chunk coordinates
-function generateChunk(chunkX, chunkZ, scene) {
-    const chunkKey = getChunkKey(chunkX, chunkZ);
-
-    // Skip if this chunk has already been generated
-    if (generatedChunks.has(chunkKey)) {
-        return;
-    }
-
-    // Add to set of generated chunks
-    generatedChunks.add(chunkKey);
-
-    // Use chunk coordinates as seed for deterministic generation
-    // Use large prime numbers to avoid patterns in the generation
-    let chunkSeed = Math.abs(chunkX * 73856093 ^ chunkZ * 19349663);
-
-    // Create a simple deterministic random function for this chunk
-    const seededRandom = () => {
-        chunkSeed = (chunkSeed * 9301 + 49297) % 233280;
-        return chunkSeed / 233280;
-    };
-
-    // Generate islands for this chunk
-    for (let i = 0; i < islandsPerChunk; i++) {
-        // Generate position within this chunk, but avoid edges to prevent islands from being too close to chunk boundaries
-        const margin = 100; // Margin from chunk edges
-        const islandX = (chunkX * chunkSize) + margin + seededRandom() * (chunkSize - 2 * margin);
-        const islandZ = (chunkZ * chunkSize) + margin + seededRandom() * (chunkSize - 2 * margin);
-
-        // Create a seed for this specific island based on its coordinates
-        const islandSeed = Math.floor(islandX * 13371 + islandZ * 92717);
-
-        // Create the island
-        createIsland(islandX, islandZ, islandSeed, scene);
-    }
-}
 
 // SPAWN CONTROLS - Update these values
 const SPAWN_CONTROLS = {
@@ -1310,98 +1212,6 @@ function createRuinedTower(island, random) {
 }
 
 // Function to update visible chunks based on boat position
-function updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition) {
-    // Get current chunk coordinates based on boat position
-    const currentChunk = getChunkCoords(boat.position.x, boat.position.z);
-
-    // Set to track chunks that should be visible
-    const chunksToKeep = new Set();
-    const waterChunksToKeep = new Set();
-
-    // Generate chunks in view distance
-    for (let xOffset = -maxViewDistance; xOffset <= maxViewDistance; xOffset++) {
-        for (let zOffset = -maxViewDistance; zOffset <= maxViewDistance; zOffset++) {
-            const chunkX = currentChunk.x + xOffset;
-            const chunkZ = currentChunk.z + zOffset;
-            const chunkKey = getChunkKey(chunkX, chunkZ);
-
-            // Add to set of chunks to keep
-            chunksToKeep.add(chunkKey);
-
-            // For water, we need a slightly larger view distance to avoid seeing edges
-            if (Math.abs(xOffset) <= maxViewDistance + 1 && Math.abs(zOffset) <= maxViewDistance + 1) {
-                waterChunksToKeep.add(chunkKey);
-                // Create water chunk if needed
-                createWaterChunk(chunkX, chunkZ, scene, waterShader);
-            }
-
-            // Generate this chunk if needed
-            generateChunk(chunkX, chunkZ, scene);
-        }
-    }
-
-    // Remove islands that are too far away
-    const islandsToRemove = [];
-    activeIslands.forEach((island, id) => {
-        // Calculate distance to boat
-        const distance = boat.position.distanceTo(island.collider.center);
-
-        // Get the chunk this island belongs to
-        const islandChunkX = Math.floor(island.collider.center.x / chunkSize);
-        const islandChunkZ = Math.floor(island.collider.center.z / chunkSize);
-        const islandChunkKey = getChunkKey(islandChunkX, islandChunkZ);
-
-        // If the island is too far or its chunk is not in the keep set, mark for removal
-        if (distance > visibleDistance || !chunksToKeep.has(islandChunkKey)) {
-            islandsToRemove.push(id);
-        }
-    });
-
-    // Remove islands marked for removal
-    islandsToRemove.forEach(id => {
-        const island = activeIslands.get(id);
-        if (island) {
-            scene.remove(island.mesh);
-
-            // Remove the island's shore if it exists
-            if (areShoreEffectsEnabled() && island.shore) {
-                removeShore(id, scene);
-            }
-
-            // Remove collider
-            islandColliders = islandColliders.filter(c => c.id !== id);
-            activeIslands.delete(id);
-        }
-    });
-
-    // Remove water chunks that are too far
-    const waterToRemove = [];
-    activeWaterChunks.forEach((water, id) => {
-        if (!waterChunksToKeep.has(id)) {
-            waterToRemove.push(id);
-        }
-    });
-
-    waterToRemove.forEach(id => {
-        const water = activeWaterChunks.get(id);
-        if (water) {
-            scene.remove(water);
-            activeWaterChunks.delete(id);
-        }
-    });
-
-    // Update shore visibilities to match islands
-    if (areShoreEffectsEnabled()) {
-        activeIslands.forEach((island, id) => {
-            setShoreVisibility(id, island.visible);
-        });
-    }
-
-    // Update the last chunk update position
-    lastChunkUpdatePosition.copy(boat.position);
-
-    return { islandsRemoved: islandsToRemove.length, waterChunksRemoved: waterToRemove.length };
-}
 
 // Find nearest island function
 function findNearestIsland(boat) {
@@ -1441,6 +1251,24 @@ function updateIslandEffects(deltaTime) {
 // Add these variables to track the massive island
 let massiveIslandSpawned = false;
 let massiveIslandPosition = { x: 2000, z: 2000 }; // Position for the massive island
+
+
+// Getter and setter functions for massive island variables
+export function getMassiveIslandSpawned() {
+    return massiveIslandSpawned;
+}
+
+export function setMassiveIslandSpawned(value) {
+    massiveIslandSpawned = value;
+}
+
+export function getMassiveIslandPosition() {
+    return { ...massiveIslandPosition }; // Return a copy to prevent direct modification
+}
+
+export function setMassiveIslandPosition(position) {
+    massiveIslandPosition = { ...position };
+}
 
 /**
  * Spawns a single massive island at the specified position
@@ -1504,38 +1332,6 @@ export function updateAllIslandEffects(deltaTime) {
     }
 }
 
-/**
- * Handles island visibility based on boat position
- * @param {THREE.Object3D} boat - The boat object
- * @param {THREE.Scene} scene - The scene
- * @param {Object} waterShader - The water shader
- * @param {THREE.Vector3} lastChunkUpdatePosition - Last position chunks were updated
- */
-export function updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition) {
-    // Update regular island chunks
-    const chunksUpdated = updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition);
-
-    // Update massive island visibility
-    if (massiveIslandSpawned) {
-        const distanceToMassiveIsland = boat.position.distanceTo(
-            new THREE.Vector3(massiveIslandPosition.x, 0, massiveIslandPosition.z)
-        );
-
-        // Only check visibility when within view distance
-        if (distanceToMassiveIsland < 4000) {
-            const nearestMassive = findNearestMassiveIsland(boat.position);
-            if (nearestMassive.id) {
-                const isVisible = distanceToMassiveIsland < visibleDistance * 2;
-                setMassiveIslandVisibility(nearestMassive.id, isVisible);
-            }
-        }
-    }
-
-    // Adjust fog to match current view distance and chunk size
-    adjustFogToViewDistance(chunkSize, maxViewDistance);
-
-    return chunksUpdated;
-}
 
 /**
  * Spawns a massive block-based cave system at the specified position
@@ -1576,15 +1372,22 @@ export function spawnIslands(scene, position) {
     return true;
 }
 
+/**
+ * Removes a collider from the island colliders array by ID
+ * @param {string} id - ID of the collider to remove
+ * @returns {boolean} Whether the collider was found and removed
+ */
+export function removeIslandCollider(id) {
+    const initialLength = islandColliders.length;
+    islandColliders = islandColliders.filter(c => c.id !== id);
+    return islandColliders.length < initialLength; // Return true if a collider was removed
+}
+
 // Export everything together at the bottom of the file
 export {
     islandColliders,
     activeIslands,
-    activeWaterChunks,
-    createWaterChunk,
-    generateChunk,
     createIsland,
-    updateVisibleChunks,
     findNearestIsland,
     checkIslandCollision,
     updateIslandEffects,

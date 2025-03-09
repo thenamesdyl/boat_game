@@ -21,7 +21,7 @@ let time = 0;
 
 // Add these variables near the top with other exports
 export const shipSpeedConfig = {
-    basePlayerSpeed: 1.0,     // Normal max speed when player is controlling
+    basePlayerSpeed: 0.5,     // Normal max speed when player is controlling
     baseKnockbackSpeed: 8.5,   // Max speed when not player-controlled (like knockbacks)
     speedMultiplier: 1.0       // Multiplier that can be adjusted by /speed command
 };
@@ -235,7 +235,7 @@ export function updateShipMovement(deltaTime) {
     // Maximum speed logic
     const playerMaxSpeed = shipSpeedConfig.basePlayerSpeed * shipSpeedConfig.speedMultiplier;
     const knockbackMaxSpeed = shipSpeedConfig.baseKnockbackSpeed * shipSpeedConfig.speedMultiplier;
-    const maxSpeed = keys.forward ? playerMaxSpeed * (keys.forward ? 1 : 0.5) : knockbackMaxSpeed;
+    const maxSpeed = keys.forward || keys.backward ? playerMaxSpeed * (keys.forward ? 1 : 0.5) : knockbackMaxSpeed;
 
     const currentSpeedValue = boatVelocity.length();
     if (currentSpeedValue > maxSpeed) {
