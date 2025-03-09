@@ -197,6 +197,7 @@ function updateCannonTargeting(position, deltaTime) {
     let closestMonster = null;
     let closestDistance = Infinity;
     let inOptimalPosition = false;
+    let activelyTargeting = false; // Flag to track if this cannon is actively targeting
 
     // First, check if we should show any targeting at all
     let surfaceMonsterExists = false;
@@ -254,6 +255,7 @@ function updateCannonTargeting(position, deltaTime) {
                 if (validArc && distance < closestDistance) {
                     closestMonster = monster;
                     closestDistance = distance;
+                    activelyTargeting = true; // This cannon is now targeting a monster
 
                     // Check if cannon is in optimal firing position (perpendicular for broadsides)
                     if (position.includes('left') || position.includes('right')) {
@@ -270,12 +272,16 @@ function updateCannonTargeting(position, deltaTime) {
     // Update targeting state
     const targetData = targets[position];
 
-    // Hide targeting if no surface monsters exist
-    if (!surfaceMonsterExists) {
+    // Hide targeting if no surface monsters exist or this cannon isn't targeting
+    if (!surfaceMonsterExists || !activelyTargeting) {
         if (targetData.trajectory) {
             targetData.trajectory.visible = false;
         }
-        return;
+
+        // If no monster exists, just return
+        if (!surfaceMonsterExists) {
+            return;
+        }
     }
 
     // If we have a target, update aiming
@@ -301,13 +307,6 @@ function updateCannonTargeting(position, deltaTime) {
             monsterVelocity.clone().multiplyScalar(predictionScale)
         );
 
-        // Debug log monster positions
-        if (Math.random() < 0.01) { // Only log occasionally to avoid spam
-            console.log(`Monster position: ${monsterPosition.x.toFixed(1)}, ${monsterPosition.y.toFixed(1)}, ${monsterPosition.z.toFixed(1)}`);
-            console.log(`Predicted position: ${predictedPosition.x.toFixed(1)}, ${predictedPosition.y.toFixed(1)}, ${predictedPosition.z.toFixed(1)}`);
-            console.log(`Cannon position: ${cannonWorldPosition.x.toFixed(1)}, ${cannonWorldPosition.y.toFixed(1)}, ${cannonWorldPosition.z.toFixed(1)}`);
-        }
-
         // Set the aim point as the predicted position
         targetData.aimPoint.copy(predictedPosition);
 
@@ -330,9 +329,14 @@ function updateCannonTargeting(position, deltaTime) {
         targetData.aimDirection.lerp(idealAimDirection, trackingSpeed * deltaTime * 60);
         targetData.aimDirection.normalize();
 
-        // Update trajectory if it exists
-        if (targetData.trajectory && targetingVisualsActive) {
-            // Show targeting trajectory
+        // Calculate how much the aim has changed - only show trajectory if actively moving
+        // Compare current aim direction with the ideal direction to see if we're still adjusting
+        const aimDifference = targetData.aimDirection.clone().sub(idealAimDirection).length();
+        const isAdjustingAim = aimDifference > 0.01; // Small threshold to detect movement
+
+        // Update trajectory if this cannon is actively targeting and the visual should be shown
+        if (targetData.trajectory && targetingVisualsActive && activelyTargeting) {
+            // Show targeting trajectory only if this cannon is actively targeting
             targetData.trajectory.visible = true;
 
             // Position at cannon
@@ -347,27 +351,12 @@ function updateCannonTargeting(position, deltaTime) {
             updateTrajectory(position, inOptimalPosition);
         }
     } else {
-        // No target, return to default direction
+        // No target, hide trajectory
         targetData.currentTarget = null;
         targetData.aimDirection.lerp(defaultAimDirection, 0.1 * deltaTime * 60);
 
-        // Hide trajectory or show it pointing in default direction
         if (targetData.trajectory) {
-            if (targetingVisualsActive) {
-                // Show trajectory pointing in default direction
-                targetData.trajectory.visible = true;
-                targetData.trajectory.position.copy(cannonWorldPosition);
-
-                const lookTarget = new THREE.Vector3()
-                    .addVectors(cannonWorldPosition, defaultAimDirection);
-                targetData.trajectory.lookAt(lookTarget);
-
-                // Update trajectory with parabolic arc
-                updateTrajectory(position, false);
-            } else {
-                // Hide trajectory completely
-                targetData.trajectory.visible = false;
-            }
+            targetData.trajectory.visible = false;
         }
     }
 }
