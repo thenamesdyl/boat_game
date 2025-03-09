@@ -60,7 +60,8 @@ Object.keys(cannonPositions).forEach(position => {
         aimPoint: new THREE.Vector3(0, 0, 0),
         trajectory: null,
         lastTargetTime: 0,          // Track when we last had a valid target
-        lastMonsterY: null          // Track last monster Y position
+        lastMonsterY: null,        // Track last monster Y position
+        targetDistance: null        // Track actual distance to target
     };
 });
 
@@ -100,7 +101,9 @@ function createCannonTrajectory(position) {
     // We'll use a strip of triangles (ribbon) that follows the parabola
     const ribbonWidth = 0.5; // Width of the trajectory ribbon
 
-    // Create parabolic trajectory points
+    // Create parabolic trajectory points - using a default length initially
+    // (the actual length will be set in updateTrajectory)
+    const defaultLength = TARGETING_CONFIG.AIM_LINE_LENGTH;
     const points = [];
     const leftPoints = [];
     const rightPoints = [];
@@ -108,10 +111,10 @@ function createCannonTrajectory(position) {
     for (let i = 0; i <= TARGETING_CONFIG.LINE_SEGMENTS; i++) {
         const t = i / TARGETING_CONFIG.LINE_SEGMENTS;
 
-        // Parabolic arc with POSITIVE Z direction (fix for targeting issue)
+        // Parabolic arc with POSITIVE Z direction
         const x = 0;
         const y = 4 * TARGETING_CONFIG.ARC_HEIGHT * t * (1 - t);
-        const z = t * TARGETING_CONFIG.AIM_LINE_LENGTH; // CHANGED: Removed negative sign
+        const z = t * defaultLength;
 
         // Center point
         const center = new THREE.Vector3(x, y, z);
@@ -276,6 +279,9 @@ function updateCannonTargeting(position, deltaTime) {
                     // Update the last target time
                     targetData.lastTargetTime = currentTime;
 
+                    // Store the actual distance to target for trajectory calculation
+                    targetData.targetDistance = distance;
+
                     // Check if cannon is in optimal firing position (perpendicular for broadsides)
                     if (position.includes('left') || position.includes('right')) {
                         // For broadsides, optimal is 90° to monster (dot product near 0)
@@ -303,6 +309,7 @@ function updateCannonTargeting(position, deltaTime) {
         // Only reset targeting if we've truly lost track
         if (timeSinceLastTarget > TARGETING_CONFIG.TARGET_PERSISTENCE) {
             targetData.currentTarget = null;
+            targetData.targetDistance = null;
 
             // Return to default aim direction gradually
             targetData.aimDirection.lerp(defaultAimDirection, 0.1 * deltaTime * 60);
@@ -340,6 +347,9 @@ function updateCannonTargeting(position, deltaTime) {
             monsterVelocity.clone().multiplyScalar(predictionScale)
         );
 
+        // Calculate and store the distance to the predicted position
+        targetData.targetDistance = cannonWorldPosition.distanceTo(predictedPosition);
+
         // Set the aim point as the predicted position
         targetData.aimPoint.copy(predictedPosition);
 
@@ -375,7 +385,7 @@ function updateCannonTargeting(position, deltaTime) {
                 .addVectors(cannonWorldPosition, targetData.aimDirection);
             targetData.trajectory.lookAt(lookTarget);
 
-            // Update trajectory with parabolic arc
+            // Update trajectory with parabolic arc using actual distance
             updateTrajectory(position, inOptimalPosition);
         }
     } else {
@@ -383,6 +393,7 @@ function updateCannonTargeting(position, deltaTime) {
         if (timeSinceLastTarget > TARGETING_CONFIG.TARGET_PERSISTENCE) {
             // Truly no target, reset everything
             targetData.currentTarget = null;
+            targetData.targetDistance = null;
             targetData.aimDirection.lerp(defaultAimDirection, 0.1 * deltaTime * 60);
 
             if (targetData.trajectory) {
@@ -397,8 +408,51 @@ function updateTrajectory(position, isOptimal) {
     const targetData = targets[position];
     if (!targetData.trajectory) return;
 
+    // Use the actual distance to target, or fall back to default length
+    const trajectoryLength = targetData.targetDistance || TARGETING_CONFIG.AIM_LINE_LENGTH;
+
+    // Scale arc height based on distance - closer targets need lower arcs
+    // This makes the trajectory more realistic
+    const baseArcHeight = TARGETING_CONFIG.ARC_HEIGHT;
+    const arcHeightScale = Math.min(1, trajectoryLength / 50); // Scale down for close targets
+    const arcHeight = baseArcHeight * arcHeightScale;
+
     // Check if we're using the ribbon approach
     if (targetData.useRibbon) {
+        // Update ribbon vertices to match target distance
+        const ribbonWidth = 0.5;
+        const positions = targetData.trajectory.geometry.getAttribute('position');
+
+        for (let i = 0; i <= TARGETING_CONFIG.LINE_SEGMENTS; i++) {
+            const t = i / TARGETING_CONFIG.LINE_SEGMENTS;
+
+            // Calculate parabolic trajectory points to match actual distance
+            const x = 0;
+            const y = 4 * arcHeight * t * (1 - t); // Scaled arc height
+            const z = t * trajectoryLength; // Use actual distance
+
+            // Left and right points for ribbon
+            const leftX = x - ribbonWidth / 2;
+            const rightX = x + ribbonWidth / 2;
+
+            // Update positions (two vertices per segment for left and right)
+            const leftIdx = i * 2 * 3; // *2 for left/right, *3 for x,y,z
+            const rightIdx = leftIdx + 3;
+
+            // Left vertex
+            positions.array[leftIdx] = leftX;
+            positions.array[leftIdx + 1] = y;
+            positions.array[leftIdx + 2] = z;
+
+            // Right vertex
+            positions.array[rightIdx] = rightX;
+            positions.array[rightIdx + 1] = y;
+            positions.array[rightIdx + 2] = z;
+        }
+
+        // Mark geometry for update
+        positions.needsUpdate = true;
+
         // Update color based on target status
         if (targetData.currentTarget) {
             if (isOptimal) {
@@ -413,15 +467,15 @@ function updateTrajectory(position, isOptimal) {
     }
 
     // If we get here, it means we're not using the ribbon approach
-    // Create parabolic trajectory points with positive Z
+    // Create parabolic trajectory points with dynamic length
     const points = [];
     for (let i = 0; i <= TARGETING_CONFIG.LINE_SEGMENTS; i++) {
         const t = i / TARGETING_CONFIG.LINE_SEGMENTS;
 
-        // Parabolic arc with POSITIVE Z direction (fix for targeting issue)
+        // Parabolic arc with dynamic length
         const x = 0;
-        const y = 4 * TARGETING_CONFIG.ARC_HEIGHT * t * (1 - t);
-        const z = t * TARGETING_CONFIG.AIM_LINE_LENGTH; // CHANGED: Removed negative sign
+        const y = 4 * arcHeight * t * (1 - t); // Scaled arc height
+        const z = t * trajectoryLength; // Use actual distance
 
         points.push(new THREE.Vector3(x, y, z));
     }
@@ -463,4 +517,92 @@ export function toggleTargetingVisuals(visible = null) {
 // Get current targeting data for all cannons
 export function getTargets() {
     return targets;
+}
+
+// Add this function to check if a monster is properly targeted by any cannon
+export function isMonsterEffectivelyTargeted(monster) {
+    if (!monster || !targets) return false;
+
+    // Track which cannons are targeting this monster effectively
+    const effectivelyTargeted = {};
+    let anyCannonTargeting = false;
+
+    // Check each cannon position
+    Object.keys(targets).forEach(position => {
+        const targetData = targets[position];
+
+        // Check if this cannon is targeting this specific monster
+        if (targetData.currentTarget === monster) {
+            // Calculate how well the cannon is aimed at the monster
+            // Get cannon position in world space
+            const cannonConfig = cannonPositions[position];
+            const cannonWorldPosition = new THREE.Vector3(
+                cannonConfig.xOffset,
+                1.5, // Height above deck
+                cannonConfig.zOffset
+            );
+            cannonWorldPosition.applyMatrix4(boat.matrixWorld);
+
+            // Get direction to monster
+            const toMonster = new THREE.Vector3()
+                .subVectors(monster.mesh.position, cannonWorldPosition)
+                .normalize();
+
+            // Check how closely the aim direction aligns with the direction to monster
+            // Perfect alignment would be 1, opposite would be -1
+            const aimAlignment = targetData.aimDirection.dot(toMonster);
+
+            // Consider it effectively targeted if alignment is above 0.9 (within ~25 degrees)
+            effectivelyTargeted[position] = (aimAlignment > 0.9);
+
+            if (effectivelyTargeted[position]) {
+                anyCannonTargeting = true;
+            }
+        }
+    });
+
+    return {
+        anyCannonTargeting,            // Is at least one cannon properly aimed?
+        effectivelyTargeted,           // Details on which cannons are targeting
+        targetingQuality: getTargetingQualityForMonster(monster) // Get overall targeting quality
+    };
+}
+
+// Helper function to determine overall targeting quality for a monster (0-1)
+function getTargetingQualityForMonster(monster) {
+    if (!monster || !targets) return 0;
+
+    let bestAlignment = 0;
+
+    // Check each cannon position
+    Object.keys(targets).forEach(position => {
+        const targetData = targets[position];
+
+        // Check if this cannon is targeting this specific monster
+        if (targetData.currentTarget === monster) {
+            // Get cannon position in world space
+            const cannonConfig = cannonPositions[position];
+            const cannonWorldPosition = new THREE.Vector3(
+                cannonConfig.xOffset,
+                1.5, // Height above deck
+                cannonConfig.zOffset
+            );
+            cannonWorldPosition.applyMatrix4(boat.matrixWorld);
+
+            // Get direction to monster
+            const toMonster = new THREE.Vector3()
+                .subVectors(monster.mesh.position, cannonWorldPosition)
+                .normalize();
+
+            // Calculate alignment (dot product)
+            const aimAlignment = targetData.aimDirection.dot(toMonster);
+
+            // Track best alignment across all cannons
+            bestAlignment = Math.max(bestAlignment, aimAlignment);
+        }
+    });
+
+    // Scale to a quality factor (0 to 1)
+    // 0.7 is about 45 degrees off, 1.0 is perfect alignment
+    return Math.max(0, (bestAlignment - 0.7) / 0.3);
 } 

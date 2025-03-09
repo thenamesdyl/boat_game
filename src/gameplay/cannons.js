@@ -3,11 +3,11 @@ import { scene, getTime } from '../core/gameState.js';
 import { gameUI } from '../ui/ui.js';
 import { onMonsterKilled, addToInventory } from '../core/network.js';
 import { createTreasureDrop } from '../entities/seaMonsters.js';
-import { initCannonTargetingSystem, updateTargeting } from './cannonautosystem.js';
+import { initCannonTargetingSystem, updateTargeting, isMonsterEffectivelyTargeted } from './cannonautosystem.js';
 
 // Cannon system configuration
 const CANNON_RANGE = 100; // Maximum range for cannons
-const CANNON_COOLDOWN = 3; // Seconds between cannon shots
+const CANNON_COOLDOWN = 0.6; // Seconds between cannon shots
 const CANNON_DAMAGE = 3; // Damage per cannon hit
 const CANNON_BALL_SPEED = 3; // Speed of cannonballs
 
@@ -327,10 +327,29 @@ function playCannonSound() {
 
 // Fire at monsters
 function fireAtMonsters(targets) {
-    // For each target, calculate hit probability based on distance
+    // For each target, calculate hit probability based on distance AND targeting
     targets.forEach(monster => {
         const distance = monster.mesh.position.distanceTo(boat.position);
-        const hitProbability = 1 - (distance / CANNON_RANGE) * 0.7; // 70% chance at max range, 100% up close
+
+        // Get targeting information from the targeting system
+        const targetingInfo = isMonsterEffectivelyTargeted(monster);
+
+        // Base probability on distance (as before)
+        let hitProbability = 1 - (distance / CANNON_RANGE) * 0.7; // 70% chance at max range, 100% up close
+
+        // Adjust probability based on targeting quality
+        if (targetingInfo.anyCannonTargeting) {
+            // Reward good targeting with higher hit chance
+            hitProbability *= (0.5 + 0.5 * targetingInfo.targetingQuality);
+        } else {
+            // Penalize poor targeting with much lower hit chance
+            hitProbability *= 0.2; // Only 20% of normal chance if not properly targeted
+        }
+
+        // Add some debugging to help see what's happening
+        if (Math.random() < 0.1) { // Only log occasionally to avoid console spam
+            console.log(`Monster hit probability: ${(hitProbability * 100).toFixed(1)}% (Distance: ${distance.toFixed(1)}, Targeting Quality: ${(targetingInfo.targetingQuality * 100).toFixed(1)}%)`);
+        }
 
         if (Math.random() < hitProbability) {
             // Hit!
