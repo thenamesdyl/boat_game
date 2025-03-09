@@ -3,6 +3,7 @@ import { scene, getTime } from '../core/gameState.js';
 import { gameUI } from '../ui/ui.js';
 import { onMonsterKilled, addToInventory } from '../core/network.js';
 import { createTreasureDrop } from '../entities/seaMonsters.js';
+import { initCannonTargetingSystem, updateTargeting } from './cannonautosystem.js';
 
 // Cannon system configuration
 const CANNON_RANGE = 100; // Maximum range for cannons
@@ -19,6 +20,7 @@ let lastFiredTime = 0;
 let leftCannon = null;
 let rightCannon = null;
 let frontCannon = null;
+let targetingSystem = null;
 
 // Initialize cannon system
 export function initCannons(playerBoat, seaMonsters) {
@@ -44,6 +46,14 @@ export function initCannons(playerBoat, seaMonsters) {
 
     // Expose fireCannons function globally for hotkey usage
     window.fireCannons = fireCannons;
+
+    // Initialize the targeting system with cannons
+    targetingSystem = initCannonTargetingSystem(
+        playerBoat,
+        seaMonsters,
+        { left: leftCannon, right: rightCannon, front: frontCannon },
+        CANNON_RANGE
+    );
 }
 
 // Update cannon system
@@ -79,6 +89,11 @@ export function updateCannons(deltaTime) {
         gameUI.elements.cannon.fireButton.disabled = true;
         gameUI.elements.cannon.fireButton.style.backgroundColor = 'rgba(100, 100, 100, 0.5)';
         gameUI.elements.cannon.fireButton.style.cursor = 'default';
+    }
+
+    // Update targeting system
+    if (targetingSystem) {
+        updateTargeting(deltaTime);
     }
 
     // Update cannonballs
@@ -119,6 +134,14 @@ export function fireCannons() {
 
     // Reset cooldown UI
     gameUI.elements.cannon.cooldown.progress.style.width = '0%';
+
+    // Get current targeting data if needed
+    if (targetingSystem) {
+        const targets = targetingSystem.getTargets();
+
+        // This could be used to adjust firing accuracy based on how well-aimed the cannons are
+        // For example, monsters closer to the aim point would be more likely to be hit
+    }
 
     // Find monsters in range
     const targetsInRange = [];
