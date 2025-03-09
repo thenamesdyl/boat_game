@@ -50,6 +50,8 @@ import { getTimeOfDay } from '../environment/skybox.js';
 import { initCollisionResponse, updateCollisionResponse, isBoatAirborne } from '../controls/islandCollisionResponse.js';
 import { getPlayerInventory, playerHasItem } from './network.js';
 
+import { initPvPTargetingSystem } from '../gameplay/cannonautosystempvp.js';
+
 // Define these variables at the file level scope (outside any functions)
 // so they're accessible throughout the file
 const fogColors = {
@@ -73,6 +75,12 @@ const fogColorKeyframes = [
 // Initialize water with explicit realistic style as default
 console.log("Initializing water in main.js");
 const water = setupWater('cartoony');
+
+const pvpTargeting = initPvPTargetingSystem(boat, 50);
+
+
+pvpTargeting.togglePvPMode(true);  // Enable PvP targeting
+
 
 /*
 const cubeTextureLoader = new THREE.CubeTextureLoader();
@@ -1248,6 +1256,8 @@ function animate() {
     // Update water with delta time
     updateWater(deltaTime);
 
+    pvpTargeting.updateTargeting(getTime());
+
     // Update island shore effects
     updateIslandEffects(deltaTime);
 
@@ -1582,6 +1592,7 @@ const birds = setupBirds(activeIslands, boat);
 
 // Initialize sea monsters
 const seaMonsters = setupSeaMonsters(boat);
+
 
 // Initialize fishing system
 initFishing(boat);

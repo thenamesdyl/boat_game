@@ -6,7 +6,7 @@ import { getFishInventory } from '../gameplay/fishing.js'; // Import the fish in
 import { createTreasureDrop, updateTreasures, initTreasureSystem } from '../gameplay/treasure.js';
 
 // Sea monster configuration
-const MONSTER_COUNT = 15;
+const MONSTER_COUNT = 0;
 const MONSTER_TYPES = {
     YELLOW_BEAST: 'yellowBeast',   // Original monster
     KRAKEN: 'kraken',              // New octopus-like monster
