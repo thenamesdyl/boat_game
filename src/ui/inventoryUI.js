@@ -649,8 +649,9 @@ class InventoryUI {
         // Clear existing content
         fishContent.innerHTML = '';
 
-        // If no fish, show message
-        if (Object.keys(fishInventory).length === 0) {
+        // Check for proper data format
+        if (!fishInventory || (Array.isArray(fishInventory) && fishInventory.length === 0) ||
+            (typeof fishInventory === 'object' && Object.keys(fishInventory).length === 0)) {
             const emptyMessage = document.createElement('div');
             emptyMessage.textContent = 'No fish caught yet. Try fishing!';
             emptyMessage.style.textAlign = 'center';
@@ -658,6 +659,30 @@ class InventoryUI {
             emptyMessage.style.color = 'rgba(200, 200, 200, 0.7)';
             fishContent.appendChild(emptyMessage);
             return;
+        }
+
+        // Process the fish data into a standardized format
+        // This handles both array format from server and object format
+        let processedFish = {};
+
+        if (Array.isArray(fishInventory)) {
+            // Server format: array of fish objects
+            fishInventory.forEach(fish => {
+                const fishName = fish.name || 'Unknown Fish';
+                if (!processedFish[fishName]) {
+                    processedFish[fishName] = {
+                        name: fishName,
+                        count: 1,
+                        value: fish.data?.value || 1,
+                        color: fish.data?.color || 0x6699CC
+                    };
+                } else {
+                    processedFish[fishName].count += 1;
+                }
+            });
+        } else {
+            // Handle both possible object formats
+            processedFish = fishInventory;
         }
 
         // Define fish tiers
@@ -669,15 +694,23 @@ class InventoryUI {
         ];
 
         // Sort fish into tiers
-        for (const [fishName, fishData] of Object.entries(fishInventory)) {
-            if (fishData.value >= 20) {
-                tiers[0].fishes.push({ name: fishName, ...fishData });
-            } else if (fishData.value >= 5) {
-                tiers[1].fishes.push({ name: fishName, ...fishData });
-            } else if (fishData.value >= 2) {
-                tiers[2].fishes.push({ name: fishName, ...fishData });
+        for (const [fishName, fishData] of Object.entries(processedFish)) {
+            // Ensure count and value have defaults
+            const safeData = {
+                ...fishData,
+                name: fishName,
+                count: fishData.count !== undefined ? fishData.count : 1,
+                value: fishData.value !== undefined ? fishData.value : 1
+            };
+
+            if (safeData.value >= 20) {
+                tiers[0].fishes.push(safeData);
+            } else if (safeData.value >= 5) {
+                tiers[1].fishes.push(safeData);
+            } else if (safeData.value >= 2) {
+                tiers[2].fishes.push(safeData);
             } else {
-                tiers[3].fishes.push({ name: fishName, ...fishData });
+                tiers[3].fishes.push(safeData);
             }
         }
 
