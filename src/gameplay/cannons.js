@@ -295,18 +295,6 @@ function createCannonEffect(cannon) {
     });
 }
 
-// Play cannon sound
-function playCannonSound() {
-    // Use the new sound system
-    import('../audio/soundEffects.js').then(module => {
-        module.playCannonSound(0.3); // 0.3 is volume, adjust as needed
-    }).catch(error => {
-        console.error("Error loading sound effects module:", error);
-        // Fallback to simple sound if module fails to load
-        playFallbackCannonSound();
-    });
-}
-
 // Add fallback sound function in case module loading fails
 function playFallbackCannonSound() {
     // Create audio context if not already created
