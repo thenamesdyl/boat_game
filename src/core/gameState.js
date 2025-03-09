@@ -242,10 +242,6 @@ export function updateShipMovement(deltaTime) {
         // Hard cap at maximum speed
         boatVelocity.normalize().multiplyScalar(maxSpeed);
 
-        // Visual feedback for max speed
-        console.log("🚨 MAXIMUM SPEED REACHED:", maxSpeed.toFixed(2),
-            "Current:", currentSpeedValue.toFixed(2),
-            "Speed Multiplier:", shipSpeedConfig.speedMultiplier.toFixed(2));
 
         if (shipSpeedConfig.speedMultiplier > 1.0 && window.showSpeedBoostEffect) {
             window.showSpeedBoostEffect(shipSpeedConfig.speedMultiplier);
