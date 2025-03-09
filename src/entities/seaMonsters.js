@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { scene, getTime, boatVelocity } from '../core/gameState.js';
+import { scene, getTime, boatVelocity, addToScene, removeFromScene, isInScene } from '../core/gameState.js';
 import { getTimeOfDay } from '../environment/skybox.js'; // Import time of day function
 import { flashBoatDamage } from '../entities/character.js'; // Add this import
 import { getFishInventory } from '../gameplay/fishing.js'; // Import the fish inventory
+import { createTreasureDrop, updateTreasures, initTreasureSystem } from '../gameplay/treasure.js';
 
 // Sea monster configuration
 const MONSTER_COUNT = 15;
@@ -38,14 +39,6 @@ const MONSTER_STATE = {
     DYING: 'dying'         // Monster is dying
 };
 
-// Monster treasure drops - each monster type has a specific treasure it drops
-const MONSTER_TREASURES = {
-    yellowBeast: { name: "Monster Scale", value: 5, color: 0xFFD700, description: "A glimmering scale from a sea beast." },
-    blueDevil: { name: "Abyssal Pearl", value: 8, color: 0x00BFFF, description: "A mysterious pearl with swirling blue patterns." },
-    greenHorror: { name: "Emerald Fang", value: 12, color: 0x32CD32, description: "A razor-sharp tooth with verdant energy." },
-    redTerror: { name: "Crimson Crystal", value: 15, color: 0xFF4500, description: "A blood-red crystal that pulses with heat." }
-};
-
 // Monster state
 let monsters = [];
 let playerBoat = null;
@@ -61,6 +54,9 @@ let lastHitTime = -999; // Initialize to negative value to ensure first hit work
 export function setupSeaMonsters(boat) {
     try {
         playerBoat = boat;
+
+        // Initialize the treasure system with the same boat reference
+        initTreasureSystem(boat);
 
         // Reset hit cooldown to ensure monsters can hit on first approach
         lastHitTime = -999; // Set to a very negative value to ensure first hit works
@@ -211,8 +207,8 @@ export function updateSeaMonsters(deltaTime) {
             }
         });
 
-        // Also update treasure drops
-        updateTreasureDrops();
+        // Update treasures using the new system
+        updateTreasures(deltaTime);
     } catch (error) {
         console.error("Error in updateSeaMonsters:", error);
     }
@@ -1367,153 +1363,8 @@ function getRandomSpawnPosition() {
     return spawnPosition;
 }
 
-// When a monster is killed, create a treasure drop
-export function createTreasureDrop(monster) {
-    // Determine which treasure to drop based on monster type
-    const treasureType = MONSTER_TREASURES[monster.monsterType] || MONSTER_TREASURES.yellowBeast;
-
-    // Create glowing orb geometry for the treasure
-    const orbGeometry = new THREE.SphereGeometry(0.5, 12, 12);
-    const orbMaterial = new THREE.MeshStandardMaterial({
-        color: treasureType.color,
-        emissive: treasureType.color,
-        emissiveIntensity: 0.7,
-        transparent: true,
-        opacity: 0.8
-    });
-
-    const treasureOrb = new THREE.Mesh(orbGeometry, orbMaterial);
-    treasureOrb.position.copy(monster.mesh.position);
-    treasureOrb.position.y = 0.5; // Float slightly above water
-    treasureOrb.userData.treasureType = treasureType;
-    treasureOrb.userData.creationTime = getTime() / 1000;
-
-    // Add to scene and tracking array
-    scene.add(treasureOrb);
-    treasureDrops.push(treasureOrb);
-
-    // Add pulsing animation to make it more noticeable
-    const startScale = treasureOrb.scale.x;
-    const pulseAnimation = () => {
-        if (!treasureOrb.parent) return; // Stop if removed from scene
-
-        const time = getTime() / 1000;
-        const pulse = 1 + 0.2 * Math.sin(time * 3);
-        treasureOrb.scale.set(startScale * pulse, startScale * pulse, startScale * pulse);
-
-        requestAnimationFrame(pulseAnimation);
-    };
-
-    pulseAnimation();
-}
-
-// Update function for treasure drops - check for collection
-function updateTreasureDrops() {
-    //console.log("updateTreasureDrops: ", treasureDrops.length);
-    if (!playerBoat || treasureDrops.length === 0) return;
-
-    const currentTime = getTime() / 1000;
-    const boatPosition = playerBoat.position.clone();
-    boatPosition.y = 0.5; // Match Y level for better collision
-
-    // Collection distance threshold (how close boat needs to be)
-    const COLLECT_DISTANCE = 5;
-
-    // Process treasures in reverse order to safely remove while iterating
-    for (let i = treasureDrops.length - 1; i >= 0; i--) {
-        const treasureOrb = treasureDrops[i];
-
-
-        // Check if treasure should disappear due to timeout (30 seconds)
-        if (currentTime - treasureOrb.userData.creationTime > 30) {
-            scene.remove(treasureOrb);
-            treasureDrops.splice(i, 1);
-            continue;
-        }
-
-        // Check if boat is close enough to collect
-        if (treasureOrb.position.distanceTo(boatPosition) < COLLECT_DISTANCE) {
-            // Collect the treasure
-            collectTreasure(treasureOrb.userData.treasureType);
-
-            // Remove the orb
-
-            scene.remove(treasureOrb);
-            treasureDrops.splice(i, 1);
-        }
-    }
-}
-
-// Export treasure inventory for use in other modules
-export function getTreasureInventory() {
-    return treasureInventory;
-}
-
-// Make getTreasureInventory available globally for the UI
-window.getTreasureInventory = getTreasureInventory;
-
-// Update the treasure inventory in the UI when changes occur
-function updateTreasureInventoryDisplay() {
-    // If inventory UI exists and has a method for updating treasures, call it
-    if (window.inventoryUI && typeof window.inventoryUI.updateTreasureInventory === 'function') {
-        window.inventoryUI.updateTreasureInventory(treasureInventory);
-    }
-}
-
-// Modify the collectTreasure function to update the inventory display
-function collectTreasure(treasureType) {
-    // console.log("collectTreasure: ", treasureType);
-    const treasureName = treasureType.name;
-
-    // Add to inventory
-    if (!treasureInventory[treasureName]) {
-        treasureInventory[treasureName] = {
-            ...treasureType,
-            count: 1
-        };
-    } else {
-        treasureInventory[treasureName].count++;
-    }
-
-    // Remove from scene and tracking array
-    //treasureDrops = treasureDrops.filter(orb => orb !== treasureOrb);
-
-    // console.log(`Collected ${treasureName}!`, treasureInventory);
-
-    // Update the inventory UI
-    updateTreasureInventoryDisplay();
-
-    // Play collection sound
-    playCollectionSound();
-}
-
-// Simple sound effect for collecting treasures
-function playCollectionSound() {
-    // Create audio context if not already created
-    if (!window.audioContext) {
-        try {
-            window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        } catch (e) {
-            console.warn('Web Audio API not supported in this browser');
-            return;
-        }
-    }
-
-    // Create oscillator for simple collection sound
-    const oscillator = window.audioContext.createOscillator();
-    const gainNode = window.audioContext.createGain();
-
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(600, window.audioContext.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(1200, window.audioContext.currentTime + 0.2);
-
-    // Set volume (50% of typical sound)
-    gainNode.gain.setValueAtTime(0.15, window.audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, window.audioContext.currentTime + 0.3);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(window.audioContext.destination);
-
-    oscillator.start();
-    oscillator.stop(window.audioContext.currentTime + 0.3);
+// Modify the createTreasureDrop function to use the new system
+export function handleMonsterTreasureDrop(monster) {
+    // Call the imported createTreasureDrop function from treasure.js
+    createTreasureDrop(monster.mesh.position, monster.monsterType);
 } 

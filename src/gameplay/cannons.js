@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { scene, getTime } from '../core/gameState.js';
 import { gameUI } from '../ui/ui.js';
 import { onMonsterKilled, addToInventory } from '../core/network.js';
-import { createTreasureDrop } from '../entities/seaMonsters.js';
+import { handleMonsterTreasureDrop } from '../entities/seaMonsters.js';
 import { initCannonTargetingSystem, updateTargeting, isMonsterEffectivelyTargeted, isMonsterTargetedWithGreenLine } from './cannonautosystem.js';
 
 // Cannon system configuration
@@ -197,7 +197,7 @@ function createCannonEffect(cannon) {
     flash.position.copy(flashPosition);
 
     // Add to scene
-    scene.add(flash);
+    //scene.add(flash);
 
     // Animate flash
     const startTime = getTime();
@@ -242,7 +242,7 @@ function createCannonEffect(cannon) {
         smokeVelocity.y += Math.random() * 0.5;
         smokeVelocity.z += (Math.random() - 0.5) * 0.5;
 
-        scene.add(smoke);
+        //scene.add(smoke);
 
         // Animate smoke
         const smokeStartTime = getTime();
@@ -284,7 +284,7 @@ function createCannonEffect(cannon) {
     const cannonball = new THREE.Mesh(cannonballGeometry, cannonballMaterial);
     cannonball.position.copy(flashPosition);
 
-    scene.add(cannonball);
+    //scene.add(cannonball);
 
     // Add to cannonballs array
     cannonballs.push({
@@ -374,7 +374,7 @@ function hitMonster(monster, hasGreenLine = false) {
     // Check if monster is defeated
     if (monster.health <= 0) {
         // Create treasure drop before monster disappears
-        createTreasureDrop(monster);
+        handleMonsterTreasureDrop(monster);
 
         // Add treasure to player's inventory
         const treasureType = monster.type || 'common'; // Use monster type if available
@@ -581,7 +581,7 @@ function createHitEffect(position) {
     const explosion = new THREE.Mesh(explosionGeometry, explosionMaterial);
     explosion.position.copy(position);
 
-    scene.add(explosion);
+    //scene.add(explosion);
 
     // Animate explosion
     const startTime = getTime();
@@ -666,7 +666,7 @@ export function createMonsterDeathEffect(position) {
 
     const explosion = new THREE.Mesh(explosionGeometry, explosionMaterial);
     explosion.position.copy(position);
-    scene.add(explosion);
+    //scene.add(explosion);
 
     // Animate explosion
     const startTime = getTime();
@@ -723,7 +723,7 @@ export function createMonsterDeathEffect(position) {
             (Math.random() - 0.5) * 3
         );
 
-        scene.add(debris);
+        //scene.add(debris);
 
         // Animate debris
         const debrisStartTime = getTime();
@@ -785,7 +785,7 @@ function createLargeSplashEffect(position) {
             (Math.random() - 0.5) * 3
         );
 
-        scene.add(splash);
+        //scene.add(splash);
 
         // Animate splash
         const startTime = getTime();
@@ -827,7 +827,7 @@ function createLargeSplashEffect(position) {
     ripple.position.copy(splashPosition);
     ripple.position.y = 0.1; // Just above water
 
-    scene.add(ripple);
+    //scene.add(ripple);
 
     // Animate ripple
     const rippleStartTime = getTime();
@@ -934,7 +934,7 @@ function createSplashEffect(position) {
             (Math.random() - 0.5) * 1.5
         );
 
-        scene.add(splash);
+        //scene.add(splash);
 
         // Animate splash
         const startTime = getTime();

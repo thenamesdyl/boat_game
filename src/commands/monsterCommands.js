@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { scene } from '../core/gameState.js';
-import { getMonsters, createTreasureDrop } from '../entities/seaMonsters.js';
+import { getMonsters } from '../entities/seaMonsters.js';
 
 // Import the death effect from cannons.js (since it's defined there)
 import { createMonsterDeathEffect } from '../gameplay/cannons.js';
@@ -28,7 +28,6 @@ export function killallCommand(args, chatSystem) {
         // Only process monsters that aren't already dying
         if (monster.state !== 'dying') {
             // Create treasure drop before monster disappears
-            createTreasureDrop(monster);
 
             // Set monster to dying state
             monster.state = 'dying';

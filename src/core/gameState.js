@@ -21,7 +21,7 @@ let time = 0;
 
 // Add these variables near the top with other exports
 export const shipSpeedConfig = {
-    basePlayerSpeed: 0.6,     // Normal max speed when player is controlling
+    basePlayerSpeed: 1.0,     // Normal max speed when player is controlling
     baseKnockbackSpeed: 8.5,   // Max speed when not player-controlled (like knockbacks)
     speedMultiplier: 1.0       // Multiplier that can be adjusted by /speed command
 };
@@ -278,4 +278,43 @@ export function updateAllPlayers(players) {
 // Add this new function to return the stored players
 export function getAllPlayers() {
     return allPlayers;
+}
+
+// Add these scene management functions
+export function addToScene(object) {
+    console.log(`Adding object to scene: ${object.name || 'unnamed object'}`);
+    scene.add(object);
+    return object;
+}
+
+export function removeFromScene(object) {
+    if (!object) {
+        console.warn("Attempted to remove null or undefined object from scene");
+        return false;
+    }
+
+    if (object.parent !== scene) {
+        console.warn(`Object ${object.name || 'unnamed'} is not a direct child of scene`);
+        return false;
+    }
+
+    console.log(`Removing object from scene: ${object.name || 'unnamed object'}`);
+    scene.remove(object);
+
+    // Clean up resources
+    if (object.geometry) object.geometry.dispose();
+    if (object.material) {
+        if (Array.isArray(object.material)) {
+            object.material.forEach(material => material.dispose());
+        } else {
+            object.material.dispose();
+        }
+    }
+
+    return true;
+}
+
+// Helper to safely check if an object is in the scene
+export function isInScene(object) {
+    return object && object.parent === scene;
 }
