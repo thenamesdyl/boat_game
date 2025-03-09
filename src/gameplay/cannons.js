@@ -3,11 +3,11 @@ import { scene, getTime } from '../core/gameState.js';
 import { gameUI } from '../ui/ui.js';
 import { onMonsterKilled, addToInventory } from '../core/network.js';
 import { createTreasureDrop } from '../entities/seaMonsters.js';
-import { initCannonTargetingSystem, updateTargeting, isMonsterEffectivelyTargeted } from './cannonautosystem.js';
+import { initCannonTargetingSystem, updateTargeting, isMonsterEffectivelyTargeted, isMonsterTargetedWithGreenLine } from './cannonautosystem.js';
 
 // Cannon system configuration
 const CANNON_RANGE = 100; // Maximum range for cannons
-const CANNON_COOLDOWN = 0.6; // Seconds between cannon shots
+const CANNON_COOLDOWN = 0.3; // Seconds between cannon shots
 const CANNON_DAMAGE = 3; // Damage per cannon hit
 const CANNON_BALL_SPEED = 3; // Speed of cannonballs
 
@@ -331,41 +331,45 @@ function fireAtMonsters(targets) {
     targets.forEach(monster => {
         const distance = monster.mesh.position.distanceTo(boat.position);
 
-        // Get targeting information from the targeting system
+        // Get targeting information
         const targetingInfo = isMonsterEffectivelyTargeted(monster);
+        const hasGreenLine = isMonsterTargetedWithGreenLine(monster);
 
-        // Base probability on distance (as before)
+        // Base probability on distance and whether the targeting line is green
         let hitProbability = 1 - (distance / CANNON_RANGE) * 0.7; // 70% chance at max range, 100% up close
 
-        // Adjust probability based on targeting quality
-        if (targetingInfo.anyCannonTargeting) {
-            // Reward good targeting with higher hit chance
-            hitProbability *= (0.5 + 0.5 * targetingInfo.targetingQuality);
+        if (hasGreenLine) {
+            // Significant boost if there's a green/yellow targeting line
+            hitProbability *= 1.5;
+            hitProbability = Math.min(1.0, hitProbability); // Cap at 100%
         } else {
-            // Penalize poor targeting with much lower hit chance
-            hitProbability *= 0.2; // Only 20% of normal chance if not properly targeted
+            // Severe penalty if no green targeting line
+            hitProbability *= 0.2; // Only 20% of normal chance
         }
 
         // Add some debugging to help see what's happening
         if (Math.random() < 0.1) { // Only log occasionally to avoid console spam
-            console.log(`Monster hit probability: ${(hitProbability * 100).toFixed(1)}% (Distance: ${distance.toFixed(1)}, Targeting Quality: ${(targetingInfo.targetingQuality * 100).toFixed(1)}%)`);
+            console.log(`Monster hit probability: ${(hitProbability * 100).toFixed(1)}% (Distance: ${distance.toFixed(1)}, Green Line: ${hasGreenLine})`);
         }
 
         if (Math.random() < hitProbability) {
-            // Hit!
-            hitMonster(monster);
+            // Hit! Make sure to flash red
+            hitMonster(monster, hasGreenLine);
         }
     });
 }
 
 // Hit a monster with cannon
-function hitMonster(monster) {
+function hitMonster(monster, hasGreenLine = false) {
     // Apply damage
     if (!monster.health) monster.health = 3; // Default health if not set
     monster.health -= CANNON_DAMAGE;
 
     // Create hit effect
     createHitEffect(monster.mesh.position);
+
+    // Make monster flash red - with more intensity if it had a green targeting line
+    flashMonsterRed(monster, hasGreenLine);
 
     // Check if monster is defeated
     if (monster.health <= 0) {
@@ -420,29 +424,148 @@ function hitMonster(monster) {
 
         // Set velocity away from boat (faster retreat)
         monster.velocity.copy(directionFromBoat.multiplyScalar(1.2));
-
-        // Make monster flash red to indicate damage
-        if (monster.mesh) {
-            monster.mesh.traverse((child) => {
-                if (child.isMesh && child.material) {
-                    // Store original color if not already stored
-                    if (!child.userData.originalColor && child.material.color) {
-                        child.userData.originalColor = child.material.color.clone();
-                    }
-
-                    // Flash red
-                    child.material.color.set(0xff0000);
-
-                    // Restore original color after a short delay
-                    setTimeout(() => {
-                        if (child.userData.originalColor) {
-                            child.material.color.copy(child.userData.originalColor);
-                        }
-                    }, 300);
-                }
-            });
-        }
     }
+}
+
+// Update the flashMonsterRed function to properly restore colors
+function flashMonsterRed(monster, hadGreenLine = false) {
+    // Ensure monster has the damage flash property to track state
+    if (monster.isFlashingRed === undefined) {
+        monster.isFlashingRed = false;
+    }
+
+    // Prevent color animation overlap if already flashing
+    if (monster.isFlashingRed) {
+        clearTimeout(monster.flashTimeout);
+    }
+
+    // Mark as currently flashing
+    monster.isFlashingRed = true;
+
+    // Store all original colors first if not already done
+    if (!monster.storedColors) {
+        monster.storedColors = new Map();
+    }
+
+    // Store original emissive if needed
+    if (!monster.storedEmissive) {
+        monster.storedEmissive = new Map();
+    }
+
+    // Process all mesh components of the monster
+    if (monster.mesh) {
+        monster.mesh.traverse((child) => {
+            if (child.isMesh && child.material) {
+                // Handle both single materials and material arrays
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+
+                materials.forEach((material, index) => {
+                    if (material && material.color) {
+                        // Create a unique identifier for this material
+                        const materialId = `${child.id}-${index}`;
+
+                        // Store original color if not already stored
+                        if (!monster.storedColors.has(materialId)) {
+                            monster.storedColors.set(materialId, material.color.clone());
+                        }
+
+                        // Set to bright red - use a more intense red for targeted hits
+                        material.color.set(hadGreenLine ? 0xff0000 : 0xdd0000);
+
+                        // Boost emissive for extra glow effect if supported
+                        if (material.emissive) {
+                            if (!monster.storedEmissive.has(materialId)) {
+                                monster.storedEmissive.set(materialId, material.emissive.clone());
+                            }
+
+                            // Add red glow - brighter for green line hits
+                            material.emissive.set(hadGreenLine ? 0x550000 : 0x330000);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    // Also handle special monster parts like fins if they exist
+    const specialParts = ['dorsalFin', 'leftFin', 'rightFin'];
+    specialParts.forEach(partName => {
+        if (monster[partName] && monster[partName].material && monster[partName].material.color) {
+            const materialId = `special-${partName}`;
+
+            // Store original color
+            if (!monster.storedColors.has(materialId)) {
+                monster.storedColors.set(materialId, monster[partName].material.color.clone());
+            }
+
+            // Set to red - brighter for targeted hits
+            monster[partName].material.color.set(hadGreenLine ? 0xff0000 : 0xdd0000);
+        }
+    });
+
+    // Flash longer for targeted hits (green line)
+    const flashDuration = hadGreenLine ? 700 : 500;
+
+    // Restore original colors after a delay
+    monster.flashTimeout = setTimeout(() => {
+        restoreMonsterColors(monster);
+    }, flashDuration);
+}
+
+// Create a separate function to restore monster colors to make the code cleaner
+// and ensure it can be called from multiple places if needed
+function restoreMonsterColors(monster) {
+    // Safety check - make sure monster exists
+    if (!monster || !monster.mesh || !monster.storedColors) {
+        return;
+    }
+
+    // Only restore if monster still exists and has stored colors
+    try {
+        monster.mesh.traverse((child) => {
+            if (child.isMesh && child.material) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+
+                materials.forEach((material, index) => {
+                    if (material && material.color) {
+                        const materialId = `${child.id}-${index}`;
+                        const originalColor = monster.storedColors.get(materialId);
+
+                        if (originalColor) {
+                            // Use copy to ensure we're properly transferring the color values
+                            material.color.copy(originalColor);
+                        }
+
+                        // Restore emissive if it exists
+                        if (material.emissive && monster.storedEmissive) {
+                            const originalEmissive = monster.storedEmissive.get(materialId);
+                            if (originalEmissive) {
+                                material.emissive.copy(originalEmissive);
+                            }
+                        }
+                    }
+                });
+            }
+        });
+
+        // Restore special parts
+        const specialParts = ['dorsalFin', 'leftFin', 'rightFin'];
+        specialParts.forEach(partName => {
+            if (monster[partName] && monster[partName].material && monster[partName].material.color) {
+                const materialId = `special-${partName}`;
+                const originalColor = monster.storedColors.get(materialId);
+
+                if (originalColor) {
+                    monster[partName].material.color.copy(originalColor);
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error restoring monster colors:", error);
+    }
+
+    // Reset flag
+    monster.isFlashingRed = false;
 }
 
 // Create hit effect

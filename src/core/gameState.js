@@ -21,9 +21,9 @@ let time = 0;
 
 // Add these variables near the top with other exports
 export const shipSpeedConfig = {
-    basePlayerSpeed: 1.2,     // Normal max speed when player is controlling
+    basePlayerSpeed: 0.6,     // Normal max speed when player is controlling
     baseKnockbackSpeed: 8.5,   // Max speed when not player-controlled (like knockbacks)
-    speedMultiplier: 0.4       // Multiplier that can be adjusted by /speed command
+    speedMultiplier: 1.0       // Multiplier that can be adjusted by /speed command
 };
 
 // Add this near the top with other exports

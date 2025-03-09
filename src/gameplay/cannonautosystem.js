@@ -605,4 +605,28 @@ function getTargetingQualityForMonster(monster) {
     // Scale to a quality factor (0 to 1)
     // 0.7 is about 45 degrees off, 1.0 is perfect alignment
     return Math.max(0, (bestAlignment - 0.7) / 0.3);
+}
+
+// Add this new export function to determine if a monster is properly targeted with a green line
+export function isMonsterTargetedWithGreenLine(monster) {
+    if (!monster || !targets) return false;
+
+    // Check each cannon position
+    for (const position of Object.keys(targets)) {
+        const targetData = targets[position];
+
+        // Check if this cannon is targeting this specific monster and the line is visible
+        if (targetData.currentTarget === monster && targetData.trajectory && targetData.trajectory.visible) {
+            // Check if the trajectory color is green (in range) or yellow (optimal)
+            const materialColor = targetData.trajectory.material.color.getHex();
+            const isGreenLine = materialColor === TARGETING_CONFIG.COLOR_IN_RANGE;
+            const isYellowLine = materialColor === TARGETING_CONFIG.COLOR_OPTIMAL;
+
+            if (isGreenLine || isYellowLine) {
+                return true; // This monster is targeted with a green/yellow line
+            }
+        }
+    }
+
+    return false; // No green targeting line found for this monster
 } 
