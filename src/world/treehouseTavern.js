@@ -39,6 +39,31 @@ export function createTreehouseTavern(params) {
     const signMaterial = new THREE.MeshBasicMaterial({ color: 0xDEB887 });
     const textMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
 
+    // NEW: Add outline material
+    const outlineMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        side: THREE.BackSide
+    });
+
+    // Helper function to add outline effect to any mesh
+    function addOutlineEffect(mesh, parent, outlineScale = 1.15) {
+        // Create outline mesh with same geometry but slightly larger
+        const outlineMesh = new THREE.Mesh(
+            mesh.geometry,
+            outlineMaterial
+        );
+
+        // Copy position, rotation, and scale but make it slightly larger
+        outlineMesh.position.copy(mesh.position);
+        outlineMesh.rotation.copy(mesh.rotation);
+        outlineMesh.scale.copy(mesh.scale).multiplyScalar(outlineScale);
+
+        // Add outline first so it renders behind the main mesh
+        parent.add(outlineMesh);
+
+        return outlineMesh;
+    }
+
     // Dimensions - based on the tree sizes in islands.js
     const trunkHeight = 12 * scale; // 60% of MIN_TREE_HEIGHT
     const trunkRadius = 1.2 * scale; // Slightly larger than MIN_TRUNK_RADIUS
@@ -52,21 +77,10 @@ export function createTreehouseTavern(params) {
     mainTrunk.position.y = trunkHeight * 0.75;
     tavern.add(mainTrunk);
 
-    // Add bark texture details to the trunk
-    for (let i = 0; i < 8; i++) {
-        const barkPiece = new THREE.Mesh(
-            new THREE.BoxGeometry(0.4 * scale, random() * 4 * scale + 2 * scale, 0.2 * scale),
-            darkWoodMaterial
-        );
-        const angle = i * Math.PI / 4 + random() * 0.4;
-        barkPiece.position.set(
-            Math.cos(angle) * (trunkRadius * 1.21),
-            trunkHeight * (0.3 + random() * 0.6),
-            Math.sin(angle) * (trunkRadius * 1.21)
-        );
-        barkPiece.rotation.y = angle;
-        tavern.add(barkPiece);
-    }
+    // Add outline to main trunk
+    addOutlineEffect(mainTrunk, tavern);
+
+    // Add bark texture details to the trunk - skipping outlines for small details
 
     // Create main platform (central tavern area)
     const mainPlatform = new THREE.Mesh(
@@ -76,10 +90,13 @@ export function createTreehouseTavern(params) {
     mainPlatform.position.y = trunkHeight * 0.8;
     tavern.add(mainPlatform);
 
+    // Add outline to platform
+    addOutlineEffect(mainPlatform, tavern);
+
     // Create central tavern structure (organic, non-rectangular)
-    // We'll use multiple merged geometries for an irregular shape
     const tavernWalls = new THREE.Group();
     tavernWalls.position.y = trunkHeight * 0.8 + 0.5 * scale;
+    tavern.add(tavernWalls);
 
     // Create wall sections with varying heights and positions
     const wallSegments = 10;
@@ -151,6 +168,9 @@ export function createTreehouseTavern(params) {
             window.rotation.y = windowAngle + Math.PI / 2;
             tavernWalls.add(window);
 
+            // Add outline to window
+            addOutlineEffect(window, tavernWalls, 1.1);
+
             // Window frame
             const windowFrame = new THREE.Mesh(
                 new THREE.TorusGeometry(windowSize, 0.3 * scale, 8, 24),
@@ -159,6 +179,9 @@ export function createTreehouseTavern(params) {
             windowFrame.position.copy(window.position);
             windowFrame.rotation.copy(window.rotation);
             tavernWalls.add(windowFrame);
+
+            // Add outline to window frame
+            addOutlineEffect(windowFrame, tavernWalls);
         }
 
         // Main entrance
@@ -205,6 +228,9 @@ export function createTreehouseTavern(params) {
     roof.position.y = trunkHeight * 0.8 + baseWallHeight + 2 * scale;
     tavern.add(roof);
 
+    // Add outline to roof
+    addOutlineEffect(roof, tavern);
+
     // Add some crossbeams on the ceiling inside
     for (let i = 0; i < 4; i++) {
         const angle = (i / 4) * Math.PI * 2;
@@ -238,6 +264,9 @@ export function createTreehouseTavern(params) {
         );
         tavern.add(supportTrunk);
 
+        // Add outline to support trunk
+        addOutlineEffect(supportTrunk, tavern);
+
         // Create platform
         const smallPlatform = new THREE.Mesh(
             new THREE.CylinderGeometry(smallPlatformRadius, smallPlatformRadius, 0.5 * scale, 12),
@@ -249,6 +278,9 @@ export function createTreehouseTavern(params) {
             Math.sin(platformAngle) * platformDistance
         );
         tavern.add(smallPlatform);
+
+        // Add outline to small platform
+        addOutlineEffect(smallPlatform, tavern);
 
         // Create small hut on platform
         const hutHeight = 3 * scale;
@@ -265,6 +297,9 @@ export function createTreehouseTavern(params) {
         );
         tavern.add(hut);
 
+        // Add outline to hut
+        addOutlineEffect(hut, tavern);
+
         // Hut roof
         const hutRoof = new THREE.Mesh(
             new THREE.ConeGeometry(hutRadius * 1.2, hutHeight * 0.6, 8),
@@ -276,6 +311,9 @@ export function createTreehouseTavern(params) {
             Math.sin(platformAngle) * platformDistance
         );
         tavern.add(hutRoof);
+
+        // Add outline to hut roof
+        addOutlineEffect(hutRoof, tavern);
 
         // Create window in hut
         const hutWindow = new THREE.Mesh(
@@ -289,6 +327,9 @@ export function createTreehouseTavern(params) {
         );
         hutWindow.rotation.y = platformAngle + Math.PI / 2;
         tavern.add(hutWindow);
+
+        // Add outline to hut window
+        addOutlineEffect(hutWindow, tavern, 1.05);
 
         // Create connecting rope bridge to main platform
         createRopeBridge(
@@ -314,7 +355,7 @@ export function createTreehouseTavern(params) {
         scale
     );
 
-    // Add glowing fungi for lighting
+    // Add glowing fungi with outlines
     for (let i = 0; i < 16; i++) {
         const isOnTrunk = random() < 0.4;
         let fungiPosition;
@@ -342,10 +383,10 @@ export function createTreehouseTavern(params) {
             );
         }
 
-        createGlowingFungus(fungiPosition, tavern, scale, random, mushroomCapMaterial, mushroomStemMaterial);
+        createGlowingFungus(fungiPosition, tavern, scale, random, mushroomCapMaterial, mushroomStemMaterial, outlineMaterial);
     }
 
-    // Add sign
+    // Add sign with outline
     const signWidth = 4 * scale;
     const signHeight = 2 * scale;
 
@@ -357,6 +398,9 @@ export function createTreehouseTavern(params) {
     signPost.position.set(platformRadius * 1.2, 4 * scale, 0);
     tavern.add(signPost);
 
+    // Add outline to sign post
+    addOutlineEffect(signPost, tavern);
+
     // Sign board
     const sign = new THREE.Mesh(
         new THREE.BoxGeometry(signWidth, signHeight, 0.3 * scale),
@@ -364,6 +408,9 @@ export function createTreehouseTavern(params) {
     );
     sign.position.set(platformRadius * 1.2, 7 * scale, 0);
     tavern.add(sign);
+
+    // Add outline to sign board
+    addOutlineEffect(sign, tavern, 1.1);
 
     // Sign text (simplified)
     const textGeometry = new THREE.BoxGeometry(signWidth * 0.8, signHeight * 0.5, 0.1 * scale);
@@ -475,7 +522,7 @@ export function createTreehouseTavern(params) {
         tavern.add(branch);
     }
 
-    console.log("Created Treehouse Tavern");
+    console.log("Created Treehouse Tavern with outline effect");
     return tavern;
 }
 
@@ -628,7 +675,7 @@ function createLadder(start, end, parent, material, scale) {
 /**
  * Helper function to create a glowing fungus
  */
-function createGlowingFungus(position, parent, scale, random, capMaterial, stemMaterial) {
+function createGlowingFungus(position, parent, scale, random, capMaterial, stemMaterial, outlineMaterial) {
     const stemHeight = (0.3 + random() * 0.5) * scale;
     const capRadius = (0.3 + random() * 0.4) * scale;
 
@@ -641,7 +688,17 @@ function createGlowingFungus(position, parent, scale, random, capMaterial, stemM
     stem.position.y += stemHeight / 2;
     parent.add(stem);
 
-    // Cap - use hemisphere for mushroom cap shape
+    // Stem outline
+    const stemOutline = new THREE.Mesh(
+        stem.geometry,
+        outlineMaterial
+    );
+    stemOutline.position.copy(stem.position);
+    stemOutline.rotation.copy(stem.rotation);
+    stemOutline.scale.copy(stem.scale).multiplyScalar(1.15);
+    parent.add(stemOutline);
+
+    // Cap
     const cap = new THREE.Mesh(
         new THREE.SphereGeometry(capRadius, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.6),
         capMaterial
@@ -650,4 +707,14 @@ function createGlowingFungus(position, parent, scale, random, capMaterial, stemM
     cap.position.y += stemHeight;
     cap.rotation.x = Math.PI;
     parent.add(cap);
+
+    // Cap outline
+    const capOutline = new THREE.Mesh(
+        cap.geometry,
+        outlineMaterial
+    );
+    capOutline.position.copy(cap.position);
+    capOutline.rotation.copy(cap.rotation);
+    capOutline.scale.copy(cap.scale).multiplyScalar(1.15);
+    parent.add(capOutline);
 } 

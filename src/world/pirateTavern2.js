@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyOutline } from '../theme/outlineStyles.js'; // Import our outline system
 
 /**
  * Creates a Floating Market Dock with multiple platforms, bridges, and market stalls
@@ -225,7 +226,16 @@ export function createPirateTavern2(params) {
         market.add(ripple);
     }
 
-    console.log("Created Floating Market Stalls");
+    // Apply outline effect to the entire market structure
+    applyOutline(market, {
+        recursive: true,  // Apply to all children meshes
+        // Don't outline transparent objects like water or windows
+        filter: (mesh) => !mesh.material.transparent,
+        // Slightly smaller outline than default for more subtle effect
+        scale: 1.12
+    });
+
+    console.log("Created Floating Market Stalls with outline effect");
 
     return market;
 }
