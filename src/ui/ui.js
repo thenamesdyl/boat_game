@@ -8,6 +8,7 @@ import { fireCannons } from '../gameplay/cannons.js';
 import { setWaterStyle } from '../environment/water.js';
 import { areShoreEffectsEnabled } from '../world/islands.js';
 import playerList from './playerList.js';
+import { initGameTerminal } from './gameTerminal.js';
 
 // Create a UI class to manage all interface elements
 class GameUI {
@@ -74,7 +75,6 @@ class GameUI {
         this.selfMarker.style.transform = 'translate(-50%, -50%)';
         this.miniMapContainer.appendChild(this.selfMarker);
 
-        // Create player stats panel after elements is initialized
         // Initialize the chat system
         this.chat = initChat();
 
@@ -84,6 +84,9 @@ class GameUI {
 
         // Initialize the shop UI
         this.elements.shop = initShop(this);
+
+        // Initialize game terminal
+        this.terminal = initGameTerminal();
 
         // Connect the fire button to the fireCannons function
         this.elements.cannon.fireButton.addEventListener('click', fireCannons);
@@ -1286,6 +1289,55 @@ class GameUI {
         });
 
         playerListSection.appendChild(playerListButton);
+
+        // After the player list button section, add a terminal button section
+        const terminalSection = document.createElement('div');
+        terminalSection.style.marginBottom = '15px';
+        settingsPanel.appendChild(terminalSection);
+
+        // Add section header
+        const terminalHeader = document.createElement('div');
+        terminalHeader.textContent = 'Command Terminal';
+        terminalHeader.style.fontWeight = 'bold';
+        terminalHeader.style.marginBottom = '8px';
+        terminalHeader.style.color = '#ffffff';
+        terminalSection.appendChild(terminalHeader);
+
+        // Create button
+        const terminalButton = document.createElement('button');
+        terminalButton.textContent = 'Open Command Terminal';
+        terminalButton.style.width = '100%';
+        terminalButton.style.padding = '8px 10px';
+        terminalButton.style.backgroundColor = '#5A3D27';
+        terminalButton.style.backgroundImage = 'linear-gradient(to bottom, #6A4D37, #5A3D27)';
+        terminalButton.style.border = '1px solid #DAA520';
+        terminalButton.style.borderRadius = '5px';
+        terminalButton.style.color = '#FFD700';
+        terminalButton.style.fontWeight = 'bold';
+        terminalButton.style.cursor = 'pointer';
+        terminalButton.style.fontFamily = 'serif';
+        terminalButton.style.fontSize = '14px';
+        terminalButton.style.textShadow = '0 1px 2px rgba(0,0,0,0.8)';
+        terminalButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)';
+
+        // Add hover effect
+        terminalButton.addEventListener('mouseover', () => {
+            terminalButton.style.backgroundImage = 'linear-gradient(to bottom, #7A5D47, #6A4D37)';
+        });
+        terminalButton.addEventListener('mouseout', () => {
+            terminalButton.style.backgroundImage = 'linear-gradient(to bottom, #6A4D37, #5A3D27)';
+        });
+
+        // Click handler to open terminal
+        terminalButton.addEventListener('click', () => {
+            // Hide settings panel
+            settingsPanel.style.display = 'none';
+
+            // Show terminal
+            this.terminal.toggle(true);
+        });
+
+        terminalSection.appendChild(terminalButton);
 
         // Store references
         this.settingsButton = settingsButton;

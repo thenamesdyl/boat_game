@@ -1825,3 +1825,15 @@ export function setupAllPlayersTracking() {
         console.log("⏱️ Periodic player check:", currentPlayers.length, "players in game state");
     }, 10000);
 }
+
+
+// Add this to an appropriate key handler
+document.addEventListener('keydown', (e) => {
+    // Open terminal with backtick/tilde key (common in games)
+    if ((e.key === '`' || e.key === '~') && !window.chatInputActive && !window.terminalInputActive) {
+        if (gameUI && gameUI.terminal) {
+            gameUI.terminal.toggle();
+            e.preventDefault();
+        }
+    }
+});
