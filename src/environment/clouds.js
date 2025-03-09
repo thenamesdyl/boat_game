@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { scene, getTime } from '../core/gameState.js';
+// Import outline system
+import { applyOutline, defaultStyleSystem } from '../theme/outlineStyles.js';
 
 let cloudInstances = [];
 const CLOUD_COUNT = 40;
@@ -10,6 +12,12 @@ const CLOUD_DRIFT_SPEED = 1.5; // Base drift speed
 // Global wind direction (prevailing wind)
 let windDirection = new THREE.Vector2(1, 0.3).normalize(); // Default wind direction
 let windChangeSpeed = 0.0001; // How quickly the wind direction can change
+
+// Create a custom cloud outline material (lighter than the default black)
+const cloudOutlineMaterial = new THREE.MeshBasicMaterial({
+    color: 0xcccccc, // Light gray for softer cloud outlines
+    side: THREE.BackSide
+});
 
 export function setupClouds() {
     // Randomly determine prevailing wind direction for this game session
@@ -56,6 +64,13 @@ export function setupClouds() {
             block.rotation.y = Math.random() * Math.PI * 0.1;
 
             cloud.add(block);
+
+            // Apply cloud-specific outline to each block 
+            // Use lighter colored outline material and a subtle scale
+            applyOutline(block, {
+                scale: 1.1,
+                material: cloudOutlineMaterial
+            });
         }
 
         // Position cloud randomly in the sky
@@ -137,4 +152,7 @@ export function updateClouds(playerPosition) {
             cloud.position.y = CLOUD_LAYER_HEIGHT + Math.random() * 100;
         }
     });
+
+    // Update all outline positions to match cloud block positions
+    defaultStyleSystem.update();
 } 
