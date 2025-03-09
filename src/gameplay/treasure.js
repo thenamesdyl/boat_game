@@ -4,7 +4,7 @@ import { scene, getTime, addToScene, removeFromScene, isInScene } from '../core/
 // Configuration
 const MAX_TREASURE_DROPS = 10; // Maximum number of treasure drops rendered at once
 const TREASURE_LIFETIME = 30; // Seconds before treasure disappears
-const COLLECT_DISTANCE = 6; // Distance at which player can collect treasures
+const COLLECT_DISTANCE = 12; // Distance at which player can collect treasures
 const PARTICLE_COUNT = 12; // Number of particles orbiting each treasure
 
 // Treasure types with different colors and values
@@ -133,12 +133,12 @@ export function createTreasureDrop(position, monsterType) {
 
     // Create coral mesh
     const coralMesh = new THREE.Mesh(coralGeometry, coralMaterial);
-    coralMesh.scale.set(0.7, 0.7, 0.7); // Scale down a bit
+    coralMesh.scale.set(1.4, 1.4, 1.4); // Doubled from 0.7 to 1.4
     treasureGroup.add(coralMesh);
 
     // Create outline mesh (slightly larger)
     const outlineMesh = new THREE.Mesh(coralGeometry, outlineMaterial);
-    outlineMesh.scale.set(0.8, 0.8, 0.8); // Slightly larger than the main mesh
+    outlineMesh.scale.set(1.6, 1.6, 1.6); // Doubled from 0.8 to 1.6
     treasureGroup.add(outlineMesh);
 
     // Add orbiting particles
@@ -235,8 +235,8 @@ function createCoralGeometry() {
 // Create small particles that orbit around the treasure
 function createOrbitingParticles(treasureGroup, treasureType) {
     for (let i = 0; i < PARTICLE_COUNT; i++) {
-        // Create particle geometry
-        const particleGeometry = new THREE.SphereGeometry(0.07, 8, 8);
+        // Create particle geometry - double the size
+        const particleGeometry = new THREE.SphereGeometry(0.14, 8, 8); // Doubled from 0.07
 
         // Create particle material with glow
         const particleMaterial = new THREE.MeshBasicMaterial({
@@ -249,7 +249,7 @@ function createOrbitingParticles(treasureGroup, treasureType) {
         const particle = new THREE.Mesh(particleGeometry, particleMaterial);
 
         // Random orbit parameters
-        const orbitRadius = 1.2 + Math.random() * 0.6;
+        const orbitRadius = 2.4 + Math.random() * 1.2; // Doubled from 1.2 + random * 0.6
         const orbitSpeed = 0.5 + Math.random() * 1.5;
         const orbitOffset = Math.random() * Math.PI * 2;
         const orbitHeight = (Math.random() - 0.5) * 0.8;

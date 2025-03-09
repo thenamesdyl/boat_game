@@ -666,7 +666,7 @@ function setupMonsterPosition(monster, tentacles, dorsalFin, leftFin, rightFin, 
 
     monster.position.set(
         Math.cos(randomAngle) * randomRadius,
-        0, // Start at water level instead of below (was 5)
+        MONSTER_DEPTH, // Start underwater instead of at surface
         Math.sin(randomAngle) * randomRadius
     );
 
@@ -680,6 +680,21 @@ function setupMonsterPosition(monster, tentacles, dorsalFin, leftFin, rightFin, 
     // Add monster to scene
     scene.add(monster);
 
+    // Determine initial state randomly for more natural behavior
+    let initialState;
+    const stateRoll = Math.random();
+
+    if (stateRoll < 0.7) {
+        // 70% chance to start lurking underwater
+        initialState = MONSTER_STATE.LURKING;
+    } else if (stateRoll < 0.9) {
+        // 20% chance to start hunting
+        initialState = MONSTER_STATE.HUNTING;
+    } else {
+        // 10% chance to start in attacking mode (for immediate challenge)
+        initialState = MONSTER_STATE.ATTACKING;
+    }
+
     // Store monster data
     monsters.push({
         mesh: monster,
@@ -688,10 +703,12 @@ function setupMonsterPosition(monster, tentacles, dorsalFin, leftFin, rightFin, 
         dorsalFin: dorsalFin,
         leftFin: leftFin,
         rightFin: rightFin,
-        state: MONSTER_STATE.ATTACKING, // Always start in attacking state
-        stateTimer: MONSTER_SURFACE_TIME + Math.random() * 20, // Stay visible longer
+        state: initialState, // Use the randomly determined state
+        stateTimer: initialState === MONSTER_STATE.ATTACKING ?
+            MONSTER_SURFACE_TIME + Math.random() * 20 : // Longer timer for attacking
+            MONSTER_DIVE_TIME + Math.random() * 30,     // Longer timer for underwater states
         targetPosition: new THREE.Vector3(),
-        eyeGlow: 0,
+        eyeGlow: initialState === MONSTER_STATE.HUNTING ? 1 : 0, // Glow eyes if hunting
         monsterType: monsterType,
         health: getMonsterHealth(monsterType)
     });

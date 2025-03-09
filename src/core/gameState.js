@@ -141,8 +141,8 @@ const SHIP_CONFIG = {
     backwardPowerRatio: 0.6,        // Moderate backwards
 
     // TURNING
-    baseRudderPower: 0.9,           // Modest turning - focused on speed
-    turnSpeedMultiplier: 0.5,       // Slower rotation - not for cornering
+    baseRudderPower: 1.1,           // Modest turning - focused on speed
+    turnSpeedMultiplier: 1.0,       // Slower rotation - not for cornering
     turnConsistencyFactor: 50,       // Poor turning at high speeds
 
     // RESISTANCE & FRICTION

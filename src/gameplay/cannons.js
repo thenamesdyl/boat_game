@@ -4,6 +4,7 @@ import { gameUI } from '../ui/ui.js';
 import { onMonsterKilled, addToInventory } from '../core/network.js';
 import { handleMonsterTreasureDrop } from '../entities/seaMonsters.js';
 import { initCannonTargetingSystem, updateTargeting, isMonsterEffectivelyTargeted, isMonsterTargetedWithGreenLine } from './cannonautosystem.js';
+import { playCannonSound } from '../audio/soundEffects.js';
 
 // Cannon system configuration
 const CANNON_RANGE = 100; // Maximum range for cannons
@@ -296,6 +297,18 @@ function createCannonEffect(cannon) {
 
 // Play cannon sound
 function playCannonSound() {
+    // Use the new sound system
+    import('../audio/soundEffects.js').then(module => {
+        module.playCannonSound(0.3); // 0.3 is volume, adjust as needed
+    }).catch(error => {
+        console.error("Error loading sound effects module:", error);
+        // Fallback to simple sound if module fails to load
+        playFallbackCannonSound();
+    });
+}
+
+// Add fallback sound function in case module loading fails
+function playFallbackCannonSound() {
     // Create audio context if not already created
     if (!window.audioContext) {
         try {
@@ -306,7 +319,7 @@ function playCannonSound() {
         }
     }
 
-    // Create oscillator for simple cannon sound
+    // Simple oscillator for fallback
     const oscillator = window.audioContext.createOscillator();
     const gainNode = window.audioContext.createGain();
 
@@ -314,7 +327,6 @@ function playCannonSound() {
     oscillator.frequency.setValueAtTime(100, window.audioContext.currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(20, window.audioContext.currentTime + 0.2);
 
-    // Reduce volume by 50% (from 0.5 to 0.25)
     gainNode.gain.setValueAtTime(0.25, window.audioContext.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.005, window.audioContext.currentTime + 0.3);
 
