@@ -19,6 +19,55 @@ const originalUpdateCamera = window.updateCamera;
 // Command registry to store all available commands
 const commands = new Map();
 
+// Command configuration - comprehensive list of all available commands and descriptions
+export const COMMAND_CONFIG = {
+    // Core commands
+    fly: {
+        description: 'Toggle fly mode or control flying options. Usage: /fly [speed]'
+    },
+
+    // Island commands
+    'rocky-island': {
+        description: 'Create a rocky island at your current position. Usage: /rocky-island create [size]'
+    },
+
+    // Fire commands
+    fireball: {
+        description: 'Launch a fireball from your ship. Usage: /fireball [size] [intensity]'
+    },
+
+    // Ship commands
+    speed: {
+        description: 'Change ship speed. Usage: /speed [value]'
+    },
+    wild: {
+        description: 'Teleport to a random location on the map'
+    },
+
+    // Monster commands
+    killall: {
+        description: 'Kill all sea monsters in the world'
+    },
+
+    // Teleport commands
+    spawn: {
+        description: 'Teleport back to the center of the map (0,0,0)'
+    },
+
+    // Clan commands
+    clan: {
+        description: 'Create and manage clans. Usage: /clan create [name]'
+    },
+    nick: {
+        description: 'Change your nickname while preserving clan tag. Usage: /nick [new name]'
+    },
+
+    // Bird commands
+    birdsworm: {
+        description: 'Spawn a swarm of birds at your location. Usage: /birdsworm [count]'
+    }
+};
+
 // Command system state
 const state = {
     flyMode: false,

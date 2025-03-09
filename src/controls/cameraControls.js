@@ -139,14 +139,22 @@ function onTouchEnd(event) {
 }
 
 function onMouseWheel(event) {
-    // Adjust camera distance based on wheel movement
-    const zoomSpeed = 0.5;
-    cameraOrbitPosition.distance += Math.sign(event.deltaY) * zoomSpeed;
+    // Check if the event target is inside the terminal or any other UI element
+    const isOverUI = event.target.closest('#game-terminal') ||
+        (window.terminalInputActive === true);
 
-    // Clamp distance to min/max values
-    cameraOrbitPosition.distance = Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, cameraOrbitPosition.distance));
+    // Only adjust camera if not over UI
+    if (!isOverUI) {
+        // Adjust camera distance based on wheel movement
+        const zoomSpeed = 0.5;
+        cameraOrbitPosition.distance += Math.sign(event.deltaY) * zoomSpeed;
 
-    event.preventDefault();
+        // Clamp distance to min/max values
+        cameraOrbitPosition.distance = Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, cameraOrbitPosition.distance));
+
+        // Only prevent default when we're actually using the event for camera control
+        event.preventDefault();
+    }
 }
 
 // Reset camera to default position - updated to be behind boat

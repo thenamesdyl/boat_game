@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { initCommandSystem, isCommand, processCommand } from '../commands/commandSystem.js';
+import { initCommandSystem, isCommand, processCommand, COMMAND_CONFIG } from '../commands/commandSystem.js';
 import { registerOpenUI, unregisterOpenUI } from './ui.js';
 
 export class GameTerminal {
@@ -210,23 +210,9 @@ export class GameTerminal {
     showCommandHelp() {
         this.addMessage('=== AVAILABLE COMMANDS ===', '#DAA520');
 
-        // Get command list from commandSystem.js 
-        // Since we don't have direct access to the commands Map from commandSystem,
-        // we'll list the most common commands
-        const commonCommands = [
-            { name: 'fly', desc: 'Toggle fly mode or control flying options' },
-            { name: 'island', desc: 'Manage islands' },
-            { name: 'fire', desc: 'Fire cannons or create fireballs' },
-            { name: 'ship', desc: 'Control your ship' },
-            { name: 'monster', desc: 'Spawn or manage monsters' },
-            { name: 'teleport', desc: 'Teleport to a location' },
-            { name: 'clan', desc: 'Manage your clan' },
-            { name: 'bird', desc: 'Spawn birds' },
-            { name: 'help', desc: 'Show this help message' }
-        ];
-
-        commonCommands.forEach(cmd => {
-            this.addMessage(`/${cmd.name} - ${cmd.desc}`);
+        // Use the COMMAND_CONFIG to display actual available commands
+        Object.entries(COMMAND_CONFIG).forEach(([cmdName, cmdInfo]) => {
+            this.addMessage(`/${cmdName} - ${cmdInfo.description}`);
         });
 
         this.addMessage('\nTo see more details about a specific command, type /<command> help', '#aaaaaa');
