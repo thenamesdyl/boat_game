@@ -34,24 +34,12 @@ let lastCollisionResult = null; // Store last collision result
 
 // Initialize the collision response system with extensive logging
 export function initCollisionResponse() {
-    console.log("%c🔍 ISLAND COLLISION SYSTEM - DEBUG MODE ACTIVE", "background:#007acc; color:white; padding:4px; border-radius:4px; font-weight:bold;");
-    console.log("%c📊 Settings: minSpeed=" + COLLISION_CONFIG.minAirborneSpeed +
-        ", bounce=" + COLLISION_CONFIG.bounceMultiplier +
-        ", lookAhead=" + COLLISION_CONFIG.lookAheadFactor,
-        "color:#4CAF50; font-weight:bold;");
-
     // Initialize position tracking
     lastPosition = boat.position.clone();
 
     // Export global flags for main.js
     window.boatInParabolicFlight = false;
     window.collisionDebugActive = COLLISION_CONFIG.debugMode;
-
-    // Log boat properties for debugging
-    console.log("%c🚢 Initial boat state:", "color:orange; font-weight:bold;");
-    console.log("   Position:", boat.position.x.toFixed(2), boat.position.y.toFixed(2), boat.position.z.toFixed(2));
-    console.log("   Velocity:", boatVelocity.x.toFixed(2), boatVelocity.y.toFixed(2), boatVelocity.z.toFixed(2));
-    console.log("   Speed:", boatVelocity.length().toFixed(2));
 
     return {
         updateCollisionResponse
@@ -126,15 +114,6 @@ function checkForUpcomingCollision() {
     // Check if future position is inside an island
     const collision = checkAllIslandCollisions(futurePosition, COLLISION_CONFIG.extraCollisionRadius);
     lastCollisionResult = collision;
-
-    // Log collision check
-    if (collision && collision.hit) {
-        console.log("%c⚠️ COLLISION DETECTED AT FUTURE POSITION", "color:red; font-weight:bold;");
-        console.log("   Distance to impact:", lookAheadDistance.toFixed(2));
-        console.log("   Island position:", collision.position);
-        console.log("   Boat speed:", speed.toFixed(2));
-        console.log("   Collision details:", collision);
-    }
 
     const endTime = performance.now();
     periodicDebugLog("⏱️ Collision check took " + (endTime - startTime).toFixed(2) + "ms");

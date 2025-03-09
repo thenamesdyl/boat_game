@@ -310,6 +310,24 @@ function setupSocketEvents() {
 
         setupAllPlayersTracking();
 
+
+        // Example usage in game code
+
+        console.log("Getting player inventory");
+        getPlayerInventory((inventory) => {
+            console.log('Inventory:', inventory);
+            if (inventory) {
+                console.log('My fish collection:', inventory.fish);
+                console.log('My treasures:', inventory.treasures);
+
+                // Check if player has a specific item
+                if (playerHasItem(inventory, 'fish', 'Rare Tuna')) {
+                    console.log('You have a Rare Tuna!');
+                }
+            }
+        });
+
+
         // IMPORTANT FIX: Update the playerName variable with the server-stored name
         // This ensures clan tags are maintained after page reload
         if (data.name) {
@@ -1042,4 +1060,43 @@ export function addToInventory(itemData) {
         item_name: itemData.item_name,
         item_data: itemData.item_data
     });
-} 
+}
+
+// Get player inventory from the server using Socket.IO instead of fetch
+export function getPlayerInventory(callback) {
+    if (!isConnected || !socket || !firebaseDocId) {
+        console.error("Cannot get inventory - not connected or no player ID");
+        if (callback) callback(null);
+        return false;
+    }
+
+    console.log(`DEBUG CLIENT: Sending get_inventory event with player_id: ${firebaseDocId}`);
+    console.log(`DEBUG CLIENT: Socket connected: ${socket.connected}`);
+    console.log(`DEBUG CLIENT: Socket ID: ${socket.id}`);
+
+    socket.off('inventory_data');
+
+
+    // Set up handler for inventory data response
+    socket.on('inventory_data', (inventoryData) => {
+        console.log('DEBUG CLIENT: Received inventory data:', inventoryData);
+        if (callback) callback(inventoryData);
+    });
+
+    // Request inventory data via Socket.IO
+    socket.emit('get_inventory', {
+        player_id: firebaseDocId
+    });
+
+    return true;
+}
+
+// Helper function to check if player has a specific item
+export function playerHasItem(inventoryData, itemType, itemName) {
+    if (!inventoryData) return false;
+
+    const itemCollection = inventoryData[itemType];
+    if (!itemCollection || !Array.isArray(itemCollection)) return false;
+
+    return itemCollection.some(item => item.name === itemName);
+}

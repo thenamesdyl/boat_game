@@ -148,10 +148,6 @@ def handle_player_join(data):
     # Get the Firebase token and UID from the request
     firebase_token = data.get('firebaseToken')
     claimed_firebase_uid = data.get('player_id')
-
-    # logger.info(f"Firebase token: {firebase_token}")
-    # logger.info(f"Claimed Firebase UID: {claimed_firebase_uid}")
-    
     # ONLY proceed with database storage if Firebase authentication is provided and valid
     if firebase_token and claimed_firebase_uid:
         verified_uid = verify_firebase_token(firebase_token)
@@ -727,11 +723,35 @@ def handle_add_to_inventory(data):
 # Add API endpoint to get player inventory
 @app.route('/api/players/<player_id>/inventory', methods=['GET'])
 def get_player_inventory(player_id):
+    print(f"DEBUG: Getting player inventory for {player_id}")
+    logger.error(f"DEBUG: Getting player inventory for {player_id}")
     """Get a player's inventory"""
     inventory = firestore_models.Inventory.get(player_id)
     if inventory:
         return jsonify(inventory)
     return jsonify({'error': 'Inventory not found'}), 404
+
+@socketio.on('get_inventory')
+def handle_get_inventory(data):
+    """
+    Handle request for player inventory
+    Expects: { player_id }
+    """
+    print(f"DEBUG: Getting inventory for {data}")
+    logger.error(f"DEBUG: Getting inventory for {data}")
+    player_id = data.get('player_id')
+    if not player_id:
+        logger.warning("Missing player ID in inventory request. Ignoring.")
+        return
+    
+    # Get inventory
+    inventory = firestore_models.Inventory.get(player_id)
+    
+    # Send inventory data back to the requesting client only
+    if inventory:
+        emit('inventory_data', inventory)
+    else:
+        emit('inventory_data', {'error': 'Inventory not found'})
 
 if __name__ == '__main__':
     # Run the Socket.IO server with debug and reloader enabled

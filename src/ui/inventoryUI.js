@@ -1,5 +1,7 @@
 // InventoryUI.js - Manages all inventory-related UI components
 
+import { getPlayerInventory } from '../core/network.js';
+
 class InventoryUI {
     constructor() {
         // Initialize elements container to store references to UI components
@@ -579,6 +581,31 @@ class InventoryUI {
             if (inventoryPanel.style.display === 'none') {
                 // Play chest opening sound
                 this.playChestOpenSound();
+
+                // ADDED: Fetch fresh inventory data when opening
+                console.log("Fetching latest inventory data from server");
+                getPlayerInventory((inventoryData) => {
+                    if (inventoryData) {
+                        console.log("Received inventory data:", inventoryData);
+
+                        // Update fish inventory display
+                        if (inventoryData.fish) {
+                            this.updateInventory(inventoryData.fish);
+                        }
+
+                        // Update treasure inventory display
+                        if (inventoryData.treasures) {
+                            this.updateTreasureInventory(inventoryData.treasures);
+                        }
+
+                        // Future: Handle cargo inventory if implemented
+                        // if (inventoryData.cargo) {
+                        //     this.updateCargoInventory(inventoryData.cargo);
+                        // }
+                    } else {
+                        console.warn("Failed to load inventory data");
+                    }
+                });
 
                 inventoryPanel.style.display = 'flex';
                 this.isOpen = true;

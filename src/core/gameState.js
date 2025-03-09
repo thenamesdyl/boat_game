@@ -272,14 +272,14 @@ export function updateShipMovement(deltaTime) {
     return boatVelocity;
 }
 
-// Add this function to update the allPlayers array
+// Update existing updateAllPlayers function to store the players data
 export function updateAllPlayers(players) {
     allPlayers = players;
     console.log("🌍 GAME STATE: All players updated:", allPlayers);
     return allPlayers;
 }
 
-// Add a getter function for the allPlayers array
+// Add this new function to return the stored players
 export function getAllPlayers() {
     return allPlayers;
 }

@@ -48,6 +48,7 @@ import { spawnBlockCave } from '../world/blockCave.js';
 import { setupFog, updateFog, toggleFog, setFogColor } from '../environment/fog.js';
 import { getTimeOfDay } from '../environment/skybox.js';
 import { initCollisionResponse, updateCollisionResponse, isBoatAirborne } from '../controls/islandCollisionResponse.js';
+import { getPlayerInventory, playerHasItem } from './network.js';
 
 // Define these variables at the file level scope (outside any functions)
 // so they're accessible throughout the file
@@ -1820,7 +1821,7 @@ export function setupAllPlayersTracking() {
         Network.getAllPlayers();
 
         // Print the current players from gameState
-        const currentPlayers = getGameStateAllPlayers();
+        const currentPlayers = getAllPlayers();
         console.log("⏱️ Periodic player check:", currentPlayers.length, "players in game state");
     }, 10000);
 }
