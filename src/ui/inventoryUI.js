@@ -681,7 +681,7 @@ class InventoryUI {
                 }
             });
         } else {
-            // Handle both possible object formats
+            // Handle existing object format
             processedFish = fishInventory;
         }
 
@@ -794,8 +794,9 @@ class InventoryUI {
         // Clear existing content
         treasureContent.innerHTML = '';
 
-        // If no treasures, show message
-        if (Object.keys(treasureInventory).length === 0) {
+        // Check for proper data format
+        if (!treasureInventory || (Array.isArray(treasureInventory) && treasureInventory.length === 0) ||
+            (typeof treasureInventory === 'object' && Object.keys(treasureInventory).length === 0)) {
             const emptyMessage = document.createElement('div');
             emptyMessage.textContent = 'No treasures found yet. Defeat sea monsters to collect treasures!';
             emptyMessage.style.textAlign = 'center';
@@ -803,6 +804,30 @@ class InventoryUI {
             emptyMessage.style.color = 'rgba(200, 200, 200, 0.7)';
             treasureContent.appendChild(emptyMessage);
             return;
+        }
+
+        // Process the treasure data into a standardized format
+        let processedTreasures = {};
+
+        if (Array.isArray(treasureInventory)) {
+            // Server format: array of treasure objects
+            treasureInventory.forEach(treasure => {
+                const treasureName = treasure.name || 'Unknown Treasure';
+                if (!processedTreasures[treasureName]) {
+                    processedTreasures[treasureName] = {
+                        name: treasureName,
+                        count: 1,
+                        value: treasure.data?.value || 5,
+                        color: treasure.data?.color || 0xFFD700,
+                        description: treasure.data?.description || ''
+                    };
+                } else {
+                    processedTreasures[treasureName].count += 1;
+                }
+            });
+        } else {
+            // Handle existing object format
+            processedTreasures = treasureInventory;
         }
 
         // Create treasure grid
@@ -813,7 +838,7 @@ class InventoryUI {
         treasureGrid.style.padding = '10px';
 
         // Add each treasure to the grid
-        for (const [treasureName, treasureData] of Object.entries(treasureInventory)) {
+        for (const [treasureName, treasureData] of Object.entries(processedTreasures)) {
             const treasureCard = document.createElement('div');
             treasureCard.style.backgroundColor = 'rgba(50, 70, 110, 0.7)';
             treasureCard.style.borderRadius = '5px';
@@ -823,11 +848,16 @@ class InventoryUI {
             treasureCard.style.alignItems = 'center';
             treasureCard.style.border = `1px solid rgba(200, 170, 100, 0.8)`;
 
+            // Ensure color is defined with a default
+            const treasureColor = treasureData.color !== undefined ?
+                `#${treasureData.color.toString(16).padStart(6, '0')}` :
+                '#FFD700';  // Default gold color
+
             // Treasure icon
             const treasureIcon = document.createElement('div');
             treasureIcon.style.width = '60px';
             treasureIcon.style.height = '60px';
-            treasureIcon.style.backgroundColor = `#${treasureData.color.toString(16).padStart(6, '0')}`;
+            treasureIcon.style.backgroundColor = treasureColor;
             treasureIcon.style.borderRadius = '50%';
             treasureIcon.style.marginBottom = '10px';
             treasureIcon.style.boxShadow = '0 0 10px rgba(255, 255, 200, 0.5)';
@@ -842,20 +872,20 @@ class InventoryUI {
             nameElement.style.color = 'rgba(255, 220, 150, 1)';
             treasureCard.appendChild(nameElement);
 
-            // Treasure count
+            // Treasure count with safe default
             const countElement = document.createElement('div');
-            countElement.textContent = `Count: ${treasureData.count}`;
+            countElement.textContent = `Count: ${treasureData.count || 1}`;
             countElement.style.fontSize = '12px';
             countElement.style.marginBottom = '5px';
             treasureCard.appendChild(countElement);
 
-            // Treasure value
+            // Treasure value with safe default
             const valueElement = document.createElement('div');
-            valueElement.textContent = `Value: ${treasureData.value}`;
+            valueElement.textContent = `Value: ${treasureData.value || 5}`;
             valueElement.style.fontSize = '12px';
             treasureCard.appendChild(valueElement);
 
-            // Treasure description
+            // Treasure description (if available)
             if (treasureData.description) {
                 const descElement = document.createElement('div');
                 descElement.textContent = treasureData.description;

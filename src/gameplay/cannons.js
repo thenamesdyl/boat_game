@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { scene, getTime } from '../core/gameState.js';
 import { gameUI } from '../ui/ui.js';
-import { onMonsterKilled } from '../core/network.js';
+import { onMonsterKilled, addToInventory } from '../core/network.js';
 import { createTreasureDrop } from '../entities/seaMonsters.js';
 
 // Cannon system configuration
@@ -329,6 +329,22 @@ function hitMonster(monster) {
     if (monster.health <= 0) {
         // Create treasure drop before monster disappears
         createTreasureDrop(monster);
+
+        // Add treasure to player's inventory
+        const treasureType = monster.type || 'common'; // Use monster type if available
+        const treasureValue = monster.value || 5; // Default value if not specified
+        const treasureColor = monster.color || 0xFFD700; // Default gold color
+
+        // Add to player's inventory using the network system
+        addToInventory({
+            item_type: 'treasure',
+            item_name: `${treasureType.charAt(0).toUpperCase() + treasureType.slice(1)} Treasure`,
+            item_data: {
+                value: treasureValue,
+                color: treasureColor,
+                description: `Treasure from defeated ${treasureType} sea monster`
+            }
+        });
 
         // Monster is defeated, make it dive and eventually remove it
         monster.state = 'dying';
