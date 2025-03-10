@@ -99,9 +99,9 @@ export function generateMixedChunk(chunkX, chunkZ, scene, options = {}) {
 
         // Create either a rocky or regular island
         if (isRockyIsland) {
-            createRockyIsland(islandX, islandZ, islandSeed, scene);
+            //createRockyIsland(islandX, islandZ, islandSeed, scene);
         } else {
-            createIsland(islandX, islandZ, islandSeed, scene);
+            //createIsland(islandX, islandZ, islandSeed, scene);
         }
 
         // Remember this position to prevent overlap

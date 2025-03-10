@@ -11,6 +11,7 @@ import {
 import { removeShore, setShoreVisibility } from '../world/shores.js';
 import BiomeInterface from './BiomeInterface.js';
 import { boat as playerObject } from '../core/gameState.js';
+import { createIceberg } from '../world/iceberg.js';
 
 // Configuration for the open biome
 const OPEN_BIOME_CONFIG = {
@@ -44,6 +45,9 @@ const OPEN_BIOME_CONFIG = {
 class OpenBiome extends BiomeInterface {
     constructor(config = OPEN_BIOME_CONFIG) {
         super(config);
+
+        // Add icebergs to tracked entities
+        this.spawnedEntities.icebergs = [];
     }
 
     /**
@@ -99,6 +103,55 @@ class OpenBiome extends BiomeInterface {
 
         const spawnedInThisChunk = [];
 
+        // TEST ICEBERG SPAWN - Create multiple icebergs with different sizes
+        if (chunkX === 0 && chunkZ === 0) {
+            console.log("Spawning test icebergs in chunk 0,0");
+
+            // Create a random function based on seed for consistency
+            const random = () => {
+                seed = (seed * 9301 + 49297) % 233280;
+                return seed / 233280;
+            };
+
+            // Array of sizes for our test icebergs
+            const icebergSizes = [
+                { scale: 0.5, distance: 100, angle: 0 },          // Small iceberg
+                { scale: 1.0, distance: 180, angle: Math.PI / 3 },  // Medium iceberg
+                { scale: 1.5, distance: 260, angle: Math.PI / 1.5 }, // Large iceberg
+                { scale: 3.0, distance: 350, angle: Math.PI },    // Huge iceberg
+                { scale: 5.0, distance: 500, angle: Math.PI * 1.5 } // Massive iceberg
+            ];
+
+            // Spawn each test iceberg
+            icebergSizes.forEach(config => {
+                // Position each iceberg in a circle around a central point
+                const icebergX = worldX + chunkSize * 0.5 + Math.cos(config.angle) * config.distance;
+                const icebergZ = worldZ + chunkSize * 0.5 + Math.sin(config.angle) * config.distance;
+
+                console.log(`Spawning iceberg with scale ${config.scale} at position ${icebergX}, ${icebergZ}`);
+
+                const iceberg = createIceberg({
+                    position: new THREE.Vector3(icebergX, 0, icebergZ),
+                    random: random,
+                    scale: config.scale,
+                    parent: scene
+                });
+
+                if (iceberg) {
+                    // Track the iceberg in our biome system
+                    this.spawnedEntities.icebergs.push(iceberg);
+                    spawnedInThisChunk.push({
+                        type: 'iceberg',
+                        entity: iceberg,
+                        position: new THREE.Vector3(icebergX, 0, icebergZ)
+                    });
+
+                    console.log(`Test iceberg scale ${config.scale} spawned successfully at ${icebergX}, ${icebergZ}`);
+                }
+            });
+        }
+
+        // Original island spawning code
         // Grid-based approach to island placement
         const gridCells = 4; // Divide chunk into a 4x4 grid
         const cellSize = chunkSize / gridCells;
@@ -268,6 +321,14 @@ class OpenBiome extends BiomeInterface {
             this.spawnedEntities[key] = [];
         }
 
+        // Clear icebergs
+        this.spawnedEntities.icebergs.forEach(iceberg => {
+            if (iceberg.mesh && iceberg.mesh.parent) {
+                iceberg.mesh.parent.remove(iceberg.mesh);
+            }
+        });
+        this.spawnedEntities.icebergs = [];
+
         // Clear processed chunks set
         this.processedChunks.clear();
     }
@@ -349,8 +410,27 @@ class OpenBiome extends BiomeInterface {
             }
         }
 
-        // Update the visibility of other entity types
-        // (For future implementation - birds, fish, structures, etc.)
+        // Handle iceberg visibility as well
+        for (let i = 0; i < this.spawnedEntities.icebergs.length; i++) {
+            const iceberg = this.spawnedEntities.icebergs[i];
+
+            // Calculate distance to player
+            const distance = playerPosition.distanceTo(iceberg.collider.center);
+
+            // Get the chunk this iceberg belongs to
+            const icebergChunkX = Math.floor(iceberg.collider.center.x / chunkSize);
+            const icebergChunkZ = Math.floor(iceberg.collider.center.z / chunkSize);
+            const icebergChunkKey = `${icebergChunkX},${icebergChunkZ}`;
+
+            // Check if chunk is within view distance
+            const isChunkVisible = Math.abs(icebergChunkX - currentChunkX) <= maxViewDistance &&
+                Math.abs(icebergChunkZ - currentChunkZ) <= maxViewDistance;
+
+            // Update visibility
+            if (iceberg.mesh) {
+                iceberg.mesh.visible = distance <= visibleDistance && isChunkVisible;
+            }
+        }
 
         // Update any particle effects or other visual elements
 

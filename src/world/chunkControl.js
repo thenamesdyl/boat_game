@@ -200,6 +200,8 @@ export function updateChunkSystem(deltaTime) {
  * This now only handles base terrain/water chunks, not entities
  */
 export function updateVisibleChunks(lastChunkUpdatePosition) {
+    console.log("Updating visible chunks");
+
     // Get current chunk coordinates based on boat position
     const currentChunk = getChunkCoords(boat.position.x, boat.position.z);
 
