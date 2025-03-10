@@ -76,6 +76,17 @@ class BiomeInterface {
     }
 
     /**
+     * Update visibility of biome entities based on player position
+     * @param {Object} playerObject - The player object (typically boat)
+     * @param {THREE.Scene} scene - The scene containing entities
+     * @param {Object} waterShader - Water shader for visual effects
+     * @param {THREE.Vector3} lastUpdatePosition - Position during last visibility update
+     */
+    updateEntityVisibility(lastUpdatePosition) {
+        throw new Error("updateEntityVisibility() must be implemented by biome classes");
+    }
+
+    /**
      * Cleanup entities that are too far from the player
      * @param {THREE.Vector3} centerPosition - Current player position
      * @param {number} cleanupRadius - Radius beyond which to remove entities

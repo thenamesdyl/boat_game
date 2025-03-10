@@ -28,7 +28,6 @@ let biomeSeed = 12345;
  */
 function initializeBiomeSystem() {
     console.log("Initializing biome system...");
-    biomeSeed = seed;
     clearBiomeCache();
 }
 

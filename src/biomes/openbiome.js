@@ -6,9 +6,11 @@ import {
     spawnBlockCaveFromIsland,
     checkAllIslandCollisions,
     updateAllIslandEffects,
-    removeShore
+    areShoreEffectsEnabled
 } from '../world/islands.js';
+import { removeShore, setShoreVisibility } from '../world/shores.js';
 import BiomeInterface from './BiomeInterface.js';
+import { boat as playerObject } from '../core/gameState.js';
 
 // Configuration for the open biome
 const OPEN_BIOME_CONFIG = {
@@ -268,6 +270,92 @@ class OpenBiome extends BiomeInterface {
 
         // Clear processed chunks set
         this.processedChunks.clear();
+    }
+
+    /**
+     * Update visibility of islands and other entities based on player position
+     * @param {Object} playerObject - The player object (typically boat)
+     * @param {THREE.Scene} scene - The scene containing entities
+     * @param {Object} waterShader - Water shader for visual effects
+     * @param {THREE.Vector3} lastUpdatePosition - Position during last visibility update
+     */
+    updateEntityVisibility(lastUpdatePosition) {
+        // Get player position for distance calculations
+        const playerPosition = playerObject.position;
+
+        // Get current chunk coordinates based on player position
+        const chunkSize = 1000; // Make sure this matches your system
+        const currentChunkX = Math.floor(playerPosition.x / chunkSize);
+        const currentChunkZ = Math.floor(playerPosition.z / chunkSize);
+
+        // Set visibility distance (should match chunking system)
+        const visibleDistance = 2000;
+        const maxViewDistance = 2; // Chunks away to keep visible
+
+        // Track which chunks should be visible
+        const chunksToKeep = new Set();
+
+        // Generate a set of chunks that should be visible
+        for (let xOffset = -maxViewDistance; xOffset <= maxViewDistance; xOffset++) {
+            for (let zOffset = -maxViewDistance; zOffset <= maxViewDistance; zOffset++) {
+                const chunkX = currentChunkX + xOffset;
+                const chunkZ = currentChunkZ + zOffset;
+                const chunkKey = `${chunkX},${chunkZ}`;
+
+                // Add to set of chunks to keep
+                chunksToKeep.add(chunkKey);
+            }
+        }
+
+        // Islands to remove (too far or in invisible chunks)
+        const islandsToRemove = [];
+
+        // Check each island for visibility
+        for (let i = 0; i < this.spawnedEntities.islands.length; i++) {
+            const island = this.spawnedEntities.islands[i];
+
+            // Calculate distance to player
+            const distance = playerPosition.distanceTo(island.collider.center);
+
+            // Get the chunk this island belongs to
+            const islandChunkX = Math.floor(island.collider.center.x / chunkSize);
+            const islandChunkZ = Math.floor(island.collider.center.z / chunkSize);
+            const islandChunkKey = `${islandChunkX},${islandChunkZ}`;
+
+            // If the island is too far or its chunk is not in the keep set, mark for removal
+            if (distance > visibleDistance || !chunksToKeep.has(islandChunkKey)) {
+                islandsToRemove.push(i);
+
+                // Hide the island while keeping it in our entities array
+                // (we handle actual removal in cleanupDistantEntities)
+                if (island.mesh) {
+                    island.mesh.visible = false;
+                }
+
+                // Hide shore effects if they exist
+                if (areShoreEffectsEnabled() && island.shore) {
+                    setShoreVisibility(island.id, false);
+                }
+            } else {
+                // Make sure the island is visible
+                if (island.mesh) {
+                    island.mesh.visible = true;
+                }
+
+                // Show shore effects if they exist
+                if (areShoreEffectsEnabled() && island.shore) {
+                    setShoreVisibility(island.id, true);
+                }
+            }
+        }
+
+        // Update the visibility of other entity types
+        // (For future implementation - birds, fish, structures, etc.)
+
+        // Update any particle effects or other visual elements
+
+        // Copy the last update position to track when we've moved significantly
+        lastUpdatePosition.copy(playerPosition);
     }
 }
 

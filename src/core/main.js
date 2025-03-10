@@ -38,7 +38,7 @@ import {
     spawnCoastalCliffScene,
     spawnMassiveIsland,
 } from '../world/islands.js';
-import { updateAllIslandVisibility } from '../world/chunkControl.js';
+import { updateAllIslandVisibility, initializeChunkSystem, updateChunkSystem } from '../world/chunkControl.js';
 import { createTestRockyIsland, createTestRockyIslandCluster } from '../world/testRockyIslands.js';
 import { showMessageOfDay, shouldShowMessageOfDay, forceShowMessageOfDay } from '../ui/motd.js';
 import { startScreenSequence, resetScreenSequence } from '../ui/messages.js';
@@ -49,7 +49,6 @@ import { setupFog, updateFog, toggleFog, setFogColor } from '../environment/fog.
 import { getTimeOfDay } from '../environment/skybox.js';
 import { initCollisionResponse, updateCollisionResponse, isBoatAirborne } from '../controls/islandCollisionResponse.js';
 import { getPlayerInventory, playerHasItem } from './network.js';
-import { initializeBiomes } from '../biomes/biomeRegistry.js';
 
 // Define these variables at the file level scope (outside any functions)
 // so they're accessible throughout the file
@@ -75,8 +74,8 @@ const fogColorKeyframes = [
 console.log("Initializing water in main.js");
 const water = setupWater('cartoony');
 
-// Initialize biomes
-const biomes = initializeBiomes();
+// Initialize biome
+initializeChunkSystem();
 
 /*
 const cubeTextureLoader = new THREE.CubeTextureLoader();
@@ -630,9 +629,7 @@ document.eventListeners.keyup = keyupHandler;
 document.addEventListener('keydown', keydownHandler);
 document.addEventListener('keyup', keyupHandler);
 
-// Animation
-let lastChunkUpdatePosition = new THREE.Vector3();
-const chunkUpdateThreshold = 50; // Reduced from 100 to update chunks more frequently
+// Animatio
 
 
 let lastLeaderboardUpdate = 0;
@@ -752,13 +749,14 @@ function animate() {
             boat.position.y = currentY; // Restore Y position
         }
 
+        /*
         if (boat.position.distanceTo(lastChunkUpdatePosition) > chunkUpdateThreshold) {
             updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition);
             // Add this line to update villagers whenever chunks update
             if (activeIslands && activeIslands.size > 0) {
                 //updateVillagers(activeIslands);
             }
-        }
+        }*/
     }
 
     // Sample water height under the boat
@@ -829,6 +827,10 @@ function animate() {
     // Update cannons
     updateCannons(deltaTime);
 
+
+    // Update chunks
+    updateChunkSystem(deltaTime);
+
     // Update sail animation
     animateSail(deltaTime);
 
@@ -848,7 +850,7 @@ function animate() {
     updateDiagnosticsDisplay(currentFps);
 
     // Update island visibility using the new islandManager
-    updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition);
+    //updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition);
 
     // Use consolidated island colliders for collision detection
     const allIslandColliders = getAllIslandColliders();
@@ -941,8 +943,8 @@ function updateGameUI() {
 }
 
 // Initialize by generating the starting chunks
-lastChunkUpdatePosition.copy(boat.position);
-updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition);
+//lastChunkUpdatePosition.copy(boat.position);
+//updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition);
 
 // Force an initial update to ensure islands are generated
 setTimeout(() => {
