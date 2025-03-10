@@ -52,7 +52,7 @@ export function startSnow(playerPosition, intensity = {}) {
     if (intensity.windStrength) SNOW_CONFIG.WIND_STRENGTH = intensity.windStrength;
 
     // Initialize with some particles
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 20; i++) {
         createSnowParticle(playerPosition);
     }
 }

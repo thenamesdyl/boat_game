@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import BiomeInterface from './BiomeInterface.js';
 import { boat as playerObject, scene } from '../core/gameState.js';
 import { createIceberg, checkIcebergCollision } from '../world/iceberg.js';
+import { createSnowIsland } from '../world/snowIsland.js';
 import { initSnow, clearAllSnow } from '../weather/snow.js';
 import {
     createIsland,
@@ -22,6 +23,8 @@ const ARCTIC_BIOME_CONFIG = {
         islandDensity: 0.3,
         // High iceberg density
         icebergDensity: 2.0,
+        // Snow island density - add this new property
+        snowIslandDensity: 0.5,
         // Icebergs spawn parameters
         icebergMinDistance: 200,
         icebergMaxDistance: 600,
@@ -53,6 +56,9 @@ class ArcticBiome extends BiomeInterface {
 
         // Add icebergs to tracked entities
         this.spawnedEntities.icebergs = [];
+
+        // Add snow islands to tracked entities
+        this.spawnedEntities.snowIslands = [];
 
         // Initialize snow system
         this.snowSystem = initSnow();
@@ -101,6 +107,17 @@ class ArcticBiome extends BiomeInterface {
     }
 
     /**
+     * Determines if a snow island should spawn at given coordinates
+     * @param {number} x - X coordinate in world space
+     * @param {number} z - Z coordinate in world space
+     * @param {number} seed - World seed for consistent generation
+     * @returns {boolean} Whether a snow island should spawn
+     */
+    shouldSpawnSnowIsland(x, z, seed) {
+        return this.shouldSpawnFeature(x, z, seed, 'snowIsland', 1.0);
+    }
+
+    /**
      * Process a chunk in the arctic biome, spawning icebergs and islands as needed
      * @param {number} chunkX - Chunk X coordinate
      * @param {number} chunkZ - Chunk Z coordinate
@@ -133,6 +150,13 @@ class ArcticBiome extends BiomeInterface {
             return seed / 233280;
         };
 
+        // Decide if this chunk gets any snow islands (maybe 50% chance)
+        let spawnSnowIslands = random() < 1.0;
+
+        // If yes, decide how many (1 or 2)
+        let snowIslandsToSpawn = spawnSnowIslands ? (random() < 0.7 ? 1 : 2) : 0;
+        let snowIslandsSpawned = 0;
+
         // Grid-based approach to entity placement
         const gridCells = 4; // Divide chunk into a 4x4 grid
         const cellSize = chunkSize / gridCells;
@@ -151,7 +175,36 @@ class ArcticBiome extends BiomeInterface {
                 const finalZ = posZ + jitterZ;
                 const position = new THREE.Vector3(finalX, 0, finalZ);
 
-                // First try to spawn an iceberg
+                // Replace your existing snow island check with:
+                if (snowIslandsToSpawn > snowIslandsSpawned) {
+                    // Randomize which cells get a snow island (1 in 4 chance per cell)
+                    if (random() < 0.25) {
+                        // Make sure we don't spawn too close to other entities
+                        if (!this.checkEntityCollisions(position, 500)) {
+                            console.log("Spawning snow island at", finalX, finalZ);
+
+                            // Create the snow island
+                            const snowIsland = createSnowIsland(finalX, finalZ, seed * (finalX * finalZ), scene);
+
+                            if (snowIsland) {
+                                this.spawnedEntities.snowIslands.push(snowIsland);
+                                spawnedInThisChunk.push({
+                                    type: 'snowIsland',
+                                    entity: snowIsland,
+                                    position: position
+                                });
+
+                                // Increment the count of spawned islands
+                                snowIslandsSpawned++;
+
+                                // Skip other entity checks for this cell
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                // If we didn't spawn a snow island, try an iceberg
                 if (this.shouldSpawnIceberg(finalX, finalZ, seed)) {
                     // Make sure we don't spawn too close to other entities
                     if (!this.checkEntityCollisions(position, this.properties.icebergMinDistance)) {
@@ -213,6 +266,14 @@ class ArcticBiome extends BiomeInterface {
         // Check iceberg collisions
         for (const iceberg of this.spawnedEntities.icebergs) {
             const distance = position.distanceTo(iceberg.collider.center);
+            if (distance < minDistance) {
+                return true;
+            }
+        }
+
+        // Check snow island collisions
+        for (const snowIsland of this.spawnedEntities.snowIslands) {
+            const distance = position.distanceTo(snowIsland.collider.center);
             if (distance < minDistance) {
                 return true;
             }
@@ -360,8 +421,28 @@ class ArcticBiome extends BiomeInterface {
             }
         }
 
-        // Update the arrays with only kept entities
+        // Update the array with only kept icebergs
         this.spawnedEntities.icebergs = keepIcebergs;
+
+        // Also clean up snow islands
+        const keepSnowIslands = [];
+
+        for (let i = 0; i < this.spawnedEntities.snowIslands.length; i++) {
+            const snowIsland = this.spawnedEntities.snowIslands[i];
+            const distance = centerPosition.distanceTo(snowIsland.collider.center);
+
+            if (distance > cleanupRadius) {
+                // Remove from scene
+                if (snowIsland.mesh && snowIsland.mesh.parent) {
+                    snowIsland.mesh.parent.remove(snowIsland.mesh);
+                }
+            } else {
+                keepSnowIslands.push(snowIsland);
+            }
+        }
+
+        // Update the array with only kept snow islands
+        this.spawnedEntities.snowIslands = keepSnowIslands;
 
         // Clean up islands using same logic as in OpenBiome
         const keepIslands = [];
@@ -402,6 +483,14 @@ class ArcticBiome extends BiomeInterface {
         });
         this.spawnedEntities.icebergs = [];
 
+        // Clear snow islands
+        this.spawnedEntities.snowIslands.forEach(snowIsland => {
+            if (snowIsland.mesh && snowIsland.mesh.parent) {
+                snowIsland.mesh.parent.remove(snowIsland.mesh);
+            }
+        });
+        this.spawnedEntities.snowIslands = [];
+
         // Clear islands
         this.spawnedEntities.islands.forEach(island => {
             if (island.mesh && island.mesh.parent) {
@@ -421,7 +510,7 @@ class ArcticBiome extends BiomeInterface {
 
         // Reset all other entity arrays
         for (const key in this.spawnedEntities) {
-            if (!['icebergs', 'islands'].includes(key)) {
+            if (!['icebergs', 'islands', 'snowIslands'].includes(key)) {
                 this.spawnedEntities[key] = [];
             }
         }

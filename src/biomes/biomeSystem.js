@@ -213,7 +213,7 @@ function updateAllBiomes(deltaTime, playerPosition) {
         //console.log("is in updateAllBiomes", biome.name);
 
         if (isPlayerInBiome(biome).name === biome.name) {
-            console.log("is in updateAllBiomes", biome.name);
+            //console.log("is in updateAllBiomes", biome.name);
             biome.update(deltaTime, playerPosition);
         }
     });
@@ -232,7 +232,7 @@ function isPlayerInBiome(biome) {
     // print the chunk map only once
     const currentTime = Date.now();
     if (currentTime - lastChunkMapPrintTime > CHUNK_MAP_PRINT_INTERVAL) {
-        console.log("chunk map", chunkBiomes);
+        //console.log("chunk map", chunkBiomes);
     }
     return getBiomeForChunk(playerChunkX, playerChunkZ);
 }
