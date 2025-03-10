@@ -14,8 +14,8 @@ class BiomeInterface {
      * @param {Object} config - Configuration for this biome
      */
     constructor(config) {
-        this.id = config.id;
-        this.name = config.name;
+        this._id = config.id;
+        this._name = config.name;
         this.properties = config.properties || {};
         this.isDefault = config.isDefault || false;
         this.weight = config.weight || 1;
@@ -31,6 +31,22 @@ class BiomeInterface {
 
         // Track processed chunks
         this.processedChunks = new Set();
+    }
+
+    /**
+     * Get the ID of this biome
+     * @returns {string} The biome ID
+     */
+    get id() {
+        return this._id;
+    }
+
+    /**
+     * Get the name of this biome
+     * @returns {string} The biome name
+     */
+    get name() {
+        return this._name;
     }
 
     /**

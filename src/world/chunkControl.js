@@ -26,6 +26,7 @@ import {
     getAllBiomes
 } from '../biomes/biomeSystem.js';
 import openBiome from '../biomes/openbiome.js';
+import arcticBiome from '../biomes/arcticbiome.js';
 import { boat, scene } from '../core/gameState.js';
 
 
@@ -56,8 +57,9 @@ export function initializeChunkSystem() {
     // Initialize the biome system with our seed
     initializeBiomeSystem(WORLD_SEED);
 
-    // Register all biomes (currently just open water)
+    // Register all biomes
     registerBiome(openBiome);
+    registerBiome(arcticBiome);
 
     console.log("Chunk system initialized with biomes!");
 }

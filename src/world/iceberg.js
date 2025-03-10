@@ -32,8 +32,17 @@ export function createIceberg(options) {
         parent.add(iceberg);
     }
 
-    // Determine iceberg type - different shapes
-    const icebergType = Math.floor(random() * 3); // 0-2 different types
+    // Determine iceberg type - Now heavily favor jagged spiky types
+    // 70% chance of jagged, 20% chance of tabular, 10% chance of rounded
+    const typeRoll = random();
+    let icebergType;
+    if (typeRoll < 0.7) {
+        icebergType = 0; // Jagged (most common for dramatic effect)
+    } else if (typeRoll < 0.9) {
+        icebergType = 1; // Tabular
+    } else {
+        icebergType = 2; // Rounded (least common)
+    }
 
     // Create iceberg geometry based on type
     let mainGeometry;
@@ -138,31 +147,74 @@ export function createIceberg(options) {
  * @returns {THREE.BufferGeometry} The generated geometry
  */
 function createJaggedIceberg(random) {
-    // Create a base cone shape
+    // Create a taller, narrower cone shape for more dramatic peaks
     const baseGeometry = new THREE.ConeGeometry(
-        15, // radius
-        35, // height
-        6, // radial segments - fewer for more angular look
-        4, // height segments
+        12, // Reduced radius for narrower base
+        50, // Increased height for taller spikes
+        6,  // Fewer radial segments for more angular look
+        6,  // More height segments for better spike definition
         false // open ended
     );
 
-    // Distort vertices for jagged appearance
+    // Distort vertices for more pronounced extreme spiky appearance
     const positionAttribute = baseGeometry.getAttribute('position');
     const vertex = new THREE.Vector3();
 
     for (let i = 0; i < positionAttribute.count; i++) {
         vertex.fromBufferAttribute(positionAttribute, i);
 
-        // Only modify vertices above water level (y > 0)
+        // Add extreme distortion for very spiky shapes
         if (vertex.y > 0) {
-            // Add random displacement to x and z
-            vertex.x += (random() - 0.5) * 6;
-            vertex.z += (random() - 0.5) * 6;
+            // Calculate distortion factor - much stronger at the top
+            const heightPercent = vertex.y / 50;
+            const topFactor = Math.pow(heightPercent, 2) * 3; // Exponential for more top-heavy effect
 
-            // Add smaller displacement to height for varied peaks
-            if (vertex.y > 20) {
-                vertex.y += (random() - 0.3) * 10;
+            // Create sharp angular displacement
+            if (random() > 0.3) {
+                // More dramatic x/z displacement for sharper angles
+                vertex.x += (random() - 0.5) * 10 * topFactor;
+                vertex.z += (random() - 0.5) * 10 * topFactor;
+            } else {
+                // Create very sharp angles by making some vertices extend outward
+                const angle = Math.floor(random() * 6) * (Math.PI / 3);
+                const distance = 5 + random() * 10 * topFactor;
+                vertex.x += Math.cos(angle) * distance;
+                vertex.z += Math.sin(angle) * distance;
+            }
+
+            // Create dramatic height variations - especially tall spikes
+            if (vertex.y > 25) {
+                if (random() > 0.5) {
+                    // Create extremely tall spikes at random points
+                    vertex.y += random() * 25 * Math.pow(heightPercent, 1.5);
+
+                    // Make spikes narrower
+                    vertex.x *= 0.8;
+                    vertex.z *= 0.8;
+                } else if (random() > 0.7) {
+                    // Create some dips to enhance the spiky look
+                    vertex.y -= random() * 10;
+                }
+            }
+        }
+
+        positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+    }
+
+    // Add a second pass to create some extreme spikes
+    for (let i = 0; i < positionAttribute.count; i++) {
+        vertex.fromBufferAttribute(positionAttribute, i);
+
+        // Only affect vertices near the top
+        if (vertex.y > 40) {
+            // 15% chance of creating an extreme spike
+            if (random() > 0.85) {
+                // Dramatic vertical spike
+                vertex.y += 15 + random() * 20;
+
+                // Make the spike thinner
+                vertex.x *= 0.6;
+                vertex.z *= 0.6;
             }
         }
 
@@ -183,27 +235,42 @@ function createTabularIceberg(random) {
     // Create a cylinder with a flat top
     const baseGeometry = new THREE.CylinderGeometry(
         14, // top radius
-        16, // bottom radius
+        18, // bottom radius (increased from 16 for more dramatic shape)
         25, // height
-        8, // radial segments
-        3, // height segments
+        10, // radial segments (increased from 8 for more detail)
+        4, // height segments (increased from 3 for more detail)
         false // open ended
     );
 
-    // Distort sides but keep top flat
+    // Distort sides but keep top mostly flat with some edge features
     const positionAttribute = baseGeometry.getAttribute('position');
     const vertex = new THREE.Vector3();
 
     for (let i = 0; i < positionAttribute.count; i++) {
         vertex.fromBufferAttribute(positionAttribute, i);
 
-        // Don't modify top vertices (y near max height)
-        if (vertex.y < 12 && vertex.y > -10) {
-            // Add random displacement to sides
+        // Make the sides more irregular and angular
+        if (vertex.y < 12) {
+            // For sides, create more pronounced angular features
             const distance = Math.sqrt(vertex.x * vertex.x + vertex.z * vertex.z);
             if (distance > 5) {
-                vertex.x += (random() - 0.5) * 4;
-                vertex.z += (random() - 0.5) * 4;
+                // Stronger distortion
+                vertex.x += (random() - 0.5) * 6;
+                vertex.z += (random() - 0.5) * 6;
+
+                // Occasionally add sharp protrusions on the sides
+                if (random() > 0.85 && vertex.y > 0) {
+                    vertex.x *= 1.1;
+                    vertex.z *= 1.1;
+                }
+            }
+        }
+
+        // Add some slight variation to the top edge to make it less perfectly flat
+        if (vertex.y > 12 && Math.sqrt(vertex.x * vertex.x + vertex.z * vertex.z) > 10) {
+            // Only modify the outer edge of the top
+            if (random() > 0.5) {
+                vertex.y += (random() - 0.5) * 3;
             }
         }
 
@@ -216,7 +283,7 @@ function createTabularIceberg(random) {
 }
 
 /**
- * Creates a rounded dome iceberg
+ * Creates a rounded dome iceberg with some angular features
  * @param {Function} random - Random function with seed
  * @returns {THREE.BufferGeometry} The generated geometry
  */
@@ -232,17 +299,27 @@ function createRoundedIceberg(random) {
         Math.PI / 2 // theta length - half sphere
     );
 
-    // Add some subtle random variation
+    // Add angular variation to make it less dome-like
     const positionAttribute = baseGeometry.getAttribute('position');
     const vertex = new THREE.Vector3();
 
     for (let i = 0; i < positionAttribute.count; i++) {
         vertex.fromBufferAttribute(positionAttribute, i);
 
-        // Add small random displacement
-        vertex.x += (random() - 0.5) * 2;
-        vertex.y += (random() - 0.5) * 2;
-        vertex.z += (random() - 0.5) * 2;
+        // Height-based distortion (more at top)
+        const heightFactor = Math.max(0, vertex.y / 15);
+
+        // Add more significant angular displacement
+        vertex.x += (random() - 0.5) * 4 * heightFactor;
+        vertex.z += (random() - 0.5) * 4 * heightFactor;
+
+        // Add some spiky features at random points
+        if (random() > 0.85 && vertex.y > 8) {
+            // Create occasional spikes
+            vertex.y += random() * 5;
+            vertex.x *= 0.9; // Narrow these points slightly
+            vertex.z *= 0.9;
+        }
 
         positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
     }

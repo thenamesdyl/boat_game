@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { WORLD_SEED, chunkSize, CLEANUP_RADIUS } from '../world/chunkControl.js';
+import { boat } from '../core/gameState.js';
+import { chunkSize } from '../world/chunkControl.js';
 
 
 /**
@@ -21,6 +22,10 @@ let defaultBiome = null;
 
 // Seed for biome distribution
 let biomeSeed = 12345;
+
+// Add these variables at the top of your file with other variables
+let lastChunkMapPrintTime = 0;
+const CHUNK_MAP_PRINT_INTERVAL = 5000; // 5 seconds in milliseconds
 
 /**
  * Initialize the biome system with the given seed
@@ -151,35 +156,43 @@ function getBiomePropertiesForChunk(chunkX, chunkZ) {
  */
 function processChunk(chunkX, chunkZ, scene, seed) {
     const biome = getBiomeForChunk(chunkX, chunkZ);
-    if (!biome) return [];
+    console.log("is in processChunk", chunkX, chunkZ, biome.name);
 
-    const chunkSize = 1000; // Standard chunk size
+    if (!biome && !(isPlayerInBiome(biome) === biome.name)) return [];
+
+
+    //console.log("is in processChunk", chunkX, chunkZ, biome.name);
+
     return biome.processChunk(chunkX, chunkZ, chunkSize, scene, seed);
 }
 
 /**
  * Spawn biome features around a position
- * @param {THREE.Vector3} centerPosition - Position to spawn around
  * @param {THREE.Scene} scene - Scene to add entities to
  * @param {number} seed - World seed
  * @param {number} radius - Radius in chunks
  * @returns {Array} Array of spawned entities
  */
-function spawnAroundPosition(centerPosition, scene, seed, radius = 2) {
-    const chunkSize = 1000;
-    const centerChunkX = Math.floor(centerPosition.x / chunkSize);
-    const centerChunkZ = Math.floor(centerPosition.z / chunkSize);
-
+function spawnAroundPosition(scene, seed, radius = 2) {
     let allSpawned = [];
 
-    // Process chunks in radius
-    for (let dx = -radius; dx <= radius; dx++) {
-        for (let dz = -radius; dz <= radius; dz++) {
-            const chunkX = centerChunkX + dx;
-            const chunkZ = centerChunkZ + dz;
+    // get chunk based on where the boat is
+    const biome = getBiomeForChunk(boat.position.x, boat.position.z);
 
-            const spawned = processChunk(chunkX, chunkZ, scene, seed);
-            allSpawned = allSpawned.concat(spawned);
+
+    if (isPlayerInBiome(biome).name === biome.name) {
+        const centerChunkX = Math.floor(centerPosition.x / chunkSize);
+        const centerChunkZ = Math.floor(centerPosition.z / chunkSize);
+
+        // Process chunks in radius
+        for (let dx = -radius; dx <= radius; dx++) {
+            for (let dz = -radius; dz <= radius; dz++) {
+                const chunkX = centerChunkX + dx;
+                const chunkZ = centerChunkZ + dz;
+
+                const spawned = processChunk(chunkX, chunkZ, scene, seed);
+                allSpawned = allSpawned.concat(spawned);
+            }
         }
     }
 
@@ -192,9 +205,36 @@ function spawnAroundPosition(centerPosition, scene, seed, radius = 2) {
  * @param {THREE.Vector3} playerPosition - Current player position
  */
 function updateAllBiomes(deltaTime, playerPosition) {
+    //console.log("is in updateAllBiomes");
     biomeImplementations.forEach(biome => {
-        biome.update(deltaTime, playerPosition);
+        // if boat is in biome, update biome
+        //console.log("is in updateAllBiomes", biome.name);
+        // print what biome the player is in
+        //console.log("is in updateAllBiomes", biome.name);
+
+        if (isPlayerInBiome(biome).name === biome.name) {
+            console.log("is in updateAllBiomes", biome.name);
+            biome.update(deltaTime, playerPosition);
+        }
     });
+}
+
+function isPlayerInBiome(biome) {
+    const playerChunkX = Math.floor(boat.position.x / chunkSize);
+    const playerChunkZ = Math.floor(boat.position.z / chunkSize);
+
+    //console.log("get biome for chunk", getBiomeForChunk(playerChunkX, playerChunkZ));
+    // print playerChunkX, playerChunkZ
+    // print the chunk map
+    // print the chunk map only once
+    // print the biome map
+
+    // print the chunk map only once
+    const currentTime = Date.now();
+    if (currentTime - lastChunkMapPrintTime > CHUNK_MAP_PRINT_INTERVAL) {
+        console.log("chunk map", chunkBiomes);
+    }
+    return getBiomeForChunk(playerChunkX, playerChunkZ);
 }
 
 /**
