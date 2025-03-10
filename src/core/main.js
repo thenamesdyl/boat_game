@@ -49,6 +49,7 @@ import { setupFog, updateFog, toggleFog, setFogColor } from '../environment/fog.
 import { getTimeOfDay } from '../environment/skybox.js';
 import { initCollisionResponse, updateCollisionResponse, isBoatAirborne } from '../controls/islandCollisionResponse.js';
 import { getPlayerInventory, playerHasItem } from './network.js';
+import { initializeBiomes } from '../biomes/biomeRegistry.js';
 
 // Define these variables at the file level scope (outside any functions)
 // so they're accessible throughout the file
@@ -73,6 +74,9 @@ const fogColorKeyframes = [
 // Initialize water with explicit realistic style as default
 console.log("Initializing water in main.js");
 const water = setupWater('cartoony');
+
+// Initialize biomes
+const biomes = initializeBiomes();
 
 /*
 const cubeTextureLoader = new THREE.CubeTextureLoader();

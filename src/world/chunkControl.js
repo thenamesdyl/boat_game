@@ -16,12 +16,18 @@ import {
     removeShore,
     setShoreVisibility
 } from './shores.js';
+import { getBiomePropertiesForChunk, processChunk } from '../biomes/biomeSystem.js';
+
+
+export const WORLD_SEED = 12345;
+export const RENDER_DISTANCE = 1; // Number of chunks around player to render
+export const CLEANUP_RADIUS = CHUNK_SIZE * 4; // Distance beyond which to remove entities
 
 // Chunking system variables
-const visibleDistance = 2000; // Distance to see islands from
-const chunkSize = 600; // Size of each "chunk" of ocean
-const islandsPerChunk = 2; // Reduced from 3 to 1 island per chunk
-const maxViewDistance = 1; // Reduced from 5 to 3 chunks view distance
+export const visibleDistance = 2000; // Distance to see islands from
+export const chunkSize = 600; // Size of each "chunk" of ocean
+export const islandsPerChunk = 2; // Reduced from 3 to 1 island per chunk
+export const maxViewDistance = 1; // Reduced from 5 to 3 chunks view distance
 
 // Store generated chunks
 const generatedChunks = new Set();
@@ -89,137 +95,46 @@ function createWaterChunk(chunkX, chunkZ, scene, waterShader) {
     return water;
 }
 
-
-function updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition) {
-    // Get current chunk coordinates based on boat position
-    const currentChunk = getChunkCoords(boat.position.x, boat.position.z);
-
-    // Set to track chunks that should be visible
-    const chunksToKeep = new Set();
-    const waterChunksToKeep = new Set();
-
-    // Generate chunks in view distance
-    for (let xOffset = -maxViewDistance; xOffset <= maxViewDistance; xOffset++) {
-        for (let zOffset = -maxViewDistance; zOffset <= maxViewDistance; zOffset++) {
-            const chunkX = currentChunk.x + xOffset;
-            const chunkZ = currentChunk.z + zOffset;
-            const chunkKey = getChunkKey(chunkX, chunkZ);
-
-            // Add to set of chunks to keep
-            chunksToKeep.add(chunkKey);
-
-            // For water, we need a slightly larger view distance to avoid seeing edges
-            if (Math.abs(xOffset) <= maxViewDistance + 1 && Math.abs(zOffset) <= maxViewDistance + 1) {
-                waterChunksToKeep.add(chunkKey);
-                // Create water chunk if needed
-                createWaterChunk(chunkX, chunkZ, scene, waterShader);
-            }
-
-            // Generate this chunk if needed
-            generateChunk(chunkX, chunkZ, scene);
-        }
-    }
-
-    // Remove islands that are too far away
-    const islandsToRemove = [];
-    activeIslands.forEach((island, id) => {
-        // Calculate distance to boat
-        const distance = boat.position.distanceTo(island.collider.center);
-
-        // Get the chunk this island belongs to
-        const islandChunkX = Math.floor(island.collider.center.x / chunkSize);
-        const islandChunkZ = Math.floor(island.collider.center.z / chunkSize);
-        const islandChunkKey = getChunkKey(islandChunkX, islandChunkZ);
-
-        // If the island is too far or its chunk is not in the keep set, mark for removal
-        if (distance > visibleDistance || !chunksToKeep.has(islandChunkKey)) {
-            islandsToRemove.push(id);
-        }
-    });
-
-    // Remove islands marked for removal
-    islandsToRemove.forEach(id => {
-        const island = activeIslands.get(id);
-        if (island) {
-            scene.remove(island.mesh);
-
-            // Remove the island's shore if it exists
-            if (areShoreEffectsEnabled() && island.shore) {
-                removeShore(id, scene);
-            }
-
-            // Remove collider
-            removeIslandCollider(id);
-            activeIslands.delete(id);
-        }
-    });
-
-    // Remove water chunks that are too far
-    const waterToRemove = [];
-    activeWaterChunks.forEach((water, id) => {
-        if (!waterChunksToKeep.has(id)) {
-            waterToRemove.push(id);
-        }
-    });
-
-    waterToRemove.forEach(id => {
-        const water = activeWaterChunks.get(id);
-        if (water) {
-            scene.remove(water);
-            activeWaterChunks.delete(id);
-        }
-    });
-
-    // Update shore visibilities to match islands
-    if (areShoreEffectsEnabled()) {
-        activeIslands.forEach((island, id) => {
-            setShoreVisibility(id, island.visible);
-        });
-    }
-
-    // Update the last chunk update position
-    lastChunkUpdatePosition.copy(boat.position);
-
-    return { islandsRemoved: islandsToRemove.length, waterChunksRemoved: waterToRemove.length };
-}
-
+/**
+ * Generate a chunk at the specified coordinates
+ * @param {number} chunkX - X coordinate of the chunk
+ * @param {number} chunkZ - Z coordinate of the chunk
+ * @param {THREE.Scene} scene - The scene to add the chunk to
+ * @returns {Object} The generated chunk object
+ */
 function generateChunk(chunkX, chunkZ, scene) {
-    const chunkKey = getChunkKey(chunkX, chunkZ);
+    // Get biome properties for this chunk
+    const biomeProperties = getBiomePropertiesForChunk(chunkX, chunkZ);
 
-    // Skip if this chunk has already been generated
-    if (generatedChunks.has(chunkKey)) {
-        return;
+    // Log for debugging
+    console.log(`Generating chunk at ${chunkX},${chunkZ} with biome: ${biomeProperties.name || 'unknown'}`);
+
+    // Use biome properties to influence chunk generation
+    // For example, water color can be affected by the biome
+    const waterColor = biomeProperties.waterColor || new THREE.Color(0x0066aa);
+
+    // Create the base water chunk (this should be your existing code)
+    const chunk = createWaterChunk(chunkX, chunkZ, scene, waterShader);
+
+    // If you have custom water tinting based on biomes:
+    if (chunk.waterMesh && biomeProperties.waterColor) {
+        // Apply biome-specific water color
+        chunk.waterMesh.material.uniforms.waterColor.value = waterColor;
     }
 
-    // Add to set of generated chunks
-    generatedChunks.add(chunkKey);
+    // Store biome reference with the chunk for later use
+    chunk.biomeId = biomeProperties.id;
 
-    // Use chunk coordinates as seed for deterministic generation
-    // Use large prime numbers to avoid patterns in the generation
-    let chunkSeed = Math.abs(chunkX * 73856093 ^ chunkZ * 19349663);
+    // Generate biome-specific features in this chunk
+    processChunk(chunkX, chunkZ, scene, WORLD_SEED);
 
-    // Create a simple deterministic random function for this chunk
-    const seededRandom = () => {
-        chunkSeed = (chunkSeed * 9301 + 49297) % 233280;
-        return chunkSeed / 233280;
-    };
-
-    // Generate islands for this chunk
-    for (let i = 0; i < islandsPerChunk; i++) {
-        // Generate position within this chunk, but avoid edges to prevent islands from being too close to chunk boundaries
-        const margin = 100; // Margin from chunk edges
-        const islandX = (chunkX * chunkSize) + margin + seededRandom() * (chunkSize - 2 * margin);
-        const islandZ = (chunkZ * chunkSize) + margin + seededRandom() * (chunkSize - 2 * margin);
-
-        // Create a seed for this specific island based on its coordinates
-        const islandSeed = Math.floor(islandX * 13371 + islandZ * 92717);
-
-        // Create the island
-        createIsland(islandX, islandZ, islandSeed, scene);
-    }
+    return chunk;
 }
 
-
+/**
+ * Update visible chunks around player
+ * This function should call generateChunk for new chunks
+ */
 function updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition) {
     // Get current chunk coordinates based on boat position
     const currentChunk = getChunkCoords(boat.position.x, boat.position.z);
@@ -242,7 +157,7 @@ function updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition) 
             if (Math.abs(xOffset) <= maxViewDistance + 1 && Math.abs(zOffset) <= maxViewDistance + 1) {
                 waterChunksToKeep.add(chunkKey);
                 // Create water chunk if needed
-                createWaterChunk(chunkX, chunkZ, scene, waterShader);
+                generateChunk(chunkX, chunkZ, scene);
             }
 
             // Generate this chunk if needed
@@ -312,7 +227,6 @@ function updateVisibleChunks(boat, scene, waterShader, lastChunkUpdatePosition) 
 
     return { islandsRemoved: islandsToRemove.length, waterChunksRemoved: waterToRemove.length };
 }
-
 
 export function updateAllIslandVisibility(boat, scene, waterShader, lastChunkUpdatePosition) {
     // Update regular island chunks

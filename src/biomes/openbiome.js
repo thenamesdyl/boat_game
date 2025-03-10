@@ -1,0 +1,279 @@
+import * as THREE from 'three';
+import {
+    createIsland,
+    SPAWN_CONTROLS,
+    spawnIslands,
+    spawnBlockCaveFromIsland,
+    checkAllIslandCollisions,
+    updateAllIslandEffects,
+    removeShore
+} from '../world/islands.js';
+import BiomeInterface from './BiomeInterface.js';
+
+// Configuration for the open biome
+const OPEN_BIOME_CONFIG = {
+    id: 'open_water',
+    name: 'Open Water',
+    properties: {
+        // Higher island density compared to default
+        islandDensity: 1.4,
+        // Custom water color for this biome
+        waterColor: new THREE.Color(0x0066aa),
+        // Island spawn parameters
+        islandMinDistance: 300,
+        islandMaxDistance: 800,
+        // Random small variation in island height
+        islandHeightVariation: 0.2,
+        // Entity spawn parameters (for future implementation)
+        birdDensity: 0.8,
+        fishDensity: 1.2,
+        monsterChance: 0.03,
+    },
+    // Make this the default biome
+    isDefault: true,
+    // Higher weight means more common
+    weight: 2
+};
+
+/**
+ * Open Water biome implementation
+ * Features islands scattered across open ocean with various sea life
+ */
+class OpenBiome extends BiomeInterface {
+    constructor(config = OPEN_BIOME_CONFIG) {
+        super(config);
+    }
+
+    /**
+     * Register this biome with the biome system
+     * @returns {Object} The registered biome properties
+     */
+    register() {
+        // Simply return the biome properties for registration
+        return {
+            id: this.id,
+            name: this.name,
+            properties: this.properties,
+            isDefault: this.isDefault,
+            weight: this.weight
+        };
+    }
+
+    /**
+     * Determines if an island should spawn at given coordinates
+     * @param {number} x - X coordinate in world space
+     * @param {number} z - Z coordinate in world space
+     * @param {number} seed - World seed for consistent generation
+     * @returns {boolean} Whether an island should spawn
+     */
+    shouldSpawnIsland(x, z, seed) {
+        return this.shouldSpawnFeature(x, z, seed, 'island', 0.02);
+    }
+
+    /**
+     * Process a chunk in the open biome, spawning islands as needed
+     * @param {number} chunkX - Chunk X coordinate
+     * @param {number} chunkZ - Chunk Z coordinate
+     * @param {number} chunkSize - Size of the chunk in world units
+     * @param {THREE.Scene} scene - The scene to add entities to
+     * @param {number} seed - World seed for consistent generation
+     * @returns {Array} Array of spawned entities
+     */
+    processChunk(chunkX, chunkZ, chunkSize, scene, seed) {
+        // Create a unique key for this chunk
+        const chunkKey = `${chunkX},${chunkZ}`;
+
+        // Skip if already processed
+        if (this.processedChunks.has(chunkKey)) {
+            return [];
+        }
+
+        // Mark as processed
+        this.processedChunks.add(chunkKey);
+
+        // Calculate world coordinates for this chunk
+        const worldX = chunkX * chunkSize;
+        const worldZ = chunkZ * chunkSize;
+
+        const spawnedInThisChunk = [];
+
+        // Grid-based approach to island placement
+        const gridCells = 4; // Divide chunk into a 4x4 grid
+        const cellSize = chunkSize / gridCells;
+
+        for (let cellX = 0; cellX < gridCells; cellX++) {
+            for (let cellZ = 0; cellZ < gridCells; cellZ++) {
+                // Calculate position at center of the cell
+                const posX = worldX + (cellX + 0.5) * cellSize;
+                const posZ = worldZ + (cellZ + 0.5) * cellSize;
+
+                // Add some randomness to the position
+                const jitterX = (Math.random() - 0.5) * cellSize * 0.5;
+                const jitterZ = (Math.random() - 0.5) * cellSize * 0.5;
+
+                const finalX = posX + jitterX;
+                const finalZ = posZ + jitterZ;
+
+                // Check if we should spawn an island here
+                if (this.shouldSpawnIsland(finalX, finalZ, seed)) {
+                    // Make sure we don't spawn too close to other islands
+                    const position = new THREE.Vector3(finalX, 0, finalZ);
+
+                    // Check for collisions with a larger radius to ensure spacing
+                    if (!checkAllIslandCollisions(position, this.properties.islandMinDistance || 200)) {
+                        // Create the island
+                        const island = createIsland(finalX, finalZ, seed * (finalX * finalZ), scene);
+
+                        if (island) {
+                            this.spawnedEntities.islands.push(island);
+                            spawnedInThisChunk.push({
+                                type: 'island',
+                                entity: island,
+                                position: new THREE.Vector3(finalX, 0, finalZ)
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Occasionally spawn a cave/structure system
+        if (Math.random() < 0.02 && SPAWN_CONTROLS.blockCave) {
+            const structureX = worldX + Math.random() * chunkSize;
+            const structureZ = worldZ + Math.random() * chunkSize;
+            const position = new THREE.Vector3(structureX, 0, structureZ);
+
+            // Ensure we're not too close to other structures
+            if (!checkAllIslandCollisions(position, 500)) {
+                const cave = spawnBlockCaveFromIsland(scene, position);
+                if (cave) {
+                    this.spawnedEntities.structures.push(cave);
+                    spawnedInThisChunk.push({
+                        type: 'cave',
+                        entity: cave,
+                        position: position
+                    });
+                }
+            }
+        }
+
+        return spawnedInThisChunk;
+    }
+
+    /**
+     * Spawns islands in a set of chunks around a position
+     * @param {THREE.Vector3} centerPosition - Center position to spawn around
+     * @param {THREE.Scene} scene - The scene to add entities to
+     * @param {number} seed - World seed for consistent generation
+     * @param {number} radius - Radius in chunks to spawn around
+     * @returns {Array} Array of spawned entities
+     */
+    spawnAroundPosition(centerPosition, scene, seed, radius = 2) {
+        const chunkSize = 1000; // Size of each chunk in world units
+
+        // Calculate the central chunk coordinates
+        const centerChunkX = Math.floor(centerPosition.x / chunkSize);
+        const centerChunkZ = Math.floor(centerPosition.z / chunkSize);
+
+        let allSpawned = [];
+
+        // Process chunks in a radius around the center
+        for (let dx = -radius; dx <= radius; dx++) {
+            for (let dz = -radius; dz <= radius; dz++) {
+                const chunkX = centerChunkX + dx;
+                const chunkZ = centerChunkZ + dz;
+
+                const spawned = this.processChunk(
+                    chunkX,
+                    chunkZ,
+                    chunkSize,
+                    scene,
+                    seed
+                );
+
+                allSpawned = allSpawned.concat(spawned);
+            }
+        }
+
+        return allSpawned;
+    }
+
+    /**
+     * Handles entity cleanup when moving away from an area
+     * @param {THREE.Vector3} centerPosition - Current player position
+     * @param {number} cleanupRadius - Radius beyond which to remove entities
+     */
+    cleanupDistantEntities(centerPosition, cleanupRadius = 3000) {
+        // Check each island and remove if too far
+        const keepIslands = [];
+
+        for (let i = 0; i < this.spawnedEntities.islands.length; i++) {
+            const island = this.spawnedEntities.islands[i];
+            const distance = centerPosition.distanceTo(island.collider.center);
+
+            if (distance > cleanupRadius) {
+                // Remove from scene
+                if (island.mesh && island.mesh.parent) {
+                    island.mesh.parent.remove(island.mesh);
+                }
+
+                // Remove shore effect if exists
+                if (island.shore) {
+                    removeShore(island.shore);
+                }
+            } else {
+                keepIslands.push(island);
+            }
+        }
+
+        // Update the arrays with only kept entities
+        this.spawnedEntities.islands = keepIslands;
+
+        // Similarly handle other entity types when implemented
+    }
+
+    /**
+     * Update function to be called in the game loop
+     * @param {number} deltaTime - Time since last update
+     * @param {THREE.Vector3} playerPosition - Current player position
+     */
+    update(deltaTime, playerPosition) {
+        // Update all island effects
+        updateAllIslandEffects(deltaTime);
+
+        // Future: Update entity animations, behaviors, etc.
+    }
+
+    /**
+     * Clear all spawned entities and reset the biome
+     * @param {THREE.Scene} scene - The scene containing the entities
+     */
+    clearAll(scene) {
+        // Clear islands
+        this.spawnedEntities.islands.forEach(island => {
+            if (island.mesh && island.mesh.parent) {
+                island.mesh.parent.remove(island.mesh);
+            }
+
+            // Remove shore effect if exists
+            if (island.shore) {
+                removeShore(island.shore);
+            }
+        });
+
+        // Reset all entity arrays
+        for (const key in this.spawnedEntities) {
+            this.spawnedEntities[key] = [];
+        }
+
+        // Clear processed chunks set
+        this.processedChunks.clear();
+    }
+}
+
+// Create singleton instance
+const openBiome = new OpenBiome(OPEN_BIOME_CONFIG);
+
+// Export the instance and config
+export default openBiome;
+export { OPEN_BIOME_CONFIG }; 
